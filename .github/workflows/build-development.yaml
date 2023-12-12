@@ -1,0 +1,29 @@
+name: "Build personalized development ISO"
+on:
+  push:
+    branches:
+      - master
+    # paths-ignore:
+    #   - docs/
+jobs:
+  build-iso:
+    strategy:
+      matrix:
+        arch:
+          - "x86_64-linux"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Nix flake inputs against policy
+        uses: DeterminateSystems/flake-checker-action@v5
+      - uses: DeterminateSystems/nix-installer-action@v9
+      - uses: DeterminateSystems/magic-nix-cache-action@v2
+      - name: Build ISO
+        run: |
+          nix build .#images.development-installer.config.system.build.isoImage --out-link build-iso-result
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest --prerelease --generate-notes build-iso-result/iso/*.iso
