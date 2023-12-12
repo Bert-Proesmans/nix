@@ -23,6 +23,8 @@ jobs:
         run: |
           nix build .#images.development-installer.config.system.build.isoImage --out-link build-iso-result
       - name: Create release
+        permissions:
+          deployments: write
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
