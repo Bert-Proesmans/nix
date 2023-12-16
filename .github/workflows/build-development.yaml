@@ -1,9 +1,9 @@
 name: "Build personalized development ISO"
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  # push:
+    # branches:
+      # - main
     # paths-ignore:
     #   - docs/
 jobs:
