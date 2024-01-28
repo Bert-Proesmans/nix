@@ -11,7 +11,7 @@
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { nixpkgs, systems, treefmt-nix, ... }:
+  outputs = { self, nixpkgs, systems, treefmt-nix, ... }:
     let
       # Small tool to iterate over each target we can (cross-)compile for
       eachSystem = f:
@@ -67,5 +67,12 @@
           packages = builtins.attrValues { inherit (pkgs) nyancat git direnv; };
         };
       });
+
+	nixosConfigurations = {};
+
+	checks = eachSystem (pkgs: let
+	currentSystemDerivations = (pkgs.lib.filterAttrs (_: nixos: nixos.pkgs.system == pkgs.system)) self.nixosConfigurations;
+        nixosHosts = pkgs.lib.mapAttrs' (name: nixos: pkgs.lib.nameValuePair "nixos-${name}" nixos.config.system.build.toplevel) currentSystemDerivations;
+	in nixosHosts // self.devShells.${pkgs.system});
     };
 }
