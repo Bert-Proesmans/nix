@@ -117,6 +117,15 @@
                 ];
               };
 
+              # Allow for remote management
+              services.openssh.enable = true;
+              services.openssh.settings.PasswordAuthentication = false;
+
+              # Allow privilege elevation to administrator role
+              security.sudo.enable = true;
+              # Allow for passwordless sudo
+              security.sudo.wheelNeedsPassword = false;
+
               # Enable hooks for vscode-server, plus additional software for plugins
               services.vscode-server.enable = true;
               environment.systemPackages =
