@@ -89,7 +89,7 @@
           modules = [
             inputs.disko.nixosModules.disko
             inputs.vscode-server.nixosModules.default
-            ({ modulesPath, lib, config, pkgs, ... }: {
+            ({ lib, config, pkgs, ... }: {
               # Check if opt-in for nixos module(?)              
               _module.check = true;
               # Consistent defaults accross all machine configurations.
@@ -99,9 +99,8 @@
               networking.hostName = lib.mkForce "development";
               networking.domain = lib.mkForce "alpha.proesmans.eu";
 
-              # Import Hyper-V kernel modules and hotloading
-              imports =
-                [ "${toString modulesPath}/virtualisation/hyperv-guest.nix" ];
+              # Load Hyper-V kernel modules
+              virtualisation.hypervGuest.enable = true;
 
               # EFI boot!
               boot.loader.systemd-boot.enable = true;
