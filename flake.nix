@@ -21,6 +21,8 @@
         (system: f nixpkgs.legacyPackages.${system});
 
       # REF; https://github.com/Mic92/dotfiles/blob/0cf2fe94c553a5801cf47624e44b2b6d145c1aa3/devshell/flake-module.nix
+      #
+      # TreeFMT is built to be used with "flake-parts", but we're building the flake from scratch on this one! 
       treefmt = eachSystem (pkgs:
         treefmt-nix.lib.evalModule pkgs {
           projectRootFile = "flake.nix";
@@ -49,9 +51,13 @@
           settings.formatter.ruff.options = [ "--fix" ];
         });
     in {
+      # Format entire flake with;
+      # nix fmt
       formatter =
         eachSystem (pkgs: treefmt.${pkgs.system}.config.build.wrapper);
 
+      # Build development shell with;
+      # nix flake develop
       devShells = eachSystem (pkgs: {
         default = pkgs.mkShellNoCC {
           name = "b-NIX development";
@@ -61,12 +67,13 @@
 
           nativeBuildInputs = [ treefmt.${pkgs.system}.config.build.wrapper ]
             ++ builtins.attrValues {
-              # Python packages required for quick-commands wrapping complex operations
+              # Python packages to easily execute maintenance and build tasks for this flake.
+              # See tasks.py TODO
               inherit (pkgs.python3.pkgs) invoke deploykit;
             };
 
           # Software directly available inside the developer shell
-          packages = builtins.attrValues { inherit (pkgs) nyancat git direnv; };
+          packages = builtins.attrValues { inherit (pkgs) nyancat git; };
         };
       });
 
@@ -85,11 +92,11 @@
         #
         # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. This depends on the conditions of the build-host and target-host
         development = nixpkgs.lib.nixosSystem {
-          specialArgs = { }; # { inherit inputs; };
+          specialArgs = { inherit inputs; };
           modules = [
             inputs.disko.nixosModules.disko
             inputs.vscode-server.nixosModules.default
-            ({ lib, config, pkgs, ... }: {
+            ({ lib, config, pkgs, inputs, ... }: {
               # Check if opt-in for nixos module(?)              
               _module.check = true;
               # Consistent defaults accross all machine configurations.
@@ -104,7 +111,10 @@
 
               # EFI boot!
               boot.loader.systemd-boot.enable = true;
-              boot.loader.efi.canTouchEfiVariables = true;
+              # Filesystem access to the EFI variables is only applicable when installing a system!
+              #boot.loader.efi.canTouchEfiVariables = true;
+
+              boot.tmp.cleanOnBoot = true;
 
               # Make me a user!
               users.users.bertp = {
@@ -119,6 +129,53 @@
                   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
                 ];
               };
+
+              # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/nix.nix
+              # Nix configuration
+
+              # Fallback quickly if substituters are not available.
+              nix.settings.connect-timeout = 5;
+
+              # Enable flakes
+              nix.settings.experimental-features =
+                [ "nix-command" "flakes" "repl-flake" ];
+
+              # The default at 10 is rarely enough.
+              nix.settings.log-lines = lib.mkDefault 25;
+
+              # Avoid disk full issues
+              nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024);
+              nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024);
+
+              # TODO: cargo culted.
+              nix.daemonCPUSchedPolicy = lib.mkDefault "batch";
+              nix.daemonIOSchedClass = lib.mkDefault "idle";
+              nix.daemonIOSchedPriority = lib.mkDefault 7;
+
+              # Make builds to be more likely killed than important services.
+              # 100 is the default for user slices and 500 is systemd-coredumpd@
+              # We rather want a build to be killed than our precious user sessions as builds can be easily restarted.
+              systemd.services.nix-daemon.serviceConfig.OOMScoreAdjust =
+                lib.mkDefault 250;
+
+              # Avoid copying unnecessary stuff over SSH
+              nix.settings.builders-use-substitutes = true;
+
+              # Make legacy nix commands consistent with flake sources!
+              # Register versioned flake inputs into the nix registry for flake subcommands
+              # Register versioned flake inputs as channels for nix (v2) commands
+
+              # Each input is mapped to 'nix.registry.<name>.flake = <flake store-content>'
+              nix.registry = lib.mapAttrs (_name: flake: { inherit flake; })
+              # Add additional package repositories here (if the required software is out-of-tree@nixpkgs)
+              # nixpkgs is a symlink to the stable source, kept for consistency with online guides
+                { inherit (inputs) nixpkgs nixos-stable nixos-unstable; };
+
+              nix.nixPath = [ "/etc/nix/path" ];
+              environment.etc = lib.mapAttrs' (name: value: {
+                name = "nix/path/${name}";
+                value.source = value.flake;
+              }) config.nix.registry;
 
               # Allow for remote management
               services.openssh.enable = true;
@@ -185,6 +242,33 @@
                   };
                 };
               };
+
+              # Avoid TOFU MITM with github by providing their public key here.
+              programs.ssh.knownHosts = {
+                "github.com".hostNames = [ "github.com" ];
+                "github.com".publicKey =
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
+                "gitlab.com".hostNames = [ "gitlab.com" ];
+                "gitlab.com".publicKey =
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf";
+
+                "git.sr.ht".hostNames = [ "git.sr.ht" ];
+                "git.sr.ht".publicKey =
+                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
+              };
+
+              # Enroll some more trusted binary caches
+              nix.settings.trusted-substituters = [
+                "https://nix-community.cachix.org"
+                "https://cache.garnix.io"
+                "https://numtide.cachix.org"
+              ];
+              nix.settings.trusted-public-keys = [
+                "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+                "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+                "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
+              ];
             })
           ];
         };
