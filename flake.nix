@@ -259,11 +259,11 @@
 
               # Keep dmesg/journalctl -k output readable by NOT logging
               # each refused connection on the open internet.
-              networking.firewall.logRefusedConnections = lib.mkDefault false;
+              networking.firewall.logRefusedConnections = false;
 
               # Use networkd instead of the pile of shell scripts
-              networking.useNetworkd = lib.mkDefault true;
-              networking.useDHCP = lib.mkDefault false;
+              networking.useNetworkd = true;
+              networking.useDHCP = false;
 
               # The notion of "online" is a broken concept
               # https://github.com/systemd/systemd/blob/e1b45a756f71deac8c1aa9a008bd0dab47f64777/NEWS#L13
@@ -278,6 +278,16 @@
               systemd.services.systemd-networkd.stopIfChanged = false;
               # Services that are only restarted might be not able to resolve when resolved is stopped before
               systemd.services.systemd-resolved.stopIfChanged = false;
+
+              # Hyper-V does not emulate PCI devices, so network adapters remain on their ethX names
+              # eth0 receives an address by DHCP and provides the default gateway route
+              # eth1 is configured with a stable address for SSH
+              networking.interfaces.eth0.useDHCP = true;
+              networking.interfaces.eth1.ipv4.addresses = [{
+                # V4 link local address
+                address = "169.254.245.139";
+                prefixLength = 24;
+              }];
 
               # Avoid TOFU MITM with github by providing their public key here.
               programs.ssh.knownHosts = {
