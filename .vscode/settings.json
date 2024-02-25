@@ -1,0 +1,8 @@
+{
+    "[nix]": {
+      "editor.formatOnSave": true,
+      "editor.defaultFormatter": "jnoortheen.nix-ide"
+    },
+    "nix.enableLanguageServer": false, // Language server integration TODO
+    "nix.formatterPath": "nixpkgs-fmt",
+}

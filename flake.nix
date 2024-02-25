@@ -25,8 +25,9 @@
       # Small tool to iterate over each target we want to (cross-)compile for
       eachSystem = f:
         lib.genAttrs [ "x86_64-linux" ]
-        (system: f inputs.nixpkgs.legacyPackages.${system});
-    in {
+          (system: f inputs.nixpkgs.legacyPackages.${system});
+    in
+    {
       # Load our custom functionality and variable types
       lib = ((import ./library/importers.nix) lib);
 
@@ -76,10 +77,10 @@
 
           nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ]
             ++ builtins.attrValues {
-              # Python packages to easily execute maintenance and build tasks for this flake.
-              # See tasks.py TODO
-              inherit (pkgs.python3.pkgs) invoke deploykit;
-            };
+            # Python packages to easily execute maintenance and build tasks for this flake.
+            # See tasks.py TODO
+            inherit (pkgs.python3.pkgs) invoke deploykit;
+          };
 
           # Software directly available inside the developer shell
           packages = builtins.attrValues { inherit (pkgs) nyancat git; };
@@ -180,15 +181,17 @@
 
               # Each input is mapped to 'nix.registry.<name>.flake = <flake store-content>'
               nix.registry = lib.mapAttrs (_name: flake: { inherit flake; })
-              # Add additional package repositories here (if the required software is out-of-tree@nixpkgs)
-              # nixpkgs is a symlink to the stable source, kept for consistency with online guides
+                # Add additional package repositories here (if the required software is out-of-tree@nixpkgs)
+                # nixpkgs is a symlink to the stable source, kept for consistency with online guides
                 { inherit (inputs) nixpkgs nixos-stable nixos-unstable; };
 
               nix.nixPath = [ "/etc/nix/path" ];
-              environment.etc = lib.mapAttrs' (name: value: {
-                name = "nix/path/${name}";
-                value.source = value.flake;
-              }) config.nix.registry;
+              environment.etc = lib.mapAttrs'
+                (name: value: {
+                  name = "nix/path/${name}";
+                  value.source = value.flake;
+                })
+                config.nix.registry;
 
               # Allow for remote management
               services.openssh.enable = true;
@@ -338,7 +341,8 @@
       # automated validation through a CLI-oneliner.
       #
       checks = eachSystem (_pkgs:
-        { # EMPTY
+        {
+          # EMPTY
         });
     };
 }
