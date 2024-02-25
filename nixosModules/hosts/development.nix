@@ -1,32 +1,19 @@
-{ inputs }:
-let
-  disko-module = inputs.disko.nixosModules.disko;
-  vscode-module = inputs.vscode-server.nixosModules.default;
-in
 { lib, config, pkgs, ... }: {
-  # Check if opt-in for nixos module(?)              
-  _module.check = true;
   # Consistent defaults accross all machine configurations.
-  system.stateVersion = lib.mkDefault "23.05";
-  # The CPU target for this machine
-  nixpkgs.hostPlatform = lib.mkDefault lib.systems.examples.gnu64;
-  networking.hostName = lib.mkForce "development";
-  networking.domain = lib.mkForce "alpha.proesmans.eu";
+  system.stateVersion = "23.11";
 
+  networking.hostName = "development";
+  networking.domain = "alpha.proesmans.eu";
+
+  proesmans.filesystem.simple-disk.enable = true;
+  proesmans.nix.linux-64 = true;
+  proesmans.nix.garbage-collect.enable = true;
+  proesmans.internationalisation.be-azerty.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
 
-  proesmans.filesystem.simple-disk.enable = true;
-
   # Load Hyper-V kernel modules
   virtualisation.hypervGuest.enable = true;
-
-  # EFI boot!
-  boot.loader.systemd-boot.enable = true;
-  # Filesystem access to the EFI variables is only applicable when installing a system!
-  #boot.loader.efi.canTouchEfiVariables = true;
-
-  boot.tmp.cleanOnBoot = true;
 
   # Make me a user!
   users.users.bertp = {
@@ -108,16 +95,4 @@ in
     "git.sr.ht".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
-
-  # Enroll some more trusted binary caches
-  nix.settings.trusted-substituters = [
-    "https://nix-community.cachix.org"
-    "https://cache.garnix.io"
-    "https://numtide.cachix.org"
-  ];
-  nix.settings.trusted-public-keys = [
-    "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-    "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
-    "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-  ];
 }

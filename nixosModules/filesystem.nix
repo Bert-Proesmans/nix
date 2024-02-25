@@ -13,14 +13,31 @@ in
 
   options.proesmans.filesystem = {
     simple-disk.enable = lib.mkEnableOption (lib.mdDoc "Enable a simple disk layout");
-    # TODO; Make disk device configurable
+    simple-disk.device = lib.mkOption {
+      default = "/dev/sda";
+      type = lib.types.str;
+      description = lib.mdDoc "The name of the one disk to format";
+    };
   };
 
   config = lib.mkMerge [
     (lib.mkIf cfg.simple-disk.enable {
+      # EFI boot!
+      boot.loader.systemd-boot.enable = true;
+      boot.tmp.cleanOnBoot = true;
+    })
+    (lib.mkIf cfg.simple-disk.enable {
+      assertions = [{
+        assertion = builtins.stringLength cfg.simple-disk.device > 0;
+        message = ''
+          A device path must be provided for formatting to work!
+          Set one at 'proesmans.filesystem.simple-disk.device'.
+        '';
+      }];
+
       disko.devices = {
         disk.disk1 = {
-          device = "/dev/sda";
+          device = cfg.proesmans.filesystem.simple-disk.device;
           type = "disk";
           content = {
             type = "gpt";

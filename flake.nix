@@ -39,8 +39,16 @@
         lib.attrValues (lib.filterAttrs not-toplevel self.outputs.nixosModules);
     in
     {
-      # Load our custom functionality and variable types
-      lib = ((import ./library/importers.nix) lib);
+      # Load our custom functionality and variable types, without using 'lib' because that would result in
+      # a circular dependency.
+      # 1. Import each path, resulting in multiple lambdas
+      # 2. Apply the final library on every lambda, resulting in multiple attribute sets
+      # 3. Shallow merge each attribute set, into lib
+      lib = builtins.foldl' (acc: set: acc // set) { }
+        (builtins.map (lib-path: (import lib-path) lib) [
+          ./library/importers.nix
+          ./library/network.nix
+        ]);
 
       # Format entire flake with;
       # nix fmt
@@ -157,7 +165,7 @@
             # The merged attribute set will become the nixosModule argument 'lib'. 'lib' is not directly related to 'pkgs.lib', because 'pkgs'
             # can be set from within nixosModules. Overridable 'lib' would result in circular dependency because configuration is dependent on
             # lib.mkIf and similar.
-            lib = inputs.nixpkgs.lib.extend (_: _: self.outputs.lib);
+            lib = lib;
             # Additional custom arguments to each nixos module
             specialArgs = { };
             # The toplevel nixos module recursively imports relevant other modules
