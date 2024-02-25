@@ -36,7 +36,8 @@ let
         let
           pathStr =
             builtins.concatStringsSep "." path; # dot-based reverse DNS notation
-        in if builtins.isPath val then
+        in
+        if builtins.isPath val then
         # builtins.trace "${toString val} is a path"
           (sum // { "${pathStr}" = val; })
         else if builtins.isAttrs val then
@@ -50,8 +51,9 @@ let
 
       recurse = sum: path: val:
         builtins.foldl' (sum: key: op sum (path ++ [ key ]) val.${key}) sum
-        (builtins.attrNames val);
-    in recurse { } [ ] tree;
+          (builtins.attrNames val);
+    in
+    recurse { } [ ] tree;
 
   rakeLeaves =
     /* *
@@ -94,15 +96,18 @@ let
 
       collect = file: type: {
         name = lib.removeSuffix ".nix" file;
-        value = let path = dirPath + "/${file}";
-        in if (type == "regular") || (type == "directory"
-          && builtins.pathExists (path + "/default.nix")) then
-          path
+        value =
+          let path = dirPath + "/${file}";
+          in if (type == "regular") || (type == "directory"
+            && builtins.pathExists (path + "/default.nix")) then
+            path
           # recurse on directories that don't contain a `default.nix`
-        else
-          rakeLeaves path;
+          else
+            rakeLeaves path;
       };
 
       files = lib.filterAttrs seive (builtins.readDir dirPath);
-    in lib.filterAttrs (_n: v: v != { }) (lib.mapAttrs' collect files);
-in { inherit rakeLeaves flattenTree; }
+    in
+    lib.filterAttrs (_n: v: v != { }) (lib.mapAttrs' collect files);
+in
+{ inherit rakeLeaves flattenTree; }
