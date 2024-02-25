@@ -1,4 +1,4 @@
-{ lib, config, pkgs, ... }: {
+{ lib, config, ... }: {
   # Consistent defaults accross all machine configurations.
   system.stateVersion = "23.11";
 
@@ -55,7 +55,7 @@
   # Use networkd instead of the pile of shell scripts
   networking.useNetworkd = true;
   networking.useDHCP = false;
-  networking.usePredictableInterfaceNames = true;
+  networking.usePredictableInterfaceNames = lib.mkDefault true;
 
   # The notion of "online" is a broken concept
   # https://github.com/systemd/systemd/blob/e1b45a756f71deac8c1aa9a008bd0dab47f64777/NEWS#L13

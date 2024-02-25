@@ -173,17 +173,28 @@
           })
         self.nixosModules.hosts;
 
-      # Test flake outputs with;
-      # nix flake check
+      # Verify flake configurations with;
+      # nix flake check --no-eval-cache
       #
-      # `nix flake check` by default evaluates and builds derivations if applicable of common flake schema outputs.
+      # `nix flake check` by default evaluates and builds derivations (if applicable) of common flake schema outputs.
       # It's not necessary to explicitly add packages, devshells, nixosconfigurations (build.toplevel attribute) to this attribute set.
       # Add custom derivations, like nixos-tests or custom format outputs of nixosSystem, to this attribute set for
       # automated validation through a CLI-oneliner.
       #
-      checks = eachSystem (_pkgs:
-        {
-          # EMPTY
-        });
+      # Test individual machine configurations with;
+      # nix build .#checks.<system>.<machine-name>-test --no-eval-cache --print-build-logs
+      # eg, nix build .#checks.x86_64-linux.bootstrap-test --no-eval-cache --print-build-logs
+      #
+      # REF; https://nixos.org/manual/nixos/stable/#sec-running-nixos-tests-interactively
+      # You can test interactively with;
+      # nix build .#checks.<system>.<machine-name>-test.driverInteractive --no-eval-cache && ./result/bin/nixos-test-driver
+      # This will drop you in a python shell to control your machines. Type start_all() launch all test nodes,
+      # follow up by machine.shell_interact() to drop into a shell on the node "machine".
+      checks = eachSystem (pkgs: builtins.foldl' (acc: set: acc // set) { } (builtins.map
+        (test-path: (import test-path) {
+          inherit (self) outputs;
+          inherit lib pkgs commonNixosModules;
+        })
+        (builtins.attrValues (lib.flattenTree (lib.rakeLeaves ./checks)))));
     };
 }
