@@ -17,15 +17,26 @@
     let
       # Shorten calls to library functions;
       # lib.genAttrs == inputs.nixpkgs.lib.genAttrs
-      # WARN; inputs.nixpkgs.lib =/= pkgs.lib. The latter is the nixpkgs library, while the
-      # former is the nixpkgs _flake_ lib and this one includes the nixos functions!
-      # eg; pkgs.lib.nixosSystem => doesn't exist. inputs.nixpkgs.lib.nixosSystem => exists
+      # WARN; inputs.nixpkgs.lib =/= (nixpkgs.legacyPackages.<system> ==) pkgs.lib. The latter is 
+      # the nixpkgs library, while the former is the nixpkgs _flake_ lib and this one includes 
+      # the nixos library functions!
+      # eg; (nixpkgs.legacyPackages.<system> or pkgs).lib.nixosSystem => doesn't exist
+      # eg; inputs.nixpkgs.lib.nixosSystem => exists
       lib = inputs.nixpkgs.lib.extend (_: _: self.outputs.lib);
 
       # Small tool to iterate over each target we want to (cross-)compile for
       eachSystem = f:
         lib.genAttrs [ "x86_64-linux" ]
           (system: f inputs.nixpkgs.legacyPackages.${system});
+
+      # Automatically include all nixos modules that are not part of the hosts collection.
+      # The (nixosModules.)hosts attribute set holds one config per machine, and we turn each into a nixosSystem derivation.
+      # NOTE; That one nixos module defining the host configuration is also called a 'toplevel module'.
+      commonNixosModules =
+        let
+          not-toplevel = name: _: name != "hosts";
+        in
+        lib.attrValues (lib.filterAttrs not-toplevel self.outputs.nixosModules);
     in
     {
       # Load our custom functionality and variable types
@@ -87,273 +98,72 @@
         };
       });
 
-      # nixOS modules are just lambda's with a defined attribute set as first argument, not derivations.
-      # nixOS modules on their own do nothing.
+      # nixOS modules are just lambda's with an attribute set as first argument, not a derivations.
+      # So nixOS modules on their own do nothing.
       #
-      # I do not want to add argument inputs (as in flake inputs) into the nixos modules, as a separation
-      # of concern measure.
-      # That means some of the lambda's need to be curried after import. The mapping function below checks
-      # if the lambda must be curried and applies, otherwise the lambda is passed through as is.
+      # I do not want to add argument 'inputs' (as in flake inputs) into the nixos modules, because of
+      # seperating concerns.
+      # That means some of the lambda's need to be curried. The mapping function below checks
+      # if the lambda must be curried (aka it's not a nixos module) and applies, otherwise 
+      # the lambda is passed through as is.
       #
-      nixosModules = builtins.mapAttrs
-        (_: nix-file:
-          let
-            lambda = import nix-file;
-            lambda-arguments = builtins.functionArgs lambda;
-            curry-arguments = { inherit inputs; };
-            # If we wanted to partially apply, intersection would be necessary.
-            # curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
-            # NOTE; Check if the lambda wants specifically '{inputs}'.
-            should-curry = (builtins.attrNames lambda-arguments)
-              == (builtins.attrNames curry-arguments);
-          in
-          (if should-curry then (lambda curry-arguments) else lambda))
-        (lib.rakeLeaves ./nixosModules);
+      nixosModules =
+        let
+          process-item = _: item:
+            # WARN; Recursively descend into attribute sets
+            if (builtins.isAttrs item) then (builtins.mapAttrs process-item item)
+            else if (builtins.isFunction item) then (apply-curry-if-required item)
+            else if (builtins.isPath item) then (apply-curry-if-required (import item))
+            else throw "Huh, haven't seen that type of item before: ${toString item}";
 
-      nixosConfigurations = {
-        # Build with; nix build .#nixosConfigurations.development.config.system.build.toplevel
-        #
-        # Deploy with nixos-anywhere; nix run github:nix-community/nixos-anywhere -- --flake .#development <user>@<ip address>
-        # NOTE; nixos-anywhere will automatically look under #nixosConfigurations so that property component can be ommited from the command line
-        # NOTE; <user> must be root or have passwordless sudo
-        # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
-        #
-        # Update with; nixos-rebuild switch --flake .#development --target-host <user>@<ip address>
-        # NOTE; nixos-rebuild will automatically look under #nixosConfigurations so that property component can be ommited from the command line
-        # NOTE; <user> must be root or have passwordless sudo
-        # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
-        #
-        # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. This depends on the conditions of the build-host and target-host
-        development = lib.nixosSystem {
-          specialArgs = { inherit inputs; };
-          modules = [
-            inputs.disko.nixosModules.disko
-            inputs.vscode-server.nixosModules.default
-            ({ lib, config, pkgs, inputs, ... }: {
-              # Check if opt-in for nixos module(?)              
-              _module.check = true;
-              # Consistent defaults accross all machine configurations.
-              system.stateVersion = lib.mkDefault "23.05";
-              # The CPU target for this machine
-              nixpkgs.hostPlatform = lib.mkDefault lib.systems.examples.gnu64;
-              networking.hostName = lib.mkForce "development";
-              networking.domain = lib.mkForce "alpha.proesmans.eu";
+          apply-curry-if-required = lambda:
+            let
+              lambda-arguments = builtins.functionArgs lambda;
+              curry-arguments = { inherit inputs; };
+              # If we wanted to partially apply, intersection would be necessary.
+              # curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
+              # NOTE; Check if the lambda wants specifically '{inputs}'.
+              should-curry = (builtins.attrNames lambda-arguments)
+                == (builtins.attrNames curry-arguments);
+            in
+            (if should-curry then (lambda curry-arguments) else lambda);
+        in
+        builtins.mapAttrs process-item (lib.rakeLeaves ./nixosModules);
 
-              # Load Hyper-V kernel modules
-              virtualisation.hypervGuest.enable = true;
-
-              # EFI boot!
-              boot.loader.systemd-boot.enable = true;
-              # Filesystem access to the EFI variables is only applicable when installing a system!
-              #boot.loader.efi.canTouchEfiVariables = true;
-
-              boot.tmp.cleanOnBoot = true;
-
-              # Make me a user!
-              users.users.bertp = {
-                isNormalUser = true;
-                description = "Bert Proesmans";
-                extraGroups = [ "wheel" ]
-                  ++ lib.optional config.virtualisation.libvirtd.enable
-                  "libvirtd" # NOTE; en-GB
-                  ++ lib.optional config.networking.networkmanager.enable
-                  "networkmanager";
-                openssh.authorizedKeys.keys = [
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
-                ];
-              };
-
-              # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/nix.nix
-              # Nix configuration
-
-              # Fallback quickly if substituters are not available.
-              nix.settings.connect-timeout = 5;
-
-              # Enable flakes
-              nix.settings.experimental-features =
-                [ "nix-command" "flakes" "repl-flake" ];
-
-              # The default at 10 is rarely enough.
-              nix.settings.log-lines = lib.mkDefault 25;
-
-              # Avoid disk full issues
-              nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024);
-              nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024);
-
-              # TODO: cargo culted.
-              nix.daemonCPUSchedPolicy = lib.mkDefault "batch";
-              nix.daemonIOSchedClass = lib.mkDefault "idle";
-              nix.daemonIOSchedPriority = lib.mkDefault 7;
-
-              # Make builds to be more likely killed than important services.
-              # 100 is the default for user slices and 500 is systemd-coredumpd@
-              # We rather want a build to be killed than our precious user sessions as builds can be easily restarted.
-              systemd.services.nix-daemon.serviceConfig.OOMScoreAdjust =
-                lib.mkDefault 250;
-
-              # Avoid copying unnecessary stuff over SSH
-              nix.settings.builders-use-substitutes = true;
-
-              # Assist nix-direnv, since project devshells aren't rooted in the computer profile, nor stored in /nix/store
-              nix.settings.keep-outputs = true;
-              nix.settings.keep-derivations = true;
-
-              # Make legacy nix commands consistent with flake sources!
-              # Register versioned flake inputs into the nix registry for flake subcommands
-              # Register versioned flake inputs as channels for nix (v2) commands
-
-              # Each input is mapped to 'nix.registry.<name>.flake = <flake store-content>'
-              nix.registry = lib.mapAttrs (_name: flake: { inherit flake; })
-                # Add additional package repositories here (if the required software is out-of-tree@nixpkgs)
-                # nixpkgs is a symlink to the stable source, kept for consistency with online guides
-                { inherit (inputs) nixpkgs nixos-stable nixos-unstable; };
-
-              nix.nixPath = [ "/etc/nix/path" ];
-              environment.etc = lib.mapAttrs'
-                (name: value: {
-                  name = "nix/path/${name}";
-                  value.source = value.flake;
-                })
-                config.nix.registry;
-
-              # Allow for remote management
-              services.openssh.enable = true;
-              services.openssh.settings.PasswordAuthentication = false;
-
-              # Allow privilege elevation to administrator role
-              security.sudo.enable = true;
-              # Allow for passwordless sudo
-              security.sudo.wheelNeedsPassword = false;
-
-              # Enable hooks for vscode-server, plus additional software for plugins
-              services.vscode-server.enable = true;
-              environment.systemPackages =
-                builtins.attrValues { inherit (pkgs) nixpkgs-fmt rnix-lsp; };
-
-              # Automatically load development shell in project working directories
-              programs.direnv.enable = true;
-              programs.direnv.nix-direnv.enable = true;
-
-              # Disk and partition layout
-              disko.devices = {
-                disk.disk1 = {
-                  device = "/dev/sda";
-                  type = "disk";
-                  content = {
-                    type = "gpt";
-                    partitions = {
-                      ESP = {
-                        size = "500M";
-                        type = "EF00";
-                        content = {
-                          type = "filesystem";
-                          format = "vfat";
-                          mountpoint = "/boot";
-                        };
-                      };
-                      encryptedSwap = {
-                        size = "3G";
-                        content = {
-                          type = "swap";
-                          randomEncryption = true;
-                        };
-                      };
-                      root = {
-                        size = "100%";
-                        content = {
-                          type = "lvm_pv";
-                          vg = "pool";
-                        };
-                      };
-                    };
-                  };
-                };
-                lvm_vg = {
-                  pool = {
-                    type = "lvm_vg";
-                    lvs = {
-                      root = {
-                        size = "100%FREE";
-                        content = {
-                          type = "filesystem";
-                          format = "ext4";
-                          mountpoint = "/";
-                          mountOptions = [ "defaults" ];
-                        };
-                      };
-                    };
-                  };
-                };
-              };
-
-              # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/networking.nix
-
-              # Networking configuration
-              # Allow PMTU / DHCP
-              networking.firewall.allowPing = true;
-
-              # Keep dmesg/journalctl -k output readable by NOT logging
-              # each refused connection on the open internet.
-              networking.firewall.logRefusedConnections = false;
-
-              # Use networkd instead of the pile of shell scripts
-              networking.useNetworkd = true;
-              networking.useDHCP = false;
-
-              # The notion of "online" is a broken concept
-              # https://github.com/systemd/systemd/blob/e1b45a756f71deac8c1aa9a008bd0dab47f64777/NEWS#L13
-              systemd.services.NetworkManager-wait-online.enable = false;
-              systemd.network.wait-online.enable = false;
-
-              # FIXME: Maybe upstream?
-              # Do not take down the network for too long when upgrading,
-              # This also prevents failures of services that are restarted instead of stopped.
-              # It will use `systemctl restart` rather than stopping it with `systemctl stop`
-              # followed by a delayed `systemctl start`.
-              systemd.services.systemd-networkd.stopIfChanged = false;
-              # Services that are only restarted might be not able to resolve when resolved is stopped before
-              systemd.services.systemd-resolved.stopIfChanged = false;
-
-              # Hyper-V does not emulate PCI devices, so network adapters remain on their ethX names
-              # eth0 receives an address by DHCP and provides the default gateway route
-              # eth1 is configured with a stable address for SSH
-              networking.interfaces.eth0.useDHCP = true;
-              networking.interfaces.eth1.ipv4.addresses = [{
-                # V4 link local address
-                address = "169.254.245.139";
-                prefixLength = 24;
-              }];
-
-              # Avoid TOFU MITM with github by providing their public key here.
-              programs.ssh.knownHosts = {
-                "github.com".hostNames = [ "github.com" ];
-                "github.com".publicKey =
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
-
-                "gitlab.com".hostNames = [ "gitlab.com" ];
-                "gitlab.com".publicKey =
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf";
-
-                "git.sr.ht".hostNames = [ "git.sr.ht" ];
-                "git.sr.ht".publicKey =
-                  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
-              };
-
-              # Enroll some more trusted binary caches
-              nix.settings.trusted-substituters = [
-                "https://nix-community.cachix.org"
-                "https://cache.garnix.io"
-                "https://numtide.cachix.org"
-              ];
-              nix.settings.trusted-public-keys = [
-                "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-                "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
-                "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-              ];
-            })
-          ];
-        };
-      };
+      # Test with; nix run .#<machine-name>-vm
+      # WARN; It's not always necessary but recommended to overwrite the network config for eth0 to DHCP
+      # WARN; It's not always necessary but recommended to create a test user for cli login
+      # NOTE; The wrapper builds the target .#nixosConfigurations.<machine-name>.config.formats.vm-nogui which
+      # is similar to #nixosConfigurations.<machine-name>.config.system.build.vm.
+      #
+      # Deploy with nixos-anywhere; nix run github:nix-community/nixos-anywhere -- --flake .#<machine-name (property of nixosConfigurations)> <user>@<ip address>
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations so that property component can be ommited from the command line
+      # NOTE; <user> must be root or have passwordless sudo
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
+      #
+      # Update with; nixos-rebuild switch --flake .#<machine-name> --target-host <user>@<ip address>
+      # NOTE; nixos-rebuild will automatically look under #nixosConfigurations so that property component can be ommited from the command line
+      # NOTE; <user> must be root or have passwordless sudo
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
+      #
+      # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. This depends on the conditions of the build-host and target-host
+      #
+      nixosConfigurations = lib.mapAttrs
+        (_name: toplevel-module: lib.nixosSystem
+          {
+            # System is deprecated, it's set within the modules as nixpkgs.hostPlatform
+            system = null;
+            # Inject our own library functions before calling nixosSystem.
+            # The merged attribute set will become the nixosModule argument 'lib'. 'lib' is not directly related to 'pkgs.lib', because 'pkgs'
+            # can be set from within nixosModules. Overridable 'lib' would result in circular dependency because configuration is dependent on
+            # lib.mkIf and similar.
+            lib = inputs.nixpkgs.lib.extend (_: _: self.outputs.lib);
+            # Additional custom arguments to each nixos module
+            specialArgs = { };
+            # The toplevel nixos module recursively imports relevant other modules
+            modules = commonNixosModules ++ [ toplevel-module ];
+          })
+        self.nixosModules.hosts;
 
       # Test flake outputs with;
       # nix flake check
