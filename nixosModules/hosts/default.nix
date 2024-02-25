@@ -1,4 +1,5 @@
-{ self, lib', inputs }:
+{ inputs }:
+{ self, lib' }:
 let
   inherit (self) outputs;
 
@@ -28,10 +29,12 @@ let
 
     # Make legacy nix commands consistent with flake sources!
     nix.nixPath = [ "/etc/nix/path" ];
-    environment.etc = lib.mapAttrs' (name: value: {
-      name = "nix/path/${name}";
-      value.source = value.flake;
-    }) config.nix.registry;
+    environment.etc = lib.mapAttrs'
+      (name: value: {
+        name = "nix/path/${name}";
+        value.source = value.flake;
+      })
+      config.nix.registry;
   };
 
   bertp = { config, lib, ... }: {
@@ -48,7 +51,8 @@ let
       ];
     };
   };
-in {
+in
+{
   development = (lib'.makeOverridable lib'.nixosSystem) {
     specialArgs = { inherit inputs outputs; };
     modules = [

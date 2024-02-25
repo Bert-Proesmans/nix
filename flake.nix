@@ -87,6 +87,29 @@
         };
       });
 
+      # nixOS modules are just lambda's with a defined attribute set as first argument, not derivations.
+      # nixOS modules on their own do nothing.
+      #
+      # I do not want to add argument inputs (as in flake inputs) into the nixos modules, as a separation
+      # of concern measure.
+      # That means some of the lambda's need to be curried after import. The mapping function below checks
+      # if the lambda must be curried and applies, otherwise the lambda is passed through as is.
+      #
+      nixosModules = builtins.mapAttrs
+        (_: nix-file:
+          let
+            lambda = import nix-file;
+            lambda-arguments = builtins.functionArgs lambda;
+            curry-arguments = { inherit inputs; };
+            # If we wanted to partially apply, intersection would be necessary.
+            # curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
+            # NOTE; Check if the lambda wants specifically '{inputs}'.
+            should-curry = (builtins.attrNames lambda-arguments)
+              == (builtins.attrNames curry-arguments);
+          in
+          (if should-curry then (lambda curry-arguments) else lambda))
+        (lib.rakeLeaves ./nixosModules);
+
       nixosConfigurations = {
         # Build with; nix build .#nixosConfigurations.development.config.system.build.toplevel
         #

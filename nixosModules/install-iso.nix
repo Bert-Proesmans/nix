@@ -1,4 +1,5 @@
-{ modulesPath, lib, config, inputs, pkgs, ... }: {
+{ inputs }:
+{ modulesPath, lib, config, pkgs, ... }: {
   imports = [
     "${toString modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
     inputs.srvos.nixosModules.common
