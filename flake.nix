@@ -13,21 +13,35 @@
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, systems, treefmt-nix, ... }@inputs:
+  outputs = { self, ... }@inputs:
     let
-      # Small tool to iterate over each target we can (cross-)compile for
-      eachSystem = f:
-        nixpkgs.lib.genAttrs (import systems)
-        (system: f nixpkgs.legacyPackages.${system});
+      # Shorten calls to library functions;
+      # lib.genAttrs == inputs.nixpkgs.lib.genAttrs
+      # WARN; inputs.nixpkgs.lib =/= pkgs.lib. The latter is the nixpkgs library, while the
+      # former is the nixpkgs _flake_ lib and this one includes the nixos functions!
+      # eg; pkgs.lib.nixosSystem => doesn't exist. inputs.nixpkgs.lib.nixosSystem => exists
+      lib = inputs.nixpkgs.lib.extend (_: _: self.outputs.lib);
 
+      # Small tool to iterate over each target we want to (cross-)compile for
+      eachSystem = f:
+        lib.genAttrs [ "x86_64-linux" ]
+        (system: f inputs.nixpkgs.legacyPackages.${system});
+    in {
+      # Load our custom functionality and variable types
+      lib = ((import ./library/importers.nix) lib);
+
+      # Format entire flake with;
+      # nix fmt
+      #
       # REF; https://github.com/Mic92/dotfiles/blob/0cf2fe94c553a5801cf47624e44b2b6d145c1aa3/devshell/flake-module.nix
       #
       # TreeFMT is built to be used with "flake-parts", but we're building the flake from scratch on this one! 
-      treefmt = eachSystem (pkgs:
-        treefmt-nix.lib.evalModule pkgs {
+      #
+      formatter = eachSystem (pkgs:
+        (inputs.treefmt-nix.lib.evalModule pkgs {
           projectRootFile = "flake.nix";
 
-          programs.nixfmt.enable = true;
+          programs.nixpkgs-fmt.enable = true;
           # Nix cleanup of dead code
           programs.deadnix.enable = true;
           programs.shellcheck.enable = true;
@@ -49,12 +63,7 @@
 
           # Run ruff linter and formatter, fixing all fixable issues
           settings.formatter.ruff.options = [ "--fix" ];
-        });
-    in {
-      # Format entire flake with;
-      # nix fmt
-      formatter =
-        eachSystem (pkgs: treefmt.${pkgs.system}.config.build.wrapper);
+        }).config.build.wrapper);
 
       # Build development shell with;
       # nix flake develop
@@ -65,7 +74,7 @@
           # REF; https://github.com/NixOS/nixpkgs/issues/58624#issuecomment-1576860784
           inputsFrom = [ ];
 
-          nativeBuildInputs = [ treefmt.${pkgs.system}.config.build.wrapper ]
+          nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ]
             ++ builtins.attrValues {
               # Python packages to easily execute maintenance and build tasks for this flake.
               # See tasks.py TODO
@@ -91,7 +100,7 @@
         # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
         #
         # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. This depends on the conditions of the build-host and target-host
-        development = nixpkgs.lib.nixosSystem {
+        development = lib.nixosSystem {
           specialArgs = { inherit inputs; };
           modules = [
             inputs.disko.nixosModules.disko
@@ -320,14 +329,16 @@
         };
       };
 
-      checks = eachSystem (pkgs:
-        let
-          currentSystemDerivations =
-            (pkgs.lib.filterAttrs (_: nixos: nixos.pkgs.system == pkgs.system))
-            self.outputs.nixosConfigurations;
-          nixosHosts = pkgs.lib.mapAttrs' (name: nixos:
-            pkgs.lib.nameValuePair "nixos-${name}"
-            nixos.config.system.build.toplevel) currentSystemDerivations;
-        in nixosHosts // self.outputs.devShells.${pkgs.system});
+      # Test flake outputs with;
+      # nix flake check
+      #
+      # `nix flake check` by default evaluates and builds derivations if applicable of common flake schema outputs.
+      # It's not necessary to explicitly add packages, devshells, nixosconfigurations (build.toplevel attribute) to this attribute set.
+      # Add custom derivations, like nixos-tests or custom format outputs of nixosSystem, to this attribute set for
+      # automated validation through a CLI-oneliner.
+      #
+      checks = eachSystem (_pkgs:
+        { # EMPTY
+        });
     };
 }
