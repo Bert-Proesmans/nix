@@ -1,9 +1,9 @@
 { inputs }:
 let
-  nixpkgs-unstable = inputs.nixos-unstable;
+  nixpkgs-stable = inputs.nixpkgs-stable;
   # Add additional package repositories (input flakes) below.
   # nixpkgs is a symlink to the stable source, kept for consistency with online guides
-  nix-registry = { inherit (inputs) nixpkgs nixos-stable nixos-unstable; };
+  nix-registry = { inherit (inputs) nixpkgs nixpkgs-stable nixpkgs-unstable; };
 in
 { config, lib, ... }:
 let
@@ -31,19 +31,23 @@ in
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
       # defined from options nixpkgs.*
       nixpkgs.overlays = [
-        (_self': super: {
+        (_self': _super: {
           # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
           # with an infinite recursion.
           # Overriding lib _must_ be done at the call-site of lib.nixosSystem.
           # REF; https://github.com/NixOS/nixpkgs/issues/156312
           # lib = super.lib // self.outputs.lib;
 
-          # Inject unstable packages, initialised with the same configuration as nixpkgs, as pkgs.unstable
-          # WARN; This will import the default.nix configuration, which lacks information from the flake.nix
-          # file;
-          #   - 'lib' will not have the nixos library function
-          #   - 'pkgs' will have all package definitions
-          unstable = (import nixpkgs-unstable) {
+          # Inject stable packages, initialised with the same configuration as nixpkgs, as pkgs.stable.
+          # The default nixpkgs follows nixpkgs-unstable, so the pkgs.stable is a way to (temporarily) stabilise changes.
+          # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same 
+          # as loading from '<flake>/flake.nix'! flake.nix includes nixos library functions, the old default.nix doesn't.
+          #   - '(import nixpkgs).lib' will not have the nixos library function
+          #   - 'inputs.nixpkgs.lib' has the nixos library functions
+          #
+          # 'pkgs' will contain all unstable package versions.
+          # 'pkgs.stable' contains all stable package versions.
+          stable = (import nixpkgs-stable) {
             inherit (config.nixpkgs) config overlay;
             localSystem = config.nixpkgs.hostPlatform;
           };

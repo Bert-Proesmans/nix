@@ -2,9 +2,9 @@
   description = "Bert Proesmans's NixOS configuration";
 
   inputs = {
-    nixpkgs.follows = "nixos-unstable";
-    nixos-stable.url = "github:NixOS/nixpkgs/nixos-23.11";
-    nixos-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.follows = "nixpkgs-unstable";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
