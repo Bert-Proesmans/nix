@@ -1,4 +1,4 @@
-{ lib, config, ... }: {
+{ lib, config, pkgs, ... }: {
   # Consistent defaults accross all machine configurations.
   system.stateVersion = "23.11";
 
@@ -41,6 +41,20 @@
   # Automatically load development shell in project working directories
   programs.direnv.enable = true;
   programs.direnv.nix-direnv.enable = true;
+
+  # Pre-install some tools for debugging network/disk/code
+  environment.systemPackages = [
+    pkgs.curl
+    pkgs.gitMinimal
+    pkgs.iperf
+    pkgs.dig
+    pkgs.traceroute
+  ];
+
+  # Note; default firewall package is IPTables
+  networking.firewall.allowedTCPPorts = [
+    5201 # Allow incoming IPerf traffic when acting as a server
+  ];
 
   # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/networking.nix
 
