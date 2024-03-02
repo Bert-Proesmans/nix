@@ -1,6 +1,5 @@
-{ lib, config, pkgs, ... }:
-let cfg = config.my.interactive-install;
-in {
+{ lib, config, ... }:
+{
   options.my.interactive-install.enable =
     lib.mkEnableOption ("Provision scripts for manual/interactive install") // {
       default = true;

@@ -1,3 +1,4 @@
 .direnv
 .nixos-test-history
 result
+*.qcow2

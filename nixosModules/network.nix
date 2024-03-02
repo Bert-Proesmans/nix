@@ -22,6 +22,13 @@ in
           The IP, which must be inside the subnet provided by option config.${opt.networks.management.subnet}.
         '';
       };
+      mac = lib.mkOption {
+        type = lib.net.types.mac;
+        default = null;
+        description = lib.mdDoc ''
+          The MAC address to identify the management adapter by.
+        '';
+      };
     };
 
     service = {
@@ -38,6 +45,13 @@ in
         default = null;
         description = lib.literalMD ''
           The IP, which must be inside the subnet provided by option config.${opt.networks.service.subnet}.
+        '';
+      };
+      mac = lib.mkOption {
+        type = lib.net.types.mac;
+        default = null;
+        description = lib.mdDoc ''
+          The MAC address to identify the service adapter by.
         '';
       };
     };

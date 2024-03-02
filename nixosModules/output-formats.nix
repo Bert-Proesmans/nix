@@ -6,52 +6,65 @@ let
   # the toplevel machine configuration!
   generators-all = inputs.nixos-generators.nixosModules.all-formats;
 in
-{ config, lib, ... }: {
+{ lib, ... }: {
   imports = [ generators-all ];
 
-  formatConfigs = lib.mkMerge (
-    [ ]
-    ++ (builtins.map
-      (format: {
-        "${format}" = { ... }: {
-          # Drop ~400MB firmware blobs from nix/store, but this will make the machine (probably) not boot on metal!
-          hardware.enableRedistributableFirmware = lib.mkDefault false;
+  formatConfigs = lib.mkMerge
+    (
+      [ ]
+      ++ (builtins.map
+        (format: {
+          "${format}" = { ... }: {
+            # Drop ~400MB firmware blobs from nix/store, but this will make the machine (probably) not boot on metal!
+            hardware.enableRedistributableFirmware = lib.mkForce false;
 
-          # Workarounds
-          disko = lib.mkForce { };
-        };
-      })
-      [
-        "vmware"
-        "hyperv"
-        "virtualbox"
-        "vm"
-        "vm-bootloader"
-        "vm-nogui"
-      ])
-    ++ (builtins.map
-      (format: {
-        "${format}" = { lib, ... }: {
-          # Faster and almost equally good compression
-          isoImage.squashfsCompression = "zstd -Xcompression-level 6";
+            # Workarounds
+            disko = lib.mkForce { };
+          };
+        })
+        [
+          "hyperv"
+          "install-iso-hyperv"
+          "virtualbox"
+          "vmware"
+          "vm"
+          "vm-bootloader"
+          "vm-nogui"
+        ])
+      ++ (builtins.map
+        (format: {
+          "${format}" = { lib, ... }: {
+            # Faster and almost equally good compression
+            isoImage.squashfsCompression = "zstd -Xcompression-level 15";
 
-          # No Wifi
-          networking.wireless.enable = lib.mkForce false;
+            # Do not carry the entire package index, this will be downloaded later
+            proesmans.nix.references-on-disk = false;
+            system.installer.channel.enable = false;
 
-          # No docs
-          documentation.enable = lib.mkForce false;
-          documentation.nixos.enable = lib.mkForce false;
+            # No BIOS boot
+            isoImage.makeBiosBootable = lib.mkForce false;
+            isoImage.makeEfiBootable = lib.mkForce true;
 
-          # No GCC toolchain
-          system.extraDependencies = lib.mkForce [ ];
+            # No Wifi
+            networking.wireless.enable = lib.mkForce false;
 
-          # Workarounds
-          disko = lib.mkForce { };
-        };
-      })
-      [
-        "install-iso"
-        "install-iso-hyperv"
-      ])
-  );
+            # No docs
+            documentation.enable = lib.mkForce false;
+            documentation.nixos.enable = lib.mkForce false;
+
+            # No GCC toolchain
+            system.extraDependencies = lib.mkForce [ ];
+
+            # If you only need in-tree filesystems
+            # boot.supportedFilesystems = lib.mkForce [ ];
+
+            # Workarounds
+            disko = lib.mkForce { };
+          };
+        })
+        [
+          "install-iso"
+          "install-iso-hyperv"
+        ])
+    );
 }

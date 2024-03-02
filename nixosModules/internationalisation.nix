@@ -12,6 +12,10 @@ in
 
     i18n = {
       defaultLocale = lib.mkDefault "en_GB.UTF-8";
+      supportedLocales = [
+        "en_GB.UTF-8/UTF-8"
+        "nl_BE.UTF-8/UTF-8"
+      ];
       extraLocaleSettings = {
         # REF; https://man.archlinux.org/man/locale.7
         LC_CTYPE = lib.mkDefault "en_GB.UTF-8";
@@ -27,7 +31,6 @@ in
         LC_MEASUREMENT = lib.mkDefault "nl_BE.UTF-8";
         LC_IDENTIFICATION = lib.mkDefault "nl_BE.UTF-8";
       };
-      supportedLocales = [ "all" ];
     };
   };
 }

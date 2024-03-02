@@ -36,9 +36,9 @@
       # NOTE; That one nixos module defining the host configuration is also called a 'toplevel module'.
       commonNixosModules =
         let
-          not-toplevel = name: _: name != "hosts";
+          unwanted-filtering = name: _: name != "hosts" && name != "profiles";
         in
-        lib.attrValues (lib.filterAttrs not-toplevel self.outputs.nixosModules);
+        lib.attrValues (lib.filterAttrs unwanted-filtering self.outputs.nixosModules);
     in
     {
       # Load our custom functionality and variable types, without using 'lib' because that would result in
@@ -169,11 +169,62 @@
             # lib.mkIf and similar.
             lib = lib;
             # Additional custom arguments to each nixos module
-            specialArgs = { };
+            specialArgs = {
+              inherit (self.outputs.nixosModules) profiles;
+            };
             # The toplevel nixos module recursively imports relevant other modules
             modules = commonNixosModules ++ [ toplevel-module ];
           })
         self.nixosModules.hosts;
+
+      # Set with named binaries.
+      # Run with; nix run .#<binary-name>
+      # eg, packages.x86_64-linux.bootstrap = self.nixosConfigurations.bootstrap.config.formats.vm => nix run .#bootstrap-vm
+      packages = eachSystem
+        (pkgs:
+          let
+            # NOTE; config.formats.vm produces a shell script to launch qemu and can be run as; ./result
+            # The symlink points to a file, while 'nix run' expects a directory (installable) containing <out>/bin/<name>
+            #
+            # NOTE; This can/should be replaced with functionality from nixos-shell
+            systems = lib.mapAttrs'
+              (name: toplevel-module: lib.nameValuePair "${name}-vm"
+                (
+                  let
+                    system = pkgs.system;
+                    system-vm = lib.nixosSystem {
+                      system = null;
+                      lib = lib;
+                      specialArgs = {
+                        inherit (self.outputs.nixosModules) profiles;
+                      };
+                      modules = commonNixosModules ++ [
+                        ({
+                          imports = [
+                            toplevel-module
+                            self.outputs.nixosModules.profiles.local-vm-test
+                          ];
+                          # Force machine configuration to match the nix derivation path
+                          # packages.x86_64-linux builds a x86_64-linux VM.
+                          nixpkgs.hostPlatform = lib.mkForce system;
+                        })
+                      ];
+                    };
+                  in
+                  pkgs.writeShellApplication {
+                    name = "wrap-${name}-vm";
+                    runtimeInputs = [ system-vm.config.formats.vm-nogui ];
+                    text = ''
+                      # Any other bash preparation can be inserted here.
+                      # Make sure to end
+                      ${system-vm.config.formats.vm-nogui}
+                    '';
+                  }
+                ))
+              self.outputs.nixosModules.hosts;
+          in
+          systems // { }
+        );
 
       # Verify flake configurations with;
       # nix flake check --no-eval-cache
