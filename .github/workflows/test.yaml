@@ -1,0 +1,23 @@
+name: "Test PRs"
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+    # paths-ignore:
+    #   - docs/
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Nix flake inputs against policy
+        uses: DeterminateSystems/flake-checker-action@v5
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v9
+      - name: Prepare nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v2
+      - name: Test
+        run: |
+          nix flake check --log-format raw
