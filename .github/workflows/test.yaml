@@ -5,10 +5,12 @@ on:
   push:
     branches:
       - main
-    # paths-ignore:
-    #   - docs/
+    paths-ignore:
+      - .github/
+      - .vscode/
+      - docs/
 jobs:
-  build-iso:
+  flake-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +19,7 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v9
       - name: Prepare nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v2
+        uses: DeterminateSystems/magic-nix-cache-action@v3
       - name: Test
         run: |
           nix flake check --log-format raw
