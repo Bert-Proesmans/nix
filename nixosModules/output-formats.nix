@@ -34,12 +34,12 @@ in
       ++ (builtins.map
         (format: {
           "${format}" = { lib, ... }: {
-            # Faster and almost equally good compression
-            isoImage.squashfsCompression = "zstd -Xcompression-level 15";
+            # Faster and (almost) equally as good compression
+            isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 15";
 
             # Do not carry the entire package index, this will be downloaded later
-            proesmans.nix.references-on-disk = false;
-            system.installer.channel.enable = false;
+            proesmans.nix.references-on-disk = lib.mkForce false;
+            system.installer.channel.enable = lib.mkForce false;
 
             # No BIOS boot
             isoImage.makeBiosBootable = lib.mkForce false;
@@ -54,9 +54,11 @@ in
 
             # No GCC toolchain
             system.extraDependencies = lib.mkForce [ ];
+            # Remove default packages not required for a bootable system
+            environment.defaultPackages = lib.mkForce [ ];
 
-            # If you only need in-tree filesystems
-            # boot.supportedFilesystems = lib.mkForce [ ];
+            # Only in-tree supported filesystems are desired
+            boot.supportedFilesystems = lib.mkForce [ ];
 
             # Workarounds
             disko = lib.mkForce { };
