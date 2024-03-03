@@ -23,4 +23,4 @@ jobs:
           pr-labels: |                  # Labels to be set on the PR
             dependencies
             automated
-      - run: echo Update DONE, check pull request number ${{ steps.update.outputs.pull-request-number }}.
+      - run: echo Update DONE, check pull request number ${{ steps.update-lockfile.outputs.pull-request-number }}.
