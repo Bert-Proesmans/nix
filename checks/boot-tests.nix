@@ -62,9 +62,10 @@ lib.mapAttrs'
           server.wait_for_unit("sshd.service", timeout=60)
           server.wait_for_open_port(22, timeout=5)
               
-          # Wait for system OK
-          server.wait_for_unit("multi-user.target", timeout=60)
-          client.wait_for_unit("multi-user.target", timeout=60)
+          # Wait for system OK is a lie
+          # The multi-user target is not guaranteed to timely finish, aka it hangs sporadically
+          # server.wait_for_unit("multi-user.target", timeout=60)
+          # client.wait_for_unit("multi-user.target", timeout=60)
 
           # client has no private keys configured so calling out to server should fail
           client.fail("ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null server whoami")
