@@ -6,9 +6,9 @@ on:
     branches:
       - main
     paths-ignore:
-      - .github/
-      - .vscode/
-      - docs/
+      - '.github/**'
+      - '.vscode/**'
+      - 'docs/**'
 jobs:
   flake-check:
     runs-on: ubuntu-latest

@@ -5,9 +5,9 @@ on:
     branches:
       - main
     paths-ignore:
-      - .github/
-      - .vscode/
-      - docs/
+      - '.github/**'
+      - '.vscode/**'
+      - 'docs/**'
 jobs:
   build-iso:
     runs-on: ubuntu-latest
