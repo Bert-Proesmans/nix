@@ -7,6 +7,9 @@ on:
 jobs:
   update-lockfile:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push the branch for the PR
+      pull-requests: write # to open the PR
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
