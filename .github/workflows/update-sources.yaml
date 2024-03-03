@@ -1,0 +1,28 @@
+name: "Update the flake lock file"
+on:
+  workflow_dispatch: # allows manual triggering
+  schedule:
+    - cron: '0 0 * * 0' # runs weekly on Sunday at 00:00
+
+jobs:
+  update-lockfile:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push the branch for the PR
+      pull-requests: write # to open the PR
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v9
+      - name: Update flake.lock
+        uses: DeterminateSystems/update-flake-lock@v21
+        with:
+          token: ${{ secrets.GH_TOKEN_FOR_PR }} # Required for automations to run on created PR
+          nix-options: --log-format raw
+          pr-title: "Update flake.lock" # Title of PR to be created
+          pr-labels: |                  # Labels to be set on the PR
+            dependencies
+            automated
+      - name: Communicate
+        run: echo Update DONE, check pull request number ${{ steps.update-lockfile.outputs.pull-request-number }}.
