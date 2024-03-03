@@ -52,6 +52,8 @@
           ./library/network.nix
         ]);
 
+      debug = true;
+
       # Format entire flake with;
       # nix fmt
       #
