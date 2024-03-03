@@ -191,7 +191,6 @@
               (name: toplevel-module: lib.nameValuePair "${name}-vm"
                 (
                   let
-                    system = pkgs.system;
                     system-vm = lib.nixosSystem {
                       system = null;
                       lib = lib;
@@ -204,9 +203,9 @@
                             toplevel-module
                             self.outputs.nixosModules.profiles.local-vm-test
                           ];
-                          # Force machine configuration to match the nix derivation path
+                          # Force machine configuration to match the nix CLI build target attribute path
                           # packages.x86_64-linux builds a x86_64-linux VM.
-                          nixpkgs.hostPlatform = lib.mkForce system;
+                          nixpkgs.hostPlatform = lib.mkForce pkgs.system;
                         })
                       ];
                     };
@@ -223,8 +222,41 @@
                 ))
               self.outputs.nixosModules.hosts;
           in
-          systems // { }
-        );
+          systems // {
+            # Build machine 'development' for bootstrapping new hosts.
+            # Function 'extendModules' on attributes set from nixosSystem is not used because I want to
+            # disable stuff. 'extendModules' works by creating a wrapper around the already configured machine.
+            default = (lib.nixosSystem {
+              system = null;
+              lib = lib;
+              specialArgs = {
+                inherit (self.outputs.nixosModules) profiles;
+              };
+              modules = commonNixosModules ++ [
+                ({ lib, config, ... }: {
+                  imports = [
+                    self.outputs.nixosModules.hosts.development
+                    self.outputs.nixosModules.profiles.local-vm-test
+                  ];
+                  # Force machine configuration to match the nix CLI build target attribute path
+                  # packages.x86_64-linux builds a x86_64-linux VM.
+                  nixpkgs.hostPlatform = lib.mkForce pkgs.system;
+                  # Append all user ssh keys to the root user
+                  users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
+                    # Flatten all public keys into a single list
+                    (lib.attrsets.mapAttrsToList (_: user: user.openssh.authorizedKeys.keys)
+                      # For each user with attribute isNormalUser
+                      (lib.attrsets.filterAttrs (_: user: user.isNormalUser) config.users.users));
+
+                  # 90+ percentage of the cases I will need this image for virtual machine bootstrapping
+                  # ERROR; Dropping the firmware will make this configuration unbootable on real metal!
+                  hardware.enableRedistributableFirmware = lib.mkForce false;
+                  # Disable the vscode server patch because it's large as fuck
+                  services.vscode-server.enable = lib.mkForce false;
+                })
+              ];
+            }).config.formats.install-iso;
+          });
 
       # Verify flake configurations with;
       # nix flake check --no-eval-cache
