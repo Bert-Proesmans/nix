@@ -1,7 +1,4 @@
 { lib, config, pkgs, ... }: {
-  # Consistent defaults accross all machine configurations.
-  system.stateVersion = "23.11";
-
   networking.hostName = "development";
   networking.domain = "alpha.proesmans.eu";
 
@@ -11,12 +8,13 @@
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
+  proesmans.home-manager.enable = true;
 
   # Load Hyper-V kernel modules
   virtualisation.hypervGuest.enable = true;
 
   # Make me a user!
-  users.users.bertp = {
+  users.users.bert-proesmans = {
     isNormalUser = true;
     description = "Bert Proesmans";
     extraGroups = [ "wheel" ]
@@ -109,4 +107,8 @@
     "git.sr.ht".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
+
+  # Ignore below
+  # Consistent defaults accross all machine configurations.
+  system.stateVersion = "23.11";
 }

@@ -11,6 +11,10 @@
     nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    home-manager.url = "github:nix-community/home-manager";
+    # Non-versioned home-manager has the best chance to work with the unstable nixpkgs branch.
+    # If nixpkgs happens to be stable by default, then also version the home-manager release!
+    home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable"; # == "nixpkgs"
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -108,14 +112,18 @@
         };
       });
 
-      # nixOS modules are just lambda's with an attribute set as first argument, not a derivations.
-      # So nixOS modules on their own do nothing.
+      # nixOS modules are just lambda's with an attribute set as argument (arity of all nix functions is
+      # always one), not a derivations. So nixOS modules on their own do nothing.
+      #
+      # Refer to nixosModules.hosts for the definition/configuration of each machine. Those attribute sets
+      # include other modules defining more options, a tree of dependencies could be built with those sets
+      # at the root (or top). This turns those modules into toplevel modules.
       #
       # I do not want to add argument 'inputs' (as in flake inputs) into the nixos modules, because of
       # seperating concerns.
-      # That means some of the lambda's need to be curried. The mapping function below checks
-      # if the lambda must be curried (aka it's not a nixos module) and applies, otherwise 
-      # the lambda is passed through as is.
+      # That means some of the lambda's need to be curried (arity of all nix lambda's is ALWAY one (1)).
+      # The mapping function below checks if the lambda must be curried (aka it's not a nixos module)
+      # and applies, otherwise the lambda is passed through as is.
       #
       nixosModules =
         let
@@ -129,14 +137,16 @@
           apply-curry-if-required = lambda:
             let
               lambda-arguments = builtins.functionArgs lambda;
-              curry-arguments = { inherit inputs; };
-              # If we wanted to partially apply, intersection would be necessary.
-              # curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
-              # NOTE; Check if the lambda wants specifically '{inputs}'.
-              should-curry = (builtins.attrNames lambda-arguments)
-                == (builtins.attrNames curry-arguments);
+              curry-arguments = { inherit (self) inputs outputs; };
+              # We want to partially apply, for the technical challenge!
+              curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
+              should-curry =
+                # If there is at least one argument to apply
+                (builtins.length (builtins.attrNames curry-intersect)) > 0
+                # If the intersection is a full overlap with the requested arguments
+                && (builtins.attrNames lambda-arguments) == (builtins.attrNames curry-intersect);
             in
-            (if should-curry then (lambda curry-arguments) else lambda);
+            (if should-curry then (lambda curry-intersect) else lambda);
         in
         builtins.mapAttrs process-item (lib.rakeLeaves ./nixosModules);
 
@@ -176,6 +186,46 @@
             modules = commonNixosModules ++ [ toplevel-module ];
           })
         self.nixosModules.hosts;
+
+      # Home manager modules are just lambda's with an attribute set as argument (arity of all nix functions is
+      # always one), not a derivations. So home manager modules on their own do nothing.
+      #
+      # Refer to homeModules.users for the definition of each user's home configuration. Those attribute sets
+      # include other modules defining more options, a tree of dependencies could be built with those sets
+      # at the root (or top). This turns those modules into toplevel modules.
+      #
+      homeModules = (lib.rakeLeaves ./homeModules);
+
+      # Update home directories with; nix run github:nix-community/home-manager -- switch
+      #
+      # NOTE; This is using home-manager in standalone mode. This is useful for getting a consistent user configuration
+      # on machines that are not NixOS.
+      # All machines defined in this flake have home-manager built into the machine configuration. The home-configuration
+      # on NixOS machines will be updated through nixos-rebuild.
+      #
+      # Testing of home-configurations is not built into this flake. I have built a single basic integration test for the
+      # user bert-proesmans, see file ./checks/home-tests.nix.
+      #
+      # DISABLED; Standalone home-manager configuration is unused and untested. The homeModules are integrated in 
+      # "nixos-integrated-configuration" mode.
+      # homeConfigurations = eachSystem (pkgs: lib.mapAttrs
+      #   (user-reference: toplevel-module: inputs.home-manager.lib.homeManagerConfiguration {
+      #     # Home-manager is system agnostic, its options reference packages from the provided attribute set that has been
+      #     # specialized for a specific given system. 
+      #     inherit pkgs;
+      #     # The toplevel module will include other modules if necessary.
+      #     modules = [
+      #       toplevel-module
+      #       ({ lib, config, ... }: {
+      #         # Home-manager requires home.username and home.homeDirectory to be set, but it can/will only set 
+      #         # those options for nixos module config. The toplevel home-modules are _also_ used in standalone mode
+      #         # (next to integrated into nixos -mode) where an error will occur if these options are missing.
+      #         home.username = lib.mkDefault user-reference;
+      #         home.homeDirectory = lib.mkDefault "/home/${user-reference}";
+      #       })
+      #     ];
+      #   })
+      #   self.homeModules.users);
 
       # Set with named binaries.
       # Run with; nix run .#<binary-name>
@@ -277,8 +327,8 @@
       # follow up by machine.shell_interact() to drop into a shell on the node "machine".
       checks = eachSystem (pkgs: builtins.foldl' (acc: set: acc // set) { } (builtins.map
         (test-path: (import test-path) {
-          inherit (self) outputs;
-          inherit lib pkgs commonNixosModules;
+          inherit self lib pkgs commonNixosModules;
+          inherit (self) inputs outputs;
         })
         (builtins.attrValues (lib.flattenTree (lib.rakeLeaves ./checks)))));
     };
