@@ -233,6 +233,7 @@
       packages = eachSystem
         (pkgs:
           let
+            forced-system = pkgs.system;
             # NOTE; config.formats.vm produces a shell script to launch qemu and can be run as; ./result
             # The symlink points to a file, while 'nix run' expects a directory (installable) containing <out>/bin/<name>
             #
@@ -276,21 +277,12 @@
             # Build machine 'development' for bootstrapping new hosts.
             # Function 'extendModules' on attributes set from nixosSystem is not used because I want to
             # disable stuff. 'extendModules' works by creating a wrapper around the already configured machine.
-            default = (lib.nixosSystem {
-              system = null;
-              lib = lib;
-              specialArgs = {
-                inherit (self.outputs.nixosModules) profiles;
-              };
-              modules = commonNixosModules ++ [
-                ({ lib, config, ... }: {
-                  imports = [
-                    self.outputs.nixosModules.hosts.development
-                    self.outputs.nixosModules.profiles.local-vm-test
-                  ];
+            default = (self.outputs.nixosConfigurations.development.extendModules {
+              modules = [
+                ({ pkgs, lib, config, ... }: {
                   # Force machine configuration to match the nix CLI build target attribute path
                   # packages.x86_64-linux builds a x86_64-linux VM.
-                  nixpkgs.hostPlatform = lib.mkForce pkgs.system;
+                  nixpkgs.hostPlatform = lib.mkForce forced-system;
                   # Append all user ssh keys to the root user
                   users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
                     # Flatten all public keys into a single list
@@ -301,9 +293,81 @@
                   # 90+ percentage of the cases I will need this image for virtual machine bootstrapping
                   # ERROR; Dropping the firmware will make this configuration unbootable on real metal!
                   hardware.enableRedistributableFirmware = lib.mkForce false;
+                  # Don't store the repo files, only keep a reference for downloading later
+                  proesmans.nix.references-on-disk = lib.mkForce false;
                   # Disable the vscode server patch because it's large as fuck
                   services.vscode-server.enable = lib.mkForce false;
-                })
+
+                  # Nix pointers for the install script to work
+                  nix.nixPath = [ "/etc/nix/path" ];
+                  # NOTE; This flake (the value of variable 'self') is copied by-value into the bootstrap image.
+                  # AKA All files in this repository are copied into the resulting build.
+                  environment.etc."nix/path/my-flake".source = self;
+                  nix.registry.my-flake.flake = self;
+
+                  services.getty.helpLine = lib.mkAfter ''
+                    This machine has been configured with an installer script, run 'install-system' to (ya-know) install the system ☝️
+                  '';
+
+                  # Provide an installer script that performs all installation steps automagically
+                  environment.systemPackages = [
+                    (
+                      let
+                        install-system = pkgs.writeShellApplication {
+                          name = "inner-install-system";
+                          runtimeInputs = [ pkgs.nix pkgs.nixos-install-tools ]; # Cannot use pkgs.sudo, for workaround see 'export PATH' below
+                          text = ''
+                            # Script that formats disks, and mounts partitions, and installs data from the development machine
+                            # NOTE; 'my-flake' is a flake reference, installed through nixos option nix.registry (see above)
+                            # my-flake is a reference to this flake
+
+                            # Fun fact; Sudo does not work in a pure shell. It fails with error 'sudo must be owned by uid 0 and have the setuid bit set'
+                            # Nixos has someting called security wrappers (nixos option security.wrapper) which perform additional 
+                            # setup during the shell init, wrapping sudo and other security related binaries.
+                            # The export below pulls in all programs that were wrapped by the system configuration. Impure, sadly..
+                            export PATH="${config.security.wrapperDir}:$PATH"
+                        
+                            echo "# Install wrapper started"
+
+                            pushd "$(mktemp -d -p "/tmp" install-XXXXXX)"
+                            TEMPD=$(pwd)
+                            trap "exit 1" HUP INT PIPE QUIT TERM
+                            trap "popd" EXIT
+                            echo "# Changed into temporary directory $TEMPD"
+
+                            nix build --out-link disko-script my-flake#nixosConfigurations.development.config.system.build.diskoScript
+                              echo "# Built disk format+mounting script"
+                            nix build --out-link system-closure my-flake#nixosConfigurations.development.config.system.build.toplevel
+                              echo "# Built system configuration"
+
+                            sudo ./disko-script
+                              echo "# Disks formatted"
+                            # NOTE; '0' as value for cores means "use all available cores"
+                            sudo nixos-install --no-channel-copy --no-root-password --max-jobs 4 --cores 0 --system "$(readlink ./system-closure)"
+                              echo "# System installed"
+
+                            echo "# Script done"
+                          '';
+                        };
+                      in
+                      # Wrapper script for capturing the output of the actual installation progress
+                      pkgs.writeShellApplication {
+                        name = "install-system";
+                        runtimeInputs = [ install-system ];
+                        text = ''
+                          # Create a temporary log file with a unique name
+                          log_file="$(mktemp -t install-system.XXXXXX.log)"
+
+                          # Execute the wrapped script, capturing both stdout and stderr
+                          "${lib.getExe install-system}" 2>&1 | tee "$log_file"
+
+                          echo "Execution log is saved at: $log_file"
+                        '';
+                      }
+                    )
+                  ];
+                }
+                )
               ];
             }).config.formats.install-iso;
           });

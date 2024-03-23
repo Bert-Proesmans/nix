@@ -1,4 +1,8 @@
 { lib, config, pkgs, ... }: {
+  # Enables (nested) virtualization through hardware acceleration.
+  # There is no harm in having both modules loaded at the same time, also no real overhead.
+  boot.kernelModules = [ "kvm-amd" "kvm-intel" ];
+
   networking.hostName = "development";
   networking.domain = "alpha.proesmans.eu";
 
@@ -85,12 +89,11 @@
 
   # Hyper-V does not emulate PCI devices, so network adapters remain on their ethX names
   # eth0 receives an address by DHCP and provides the default gateway route
-  # eth1 is configured with a stable address for SSH
+  # eth0 also gets a stable link-local address for SSH
   networking.interfaces.eth0.useDHCP = true;
-  networking.interfaces.eth1.ipv4.addresses = [{
-    # V4 link local address
+  networking.interfaces.eth0.ipv4.addresses = [{
     address = "169.254.245.139";
-    prefixLength = 24;
+    prefixLength = 16;
   }];
 
   # Avoid TOFU MITM with github by providing their public key here.

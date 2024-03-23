@@ -37,7 +37,7 @@ in
 
       disko.devices = {
         disk.disk1 = {
-          device = cfg.proesmans.filesystem.simple-disk.device;
+          device = cfg.simple-disk.device;
           type = "disk";
           content = {
             type = "gpt";
