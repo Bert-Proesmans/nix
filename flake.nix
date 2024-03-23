@@ -389,11 +389,12 @@
       # nix build .#checks.<system>.<machine-name>-test.driverInteractive --no-eval-cache && ./result/bin/nixos-test-driver
       # This will drop you in a python shell to control your machines. Type start_all() launch all test nodes,
       # follow up by machine.shell_interact() to drop into a shell on the node "machine".
-      checks = eachSystem (pkgs: builtins.foldl' (acc: set: acc // set) { } (builtins.map
-        (test-path: (import test-path) {
-          inherit self lib pkgs commonNixosModules;
-          inherit (self) inputs outputs;
-        })
-        (builtins.attrValues (lib.flattenTree (lib.rakeLeaves ./checks)))));
+      checks = eachSystem
+        (pkgs: builtins.foldl' (acc: set: acc // set) { } (builtins.map
+          (test-path: (import test-path) {
+            inherit self lib pkgs commonNixosModules;
+            inherit (self) inputs outputs;
+          })
+          (builtins.attrValues (lib.flattenTree (lib.rakeLeaves ./checks)))));
     };
 }

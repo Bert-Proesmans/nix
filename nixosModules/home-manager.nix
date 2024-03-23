@@ -3,7 +3,7 @@ let
   hm-module = inputs.home-manager.nixosModules.default;
   home-configurations = outputs.homeModules.users;
 in
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 let
   cfg = config.proesmans.home-manager;
   cfg-users = config.users.users;
