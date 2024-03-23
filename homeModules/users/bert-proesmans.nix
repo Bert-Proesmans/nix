@@ -67,6 +67,7 @@
   };
 
   programs.bat.enable = true;
+  programs.bat.config.theme = "Visual Studio Dark+";
   programs.broot.enable = true;
   programs.eza.enable = true;
   programs.eza.git = true;
