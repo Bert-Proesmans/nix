@@ -14,7 +14,7 @@ $VHDPath = "C:\ProgramData\Microsoft\Windows\Virtual Hard Disks\$VMName.vhdx"
 $ISOPath = "C:\Path\To\Your\ISO\file.iso"  # Change this to your ISO file path
 
 # Create a new virtual machine
-New-VM -Name $VMName -Path $VMPath -Generation 2 -MemoryStartupBytes $MemoryStartupBytes
+New-VM -Name $VMName -Path $VMPath -Generation 2 -MemoryStartupBytes $MemoryStartupBytes -SwitchName "Default Switch"
 # Enable nested virtualization
 # Make sure to enable the kvm_{intel,amd} kernel modules, and configure KVM for nested virtualization.
 # WARN; `cat /sys/module/{kvm,amd}_intel/parameters/nested` must print 'Y'
@@ -22,7 +22,6 @@ Set-VMProcessor -VMName $VMName -ExposeVirtualizationExtensions $true
 Set-VMProcessor -VMName $VMName -Count $Cores -Reserve 10 -Maximum 75
 Set-VMFirmware -VMName $VMName -EnableSecureBoot 'Off'
 
-Add-VMNetworkAdapter -VMName $VMName -SwitchName "Default Switch"
 # Enable MAC address spoofing so the nested VM's can have their own MAC
 Set-VMNetworkAdapter -VMName $VMName -MacAddressSpoofing 'On' -DhcpGuard 'On'
 # Assign a link-local IP to the default switch host adapter, this enables connectivity with the VM later
