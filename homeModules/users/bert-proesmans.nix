@@ -58,6 +58,10 @@
   programs.ssh.enable = true;
   programs.ssh.hashKnownHosts = true;
   programs.ssh.forwardAgent = false;
+  programs.ssh.matchBlocks = {
+    "development".hostname = "fe80::1";
+    "buddy".hostname = "192.168.88.10";
+  };
 
   programs.atuin.enable = true;
   programs.atuin.settings = {
