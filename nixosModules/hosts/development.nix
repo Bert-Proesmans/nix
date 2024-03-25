@@ -95,6 +95,10 @@
     address = "169.254.245.139";
     prefixLength = 16;
   }];
+  networking.interfaces.eth0.ipv6.addresses = [{
+    address = "fe80::1";
+    prefixLength = 10;
+  }];
 
   # Avoid TOFU MITM with github by providing their public key here.
   programs.ssh.knownHosts = {
