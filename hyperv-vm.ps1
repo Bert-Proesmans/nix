@@ -22,10 +22,18 @@ Set-VMProcessor -VMName $VMName -ExposeVirtualizationExtensions $true
 Set-VMProcessor -VMName $VMName -Count $Cores -Reserve 10 -Maximum 75
 Set-VMFirmware -VMName $VMName -EnableSecureBoot 'Off'
 
+# Add second adapter for host<->vm connectivity
+# ERROR; If the commands below don't work for you you're shit out of luck and that's the state of Hyper-V where
+# seemingly simple shit goes down so bad in a way that is so complex that even the "how" you should figure your shit
+# out is made impossible because the debugging commands also don't work. It's all built on sheit.
+New-VMSwitch -Name "Static Net" -SwitchType Internal
+Add-VMNetworkAdapter -VMName $VMName -SwitchName "Static Net" -Name "Static Net"
+New-NetIPAddress -InterfaceAlias "vEthernet (Static Net)" -IPAddress "169.254.245.1" -PrefixLength 24
+New-NetIPAddress -InterfaceAlias "vEthernet (Static Net)" -IPAddress "fe80::1" -PrefixLength 64
+
 # Enable MAC address spoofing so the nested VM's can have their own MAC
+# WARN; This applies to all VM adapters!
 Set-VMNetworkAdapter -VMName $VMName -MacAddressSpoofing 'On' -DhcpGuard 'On'
-# Assign a link-local IP to the default switch host adapter, this enables connectivity with the VM later
-New-NetIPAddress -InterfaceAlias "vEthernet (Default Switch)" -IPAddress "169.254.245.200" -PrefixLength 16
 
 # Attach a new virtual hard disk to the VM
 New-VHD -Path $VHDPath -SizeBytes $VHDSizeBytes -Dynamic

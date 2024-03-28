@@ -89,15 +89,17 @@
 
   # Hyper-V does not emulate PCI devices, so network adapters remain on their ethX names
   # eth0 receives an address by DHCP and provides the default gateway route
-  # eth0 also gets a stable link-local address for SSH
+  # eth1 gets a stable link-local address for SSH, because Windows goes fucky wucky with
+  # the host bridge network adapter and that's sad because IP's and routes won't stick
+  # after a reboot.
   networking.interfaces.eth0.useDHCP = true;
-  networking.interfaces.eth0.ipv4.addresses = [{
+  networking.interfaces.eth1.ipv4.addresses = [{
     address = "169.254.245.139";
-    prefixLength = 16;
+    prefixLength = 24;
   }];
-  networking.interfaces.eth0.ipv6.addresses = [{
-    address = "fe80::1";
-    prefixLength = 10;
+  networking.interfaces.eth1.ipv6.addresses = [{
+    address = "fe80::139";
+    prefixLength = 64;
   }];
 
   # Avoid TOFU MITM with github by providing their public key here.
