@@ -50,11 +50,24 @@
       # 1. Import each path, resulting in multiple lambdas
       # 2. Apply the final library on every lambda, resulting in multiple attribute sets
       # 3. Shallow merge each attribute set, into lib
-      lib = builtins.foldl' (acc: set: acc // set) { }
-        (builtins.map (lib-path: (import lib-path) lib) [
+      lib =
+        let
+          # Taken from lib.pipe, for code clarity
+          pipe = builtins.foldl' (x: f: f x);
+        in
+        pipe [
+          # Add library files here
           ./library/importers.nix
           ./library/network.nix
-        ]);
+        ] [
+          # Import each library path, results in lambdas
+          (builtins.map (file-path: import file-path))
+          # Apply the final library to every lambda, results in attribute sets
+          (builtins.map (lambda: lambda /* `lib` is from `let .. in` above */ lib))
+          # Shallow merge the attribute set, results in exported lib. 
+          # ERROR; Last attribute set wins in case of name conflicts (that's why fold-left)
+          (builtins.foldl' (final: part: final // part) { /* starts with empty set */ })
+        ];
 
       # Format entire flake with;
       # nix fmt
@@ -230,147 +243,129 @@
       # Set with named binaries.
       # Run with; nix run .#<binary-name>
       # eg, packages.x86_64-linux.bootstrap = self.nixosConfigurations.bootstrap.config.formats.vm => nix run .#bootstrap-vm
-      packages = eachSystem
-        (pkgs:
-          let
-            forced-system = pkgs.system;
-            # NOTE; config.formats.vm produces a shell script to launch qemu and can be run as; ./result
-            # The symlink points to a file, while 'nix run' expects a directory (installable) containing <out>/bin/<name>
-            #
-            # NOTE; This can/should be replaced with functionality from nixos-shell
-            systems = lib.mapAttrs'
-              (name: toplevel-module: lib.nameValuePair "${name}-vm"
-                (
-                  let
-                    system-vm = lib.nixosSystem {
-                      system = null;
-                      lib = lib;
-                      specialArgs = {
-                        inherit (self.outputs.nixosModules) profiles;
-                      };
-                      modules = commonNixosModules ++ [
-                        ({
-                          imports = [
-                            toplevel-module
-                            self.outputs.nixosModules.profiles.local-vm-test
-                          ];
-                          # Force machine configuration to match the nix CLI build target attribute path
-                          # packages.x86_64-linux builds a x86_64-linux VM.
-                          nixpkgs.hostPlatform = lib.mkForce pkgs.system;
-                        })
-                      ];
-                    };
-                  in
-                  pkgs.writeShellApplication {
-                    name = "wrap-${name}-vm";
-                    runtimeInputs = [ system-vm.config.formats.vm-nogui ];
-                    text = ''
-                      # Any other bash preparation can be inserted here.
-                      # Make sure to end
-                      ${system-vm.config.formats.vm-nogui}
-                    '';
-                  }
-                ))
-              self.outputs.nixosModules.hosts;
-          in
-          systems // {
-            # Build machine 'development' for bootstrapping new hosts.
-            # Function 'extendModules' on attributes set from nixosSystem is not used because I want to
-            # disable stuff. 'extendModules' works by creating a wrapper around the already configured machine.
-            default = (self.outputs.nixosConfigurations.development.extendModules {
+      packages = eachSystem (pkgs:
+        let
+          # Force the system architecture to that of the host for native virtualization (no emulation required)
+          forced-system = pkgs.system;
+          systems = lib.flip builtins.mapAttrs self.outputs.nixosConfigurations
+            (_name: configuration: configuration.extendModules {
               modules = [
-                ({ pkgs, lib, config, ... }: {
+                self.outputs.nixosModules.profiles.local-vm-test
+                ({ lib, ... }: {
                   # Force machine configuration to match the nix CLI build target attribute path
                   # packages.x86_64-linux builds a x86_64-linux VM.
                   nixpkgs.hostPlatform = lib.mkForce forced-system;
-                  # Append all user ssh keys to the root user
-                  users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
-                    # Flatten all public keys into a single list
-                    (lib.attrsets.mapAttrsToList (_: user: user.openssh.authorizedKeys.keys)
-                      # For each user with attribute isNormalUser
-                      (lib.attrsets.filterAttrs (_: user: user.isNormalUser) config.users.users));
-
-                  # 90+ percentage of the cases I will need this image for virtual machine bootstrapping
-                  # ERROR; Dropping the firmware will make this configuration unbootable on real metal!
-                  hardware.enableRedistributableFirmware = lib.mkForce false;
-                  # Don't store the repo files, only keep a reference for downloading later
-                  proesmans.nix.references-on-disk = lib.mkForce false;
-                  # Disable the vscode server patch because it's large as fuck
-                  services.vscode-server.enable = lib.mkForce false;
-
-                  # Nix pointers for the install script to work
-                  nix.nixPath = [ "/etc/nix/path" ];
-                  # NOTE; This flake (the value of variable 'self') is copied by-value into the bootstrap image.
-                  # AKA All files in this repository are copied into the resulting build.
-                  environment.etc."nix/path/my-flake".source = self;
-                  nix.registry.my-flake.flake = self;
-
-                  services.getty.helpLine = lib.mkAfter ''
-                    This machine has been configured with an installer script, run 'install-system' to (ya-know) install the system ☝️
-                  '';
-
-                  # Provide an installer script that performs all installation steps automagically
-                  environment.systemPackages = [
-                    (
-                      let
-                        install-system = pkgs.writeShellApplication {
-                          name = "inner-install-system";
-                          runtimeInputs = [ pkgs.nix pkgs.nixos-install-tools ]; # Cannot use pkgs.sudo, for workaround see 'export PATH' below
-                          text = ''
-                            # Script that formats disks, and mounts partitions, and installs data from the development machine
-                            # NOTE; 'my-flake' is a flake reference, installed through nixos option nix.registry (see above)
-                            # my-flake is a reference to this flake
-
-                            # Fun fact; Sudo does not work in a pure shell. It fails with error 'sudo must be owned by uid 0 and have the setuid bit set'
-                            # Nixos has someting called security wrappers (nixos option security.wrapper) which perform additional 
-                            # setup during the shell init, wrapping sudo and other security related binaries.
-                            # The export below pulls in all programs that were wrapped by the system configuration. Impure, sadly..
-                            export PATH="${config.security.wrapperDir}:$PATH"
-                        
-                            echo "# Install wrapper started"
-
-                            pushd "$(mktemp -d -p "/tmp" install-XXXXXX)"
-                            TEMPD=$(pwd)
-                            trap "exit 1" HUP INT PIPE QUIT TERM
-                            trap "popd" EXIT
-                            echo "# Changed into temporary directory $TEMPD"
-
-                            nix build --out-link disko-script my-flake#nixosConfigurations.development.config.system.build.diskoScript
-                              echo "# Built disk format+mounting script"
-                            nix build --out-link system-closure my-flake#nixosConfigurations.development.config.system.build.toplevel
-                              echo "# Built system configuration"
-
-                            sudo ./disko-script
-                              echo "# Disks formatted"
-                            # NOTE; '0' as value for cores means "use all available cores"
-                            sudo nixos-install --no-channel-copy --no-root-password --max-jobs 4 --cores 0 --system "$(readlink ./system-closure)"
-                              echo "# System installed"
-
-                            echo "# Script done"
-                          '';
-                        };
-                      in
-                      # Wrapper script for capturing the output of the actual installation progress
-                      pkgs.writeShellApplication {
-                        name = "install-system";
-                        runtimeInputs = [ install-system ];
-                        text = ''
-                          # Create a temporary log file with a unique name
-                          log_file="$(mktemp -t install-system.XXXXXX.log)"
-
-                          # Execute the wrapped script, capturing both stdout and stderr
-                          "${lib.getExe install-system}" 2>&1 | tee "$log_file"
-
-                          echo "Execution log is saved at: $log_file"
-                        '';
-                      }
-                    )
-                  ];
-                }
-                )
+                })
               ];
-            }).config.formats.install-iso;
-          });
+            });
+          # ERROR; The attribute `vm-nogui` creates a script, but not in the form of an application package.
+          # The script is wrapped so 'nix run' can find and execute it.
+          wrap-launcher = name: configuration: pkgs.writeShellApplication {
+            name = "launch-wrapper-${name}";
+            text = ''
+              # All preparations before launching the virtual machine goes here
+              ${configuration.config.formats.vm-nogui}
+            '';
+          };
+        in
+        (builtins.mapAttrs wrap-launcher systems) // {
+          # Build machine 'development' for bootstrapping new hosts.
+          # Function 'extendModules' on attributes set from nixosSystem is not used because I want to
+          # disable stuff. 'extendModules' works by creating a wrapper around the already configured machine.
+          default = (self.outputs.nixosConfigurations.development.extendModules {
+            modules = [
+              ({ pkgs, lib, config, ... }: {
+                # Force machine configuration to match the nix CLI build target attribute path
+                # packages.x86_64-linux builds a x86_64-linux VM.
+                nixpkgs.hostPlatform = lib.mkForce forced-system;
+                # Append all user ssh keys to the root user
+                users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
+                  # Flatten all public keys into a single list
+                  (lib.attrsets.mapAttrsToList (_: user: user.openssh.authorizedKeys.keys)
+                    # For each user with attribute isNormalUser
+                    (lib.attrsets.filterAttrs (_: user: user.isNormalUser) config.users.users));
+
+                # 90+ percentage of the cases I will need this image for virtual machine bootstrapping
+                # ERROR; Dropping the firmware will make this configuration unbootable on real metal!
+                hardware.enableRedistributableFirmware = lib.mkForce false;
+                # Don't store the repo files, only keep a reference for downloading later
+                proesmans.nix.references-on-disk = lib.mkForce false;
+                # Disable the vscode server patch because it's large as fuck
+                services.vscode-server.enable = lib.mkForce false;
+
+                # Nix pointers for the install script to work
+                nix.nixPath = [ "/etc/nix/path" ];
+                # NOTE; This flake (the value of variable 'self') is copied by-value into the bootstrap image.
+                # AKA All files in this repository are copied into the resulting build.
+                environment.etc."nix/path/my-flake".source = self;
+                nix.registry.my-flake.flake = self;
+
+                services.getty.helpLine = lib.mkAfter ''
+                  This machine has been configured with an installer script, run 'install-system' to (ya-know) install the system ☝️
+                '';
+
+                # Provide an installer script that performs all installation steps automagically
+                environment.systemPackages = [
+                  (
+                    let
+                      install-system = pkgs.writeShellApplication {
+                        name = "inner-install-system";
+                        runtimeInputs = [ pkgs.nix pkgs.nixos-install-tools ]; # Cannot use pkgs.sudo, for workaround see 'export PATH' below
+                        text = ''
+                          # Script that formats disks, and mounts partitions, and installs data from the development machine
+                          # NOTE; 'my-flake' is a flake reference, installed through nixos option nix.registry (see above)
+                          # my-flake is a reference to this flake
+
+                          # Fun fact; Sudo does not work in a pure shell. It fails with error 'sudo must be owned by uid 0 and have the setuid bit set'
+                          # Nixos has someting called security wrappers (nixos option security.wrapper) which perform additional 
+                          # setup during the shell init, wrapping sudo and other security related binaries.
+                          # The export below pulls in all programs that were wrapped by the system configuration. Impure, sadly..
+                          export PATH="${config.security.wrapperDir}:$PATH"
+                        
+                          echo "# Install wrapper started"
+
+                          pushd "$(mktemp -d -p "/tmp" install-XXXXXX)"
+                          TEMPD=$(pwd)
+                          trap "exit 1" HUP INT PIPE QUIT TERM
+                          trap "popd" EXIT
+                          echo "# Changed into temporary directory $TEMPD"
+
+                          nix build --out-link disko-script my-flake#nixosConfigurations.development.config.system.build.diskoScript
+                            echo "# Built disk format+mounting script"
+                          nix build --out-link system-closure my-flake#nixosConfigurations.development.config.system.build.toplevel
+                            echo "# Built system configuration"
+
+                          sudo ./disko-script
+                            echo "# Disks formatted"
+                          # NOTE; '0' as value for cores means "use all available cores"
+                          sudo nixos-install --no-channel-copy --no-root-password --max-jobs 4 --cores 0 --system "$(readlink ./system-closure)"
+                            echo "# System installed"
+
+                          echo "# Script done"
+                        '';
+                      };
+                    in
+                    # Wrapper script for capturing the output of the actual installation progress
+                    pkgs.writeShellApplication {
+                      name = "install-system";
+                      runtimeInputs = [ install-system ];
+                      text = ''
+                        # Create a temporary log file with a unique name
+                        log_file="$(mktemp -t install-system.XXXXXX.log)"
+
+                        # Execute the wrapped script, capturing both stdout and stderr
+                        "${lib.getExe install-system}" 2>&1 | tee "$log_file"
+
+                        echo "Execution log is saved at: $log_file"
+                      '';
+                    }
+                  )
+                ];
+              }
+              )
+            ];
+          }).config.formats.install-iso;
+        });
 
       # Verify flake configurations with;
       # nix flake check --no-eval-cache
@@ -389,12 +384,23 @@
       # nix build .#checks.<system>.<machine-name>-test.driverInteractive --no-eval-cache && ./result/bin/nixos-test-driver
       # This will drop you in a python shell to control your machines. Type start_all() launch all test nodes,
       # follow up by machine.shell_interact() to drop into a shell on the node "machine".
-      checks = eachSystem
-        (pkgs: builtins.foldl' (acc: set: acc // set) { } (builtins.map
-          (test-path: (import test-path) {
-            inherit self lib pkgs commonNixosModules;
-            inherit (self) inputs outputs;
-          })
-          (builtins.attrValues (lib.flattenTree (lib.rakeLeaves ./checks)))));
+      checks = eachSystem (pkgs: lib.pipe ./checks [
+        # Read checks folder, outputs the file structure containing tests
+        (lib.rakeLeaves)
+        # Flatten nested attribute sets, outputs name-value pairs on a single level
+        (lib.flattenTree)
+        # Keep the nix file paths
+        (builtins.attrValues)
+        # Import file, outputs lambdas that produce test derivations
+        (builtins.map (file-path: (import file-path)))
+        # Apply lambdas, outputs test derivations
+        (builtins.map (lambda: lambda {
+          inherit self lib pkgs commonNixosModules;
+          inherit (self) inputs outputs;
+        }))
+        # Shallow merge the attribute set, results in exported checks
+        # ERROR; Last attribute set wins in case of name conflicts (that's why fold-left)
+        (builtins.foldl' (final: part: final // part) { /* starts with empty set */ })
+      ]);
     };
 }
