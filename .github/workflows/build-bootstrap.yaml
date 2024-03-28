@@ -1,13 +1,15 @@
 name: "Build bootstrap ISO"
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '.github/**'
-      - '.vscode/**'
-      - 'docs/**'
+  workflow_dispatch: # runs whenever I want it to
+  schedule:
+    - cron: '0 0 1 * *' # runs monthly at 00:00
+  # push:
+  #   branches:
+  #     - main
+  #   paths-ignore:
+  #     - '.github/**'
+  #     - '.vscode/**'
+  #     - 'docs/**'
 jobs:
   build-iso:
     runs-on: ubuntu-latest
