@@ -33,6 +33,8 @@ in
       nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
       # The default at 10 is rarely enough.
       nix.settings.log-lines = lib.mkDefault 25;
+      # Dirty git repo becomes tiresome really quickly...
+      nix.settings.warn-dirty = false;
 
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
       # defined from options nixpkgs.*
@@ -59,6 +61,13 @@ in
           };
         })
       ];
+
+      # Need to explicitly set trusted users so they can push additional content to the machine
+      # TODO; Figure out what trusted-users exactly means; proper usage might involve a two-step process
+      # by privileged publishing to a build cache, and pulling from trusted build caches. Probably need a dedicated
+      # build host too.
+      # REF; https://nixos.wiki/wiki/Nixos-rebuild
+      nix.settings.trusted-users = [ "@wheel" ];
 
       # Enroll some more trusted binary caches
       nix.settings.trusted-substituters = [

@@ -67,7 +67,9 @@
   programs.atuin.settings = {
     update_check = false;
     dialect = "uk";
-    enter_accept = false;
+    enter_accept = true;
+    prefers_reduced_motion = true;
+    filter_mode_shell_up_key_binding = "directory";
   };
 
   programs.bat.enable = true;
