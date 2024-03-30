@@ -278,6 +278,8 @@
                 # Force machine configuration to match the nix CLI build target attribute path
                 # packages.x86_64-linux builds a x86_64-linux VM.
                 nixpkgs.hostPlatform = lib.mkForce forced-system;
+                # Make sure EFI store is writable because we're installing!
+                boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
                 # Append all user ssh keys to the root user
                 users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
                   # Flatten all public keys into a single list
