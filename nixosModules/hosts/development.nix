@@ -6,6 +6,17 @@
   networking.hostName = "development";
   networking.domain = "alpha.proesmans.eu";
 
+  # Generated with `head -c4 /dev/urandom | od -A none -t x4`
+  # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
+  # It's best practise to mark the pools as 'exported' before moving them between systems.
+  # NOTE; Force importing is possible, ofcourse.
+  networking.hostId = "9c522fc1";
+  boot.supportedFilesystems = [ "zfs" ];
+  boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
+  # Leave ZFS pool alone!
+  boot.zfs.forceImportRoot = false;
+  boot.zfs.forceImportAll = false;
+
   proesmans.filesystem.simple-disk.enable = true;
   proesmans.nix.linux-64 = true;
   proesmans.nix.garbage-collect.enable = true;
