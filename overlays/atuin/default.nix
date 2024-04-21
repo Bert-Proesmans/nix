@@ -1,6 +1,7 @@
 # This is an overlay lambda
 _final: prev: {
-  atuin = prev.atuin.overrideAttrs (_old: {
+  atuin = prev.atuin.overrideAttrs (old: {
+    version = "${old.version}-zfs-fast";
     patches = [
       # Workaround sync hang with SQLite WAL
       # REF; https://github.com/atuinsh/atuin/issues/952
