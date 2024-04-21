@@ -404,5 +404,14 @@
         # ERROR; Last attribute set wins in case of name conflicts (that's why fold-left)
         (builtins.foldl' (final: part: final // part) { /* starts with empty set */ })
       ]);
+
+      # Overwrite (aka patch) functionality defined by the inputs, mostly nixpkgs.
+      #
+      # These attributes are lambda's that don't do anything on their own. Use the `overlay`
+      # options to incorporate them into your configuration.
+      # eg; (nixos options) nixpkgs.overlays = self.outputs.overlays;
+      #
+      # See also; nixosModules.nix-system
+      overlays = builtins.mapAttrs (_: file-path: (import file-path)) (lib.rakeLeaves ./overlays);
     };
 }

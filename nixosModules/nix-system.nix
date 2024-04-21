@@ -1,6 +1,8 @@
-{ inputs }:
+{ inputs, outputs }:
 let
   nixpkgs-stable = inputs.nixpkgs-stable;
+  nixpkgs-overlays = builtins.attrValues outputs.overlays;
+
   # Add additional package repositories (input flakes) below.
   # nixpkgs is a symlink to the stable source, kept for consistency with online guides
   nix-registry = { inherit (inputs) nixpkgs nixpkgs-stable nixpkgs-unstable; };
@@ -38,7 +40,8 @@ in
 
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
       # defined from options nixpkgs.*
-      nixpkgs.overlays = [
+      nixpkgs.overlays = nixpkgs-overlays
+        ++ [
         (_self': _super: {
           # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
           # with an infinite recursion.

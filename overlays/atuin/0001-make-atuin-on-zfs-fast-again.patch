@@ -1,0 +1,21 @@
+--- a/atuin-client/src/database.rs
++++ b/atuin-client/src/database.rs
+@@ -138,6 +138,7 @@ impl Sqlite {
+ 
+         let opts = SqliteConnectOptions::from_str(path.as_os_str().to_str().unwrap())?
+             .journal_mode(SqliteJournalMode::Wal)
++            .synchronous(sqlx::sqlite::SqliteSynchronous::Off)
+             .optimize_on_close(true, None)
+             .synchronous(SqliteSynchronous::Normal)
+             .with_regexp()
+
+--- a/atuin-client/src/record/sqlite_store.rs
++++ b/atuin-client/src/record/sqlite_store.rs
+@@ -42,6 +42,7 @@ impl SqliteStore {
+ 
+         let opts = SqliteConnectOptions::from_str(path.as_os_str().to_str().unwrap())?
+             .journal_mode(SqliteJournalMode::Wal)
++            .synchronous(sqlx::sqlite::SqliteSynchronous::Off)
+             .foreign_keys(true)
+             .create_if_missing(true);
+ 

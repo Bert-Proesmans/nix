@@ -18,13 +18,19 @@ in
       type = lib.types.str;
       description = lib.mdDoc "The name of the one disk to format";
     };
+    simple-disk.systemd-boot.enable = lib.mkEnableOption (lib.mdDoc "Use the systemd bootloader");
   };
 
   config = lib.mkMerge [
     (lib.mkIf cfg.simple-disk.enable {
+      # Cleaning tmp directory not required if it's a tmpfs
+      # Enabling tmpfs for tmp also prevents additional SSD writes
+      boot.tmp.cleanOnBoot = lib.mkDefault (!config.boot.tmp.useTmpfs);
+    })
+    (lib.mkIf (cfg.simple-disk.enable && cfg.simple-disk.systemd-boot.enable) {
       # EFI boot!
-      boot.loader.systemd-boot.enable = true;
-      boot.tmp.cleanOnBoot = true;
+      boot.loader.systemd-boot.enable = lib.mkDefault true;
+      boot.loader.systemd-boot.editor = false;
     })
     (lib.mkIf cfg.simple-disk.enable {
       assertions = [{
