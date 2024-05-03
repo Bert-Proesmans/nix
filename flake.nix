@@ -17,6 +17,8 @@
     home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable"; # == "nixpkgs"
     vscode-server.url = "github:nix-community/nixos-vscode-server";
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
+    microvm.url = "github:astro/microvm.nix";
+    microvm.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
