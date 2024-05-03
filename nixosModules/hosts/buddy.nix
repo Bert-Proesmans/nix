@@ -263,7 +263,10 @@
         # HELP; Disable access time selectively per dataset
         relatime = "on";
         # NOTE; Make standard record size explicit
+        # NOTE; Within hard disk pools it's better to go for bigger recordsizes to optimize away the static
+        # seek time latency. But this improves the ratio of latency while increasing the average latency.
         # HELP; Change record size per dataset, there are various online sources with information
+        # HELP; If application level caching is present, push the recordsize upwards
         recordsize = "128K";
         # NOTE; Compare filenames after normalizing using KC unicode conversion table. This turns characters into
         # equivalent characters; fullwidth "Ａ" (U+FF21) -> "A" (U+0041) [lossy conversion!!]
@@ -271,6 +274,11 @@
         # NOTE; Activate ZIL direct mode. This reduces pool fragmentation while burning through an (old) SSD SLOG device.
         # NOTE; ZIL blocks (aka the journal) are ephemeral, after the transaction commit they are erased. If those blocks were written
         # to the data vdevs, this causes data holes of various sizes aka bad fragmentation.
+        # NOTE; Continuous and/or random writes are collected into the ZIL until a continuous block of `recordsize` data is present. Then
+        # that data gets written to the data vdevs on next commit (or filesystem sync request). The ZIL is part of the pool, but `recordsize`
+        # depends on the target dataset configuration.
+        # AKA; A bittorrent client might be performing small random writes accross the files until downloading completes, but the to-disk
+        # behaviour of ZFS is not actually that small nor random! (Given there is no program requesting filesystem syncs)
         #
         # Bias ZIL on throughput
         # When ZIL indirect mode writes records to the data vdevs, it writes data blocks to the data vdevs too. The data is 
@@ -354,10 +362,28 @@
           options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
         };
         #"safe" = { };
-        "safe/persist" = {
+        #"safe/persist" = {
+        # "safe/persist/vm" = {
+        "safe/persist/vm/state" = {
           # Stores all state between reboots in a single location
           # at file/folder granularity
           type = "zfs_fs";
+          options = {
+            mountpoint = "/vm-state";
+            # Qemu does its own application level caching
+            # NOTE; Set to none if you'd be storing raw- or qcow backed volumes.
+            primarycache = "metadata";
+            # Asynchronous IO for maximal volume performance
+            logbias = "throughput";
+            # Haven't done benchmarking to change away from the default
+            recordsize = "128K";
+            # ACL required for virtiofs
+            acltype = "posixacl";
+            xattr = "sa";
+            # 
+            devices = "off";
+            setuid = "off";
+          };
         };
         "safe/home" = {
           # User data
@@ -408,8 +434,13 @@
           type = "zfs_fs";
           mountpoint = "/nix";
           options = {
-            acltype = "off"; # nix store is owned by root
             atime = "off"; # nix store doesn't use access time
+            sync = "disabled"; # No sync writes
+            # NOTE; The nix store is shared into virtual machines by virtiofs. Virtiofs requires 
+            # the presence of acl metadata in our dataset
+            # acltype = "off"; # set to off if there is no virtiofs in use
+            acltype = "posixacl";
+            xattr = "sa";
             mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
           };
         };
