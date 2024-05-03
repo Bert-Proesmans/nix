@@ -1,4 +1,6 @@
-{ lib, pkgs, config, ... }: {
+{ lib, config, profiles, ... }: {
+
+  imports = [ profiles.hypervisor ];
 
   networking.hostName = "buddy";
   networking.domain = "alpha.proesmans.eu";
@@ -13,7 +15,7 @@
 
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.
-  boot.kernelModules = [ "kvm-amd" "kvm-intel" ];
+  boot.kernelModules = [ "kvm-amd" ];
   hardware.cpu.amd.updateMicrocode = true;
 
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
@@ -554,8 +556,35 @@
 
   # Use networkd instead of the pile of shell scripts
   networking.useNetworkd = true;
-  networking.usePredictableInterfaceNames = lib.mkDefault true;
-  networking.interfaces.eth0.useDHCP = true;
+  # Setup a fixed mac-address on the hypervisor bridge
+  systemd.network.netdevs."bridge0" = {
+    # ERROR; Must copy in all netdevConfig attribute names because this type of set doesn't merge
+    # with other declarations!
+    netdevConfig = {
+      Name = "bridge0";
+      Kind = "bridge";
+      MACAddress = lib.facts.buddy.net.management.mac;
+    };
+  };
+  systemd.network.networks = {
+    # Attach the physical interface to the bridge. This allows network access to the VMs
+    "30-lan" = {
+      matchConfig.MACAddress = [ lib.facts.buddy.net.physical.mac ];
+      networkConfig = {
+        Bridge = "bridge0";
+      };
+    };
+    # The host IP comes from a DHCP offer, the DHCP client must run on/from the bridge interface
+    "30-lan-bridge" = {
+      matchConfig.Name = "bridge0";
+      networkConfig = {
+        Address = [ "192.168.100.2/24" ];
+        # Gateway = "192.168.100.1";
+        DHCP = "ipv4";
+        IPv6AcceptRA = false;
+      };
+    };
+  };
 
   # The notion of "online" is a broken concept
   # https://github.com/systemd/systemd/blob/e1b45a756f71deac8c1aa9a008bd0dab47f64777/NEWS#L13
@@ -570,6 +599,59 @@
   systemd.services.systemd-networkd.stopIfChanged = false;
   # Services that are only restarted might be not able to resolve when resolved is stopped before
   systemd.services.systemd-resolved.stopIfChanged = false;
+
+  # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
+  microvm.host.enable = lib.mkForce true;
+  microvm.vms = {
+    technitium = {
+      autostart = true;
+      flake = null;
+      updateFlake = null;
+      specialArgs = { inherit profiles; };
+
+      config = {
+        networking.hostName = "DNS";
+        imports = [ profiles.micro-vm ];
+
+        microvm.interfaces = [{
+          type = "tap";
+          id = "tap-technitium";
+          mac = lib.facts.vm.dns.net.mac;
+        }];
+
+        microvm.shares = [{
+          source = "/vm-state/technitium";
+          # ERROR; The systemd service is defined with a DynamicUser statement, meaning the
+          # directory "/var/lib/technitium-dns-server" is a symlink into "/var/lib/private/technitium-dns-server"
+          # for additional host sandboxing.
+          # If the service is not run with a dynamic user id, bind the normal "/var/lib/technitium-dns-server" path.
+          mountPoint = "/var/lib/private/technitium-dns-server";
+          tag = "technitium";
+          proto = "virtiofs";
+        }];
+
+        services.technitium-dns-server.enable = true;
+        services.technitium-dns-server.openFirewall = true;
+      };
+    };
+
+    # kanidm = {
+    #   autostart = true;
+    #   flake = null;
+    #   updateFlake = null;
+    #   specialArgs = { inherit profiles; };
+
+    #   # The configuration for the MicroVM.
+    #   # Multiple definitions will be merged as expected.
+    #   config = {
+    #     networking.hostName = "SSO";
+    #     imports = [ profiles.micro-vm ];
+
+    #     # Any other configuration for your MicroVM
+    #     # [...]
+    #   };
+    # };
+  };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

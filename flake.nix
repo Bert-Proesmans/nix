@@ -153,7 +153,10 @@
           apply-curry-if-required = lambda:
             let
               lambda-arguments = builtins.functionArgs lambda;
-              curry-arguments = { inherit (self) inputs outputs; };
+              curry-arguments = {
+                inherit (self) inputs outputs;
+                inherit commonNixosModules;
+              };
               # We want to partially apply, for the technical challenge!
               curry-intersect = builtins.intersectAttrs lambda-arguments curry-arguments;
               should-curry =
