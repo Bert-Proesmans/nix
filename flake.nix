@@ -56,6 +56,7 @@
           pipe = builtins.foldl' (x: f: f x);
         in
         pipe [
+          ./library/facts.nix
           # Add library files here
           ./library/importers.nix
           ./library/network.nix
