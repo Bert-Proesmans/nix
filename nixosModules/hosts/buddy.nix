@@ -1,6 +1,9 @@
 { lib, config, profiles, ... }: {
 
-  imports = [ profiles.hypervisor ];
+  imports = [
+    profiles.hypervisor
+    profiles.dns-server
+  ];
 
   networking.hostName = "buddy";
   networking.domain = "alpha.proesmans.eu";

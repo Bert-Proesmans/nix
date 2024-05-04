@@ -1,0 +1,155 @@
+# SOURCE; https://github.com/folbricht/routedns/blob/70bdfc29d9288eac1bf34d3b3b9ace37fcd1a393/cmd/routedns/example-config/use-case-6.toml
+# RouteDNS config with caching and multiple blocklists that are loaded and refreshed from remote
+# locations daily. DNS queries are received on the local network, filtered, cached and forwarded
+# over DoT to upstream resolvers.
+
+# Since this configuration references remote blocklists, hostname resolution for them could
+# fail on startup if the system uses RouteDNS as only source of name resolution. Using
+# a bootstrap-resolver defines how hostnames in blocklists or resolvers should be looked up.
+# Here, use Cloudflare DNS-over-TLS to lookup blocklist addresses.
+[bootstrap-resolver]
+address = "1.1.1.1:853"
+protocol = "dot"
+
+# Listeners for the local network. Can be restricted further to specific networks
+# with the "allowed-net" option
+[listeners.network-udp]
+address = "0.0.0.0:53"
+protocol = "udp"
+resolver = "cache"
+
+[listeners.network-tcp]
+address = "0.0.0.0:53"
+protocol = "tcp"
+resolver = "cache"
+
+# TODO; Secret material to serve and secure the analytics page
+# [listeners.local-admin]
+# address = "127.0.0.7:443"
+# protocol = "admin"
+# server-crt = "example-config/server.crt"
+# server-key = "example-config/server.key"
+
+# Cache
+[groups.cache]
+type = "cache"
+resolvers = ["ttl-update"]
+# cache-size = 8192 # DEPRECATED, set limit in backend
+cache-negative-ttl = 60 # 1 minute
+backend = {type = "memory", size = 8192}
+
+# Update TTL to avoid noise using values that are too low
+[groups.ttl-update]
+type = "ttl-modifier"
+resolvers = ["rate-limit-client"]
+ttl-min = 1800  # 30 Minutes
+ttl-max = 43200 # 12 Hours
+
+# Rate limit requests for each client
+[groups.rate-limit-client]
+type = "rate-limiter"
+resolvers = ["blocklist"]
+limit-resolver = "static-refused"
+# Max 100 requests per host-IP per 2 minutes
+requests = 100
+window = 120
+prefix4 = 32
+prefix6 = 128
+
+# Block queries (by name) using lists loaded from remote locations with HTTP and refreshed once a day
+[groups.blocklist]
+type = "blocklist-v2"
+resolvers = ["blocklist-response"]
+blocklist-refresh = 86400 # 24 hours
+[[groups.blocklist.blocklist-source]]
+    name = "recent-domains"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+    format = "domain"
+    source = "https://shreshtait.com/newly-registered-domains/nrd-1m"
+[[groups.blocklist.blocklist-source]]
+    name = "steven-black-malware-fakenews-blocklist"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+	format = "hosts"
+    source = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews/hosts"
+[[groups.blocklist.blocklist-source]]
+    # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
+    name = "cbuijs-abused-tlds"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+    format = "domain"
+    source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/tlds/plain.black.domain.list"
+[[groups.blocklist.blocklist-source]]
+    # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
+    name = "cbuijs-easylist-adblock"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+    format = "domain"
+    source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/easylist/plain.black.domain.list"
+
+# Block responses that include certain names
+[groups.blocklist-response]
+type = "response-blocklist-name"
+resolvers = ["blocklist-ip"]
+blocklist-refresh = 86400 # 24 hours
+[[groups.blocklist-response.blocklist-source]]
+    name = "cbuijs-dynamic-content-malicious"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+    format = "domain"
+    source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/cloak/plain.black.domain.list"
+
+# Block responses by IP ranges
+[groups.blocklist-ip]
+type = "response-blocklist-ip"
+resolvers = ["rate-limit-upstream"]
+blocklist-refresh = 86400 # 24 hours
+[[groups.blocklist-ip.blocklist-source]]
+    name = "cbuijs-bogon-ips"
+    cache-dir = "/var/cache/routedns"
+    allow-failure = true # Keep running the show if downloading the blocklists fail
+    format = "cidr"
+    source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/bogons/plain.black.ip4cidr.list"
+# ERROR; This list of IPs blocks the cache.nixos.org website! This blocks nixos-rebuild from installing updates!
+# LOG; level=debug msg="blocking response" client=127.0.0.1 id=blocklist-ip ip=151.101.194.217 list=cbuijs-malware-ips
+#      qname=cache.nixos.org. qtype=A rule=151.101.194.217/32
+# TODO; Build out my own nixpkg cache!
+# [[groups.blocklist-ip.blocklist-source]]
+#     name = "cbuijs-malware-ips"
+#     cache-dir = "/var/cache/routedns"
+#     allow-failure = true # Keep running the show if downloading the blocklists fail
+# 	format = "cidr"
+#     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/malicious-ip/plain.black.ipcidr.list"
+
+# Put a limit to the amount of upstream requests
+[groups.rate-limit-upstream]
+type = "rate-limiter"
+resolvers = ["cloudflare"]
+limit-resolver = "static-refused"
+# Max 200 requests per client subnet per minute
+requests = 100
+window = 60
+prefix4 = 24
+prefix6 = 64
+
+# Route requests into this handler to terminate the response flow
+[groups.static-refused]
+type  = "static-responder"
+rcode = 5 # REFUSED
+
+# Resolver group that uses 2 cloudflare upstream resolvers, additional ones can be added
+[groups.cloudflare]
+type = "fail-rotate"
+resolvers = ["cloudflare-dot-1", "cloudflare-dot-2"]
+
+# Cloudflare DNS-over-TLS, blocking websites with malware
+[resolvers.cloudflare-dot-1]
+address = "security.cloudflare-dns.com:853"
+bootstrap-address = "1.1.1.2"
+protocol = "dot"
+
+[resolvers.cloudflare-dot-2]
+address = "security.cloudflare-dns.com:853"
+bootstrap-address = "1.0.0.2"
+protocol = "dot"
