@@ -603,37 +603,37 @@
   # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
-    technitium = {
-      autostart = true;
-      flake = null;
-      updateFlake = null;
-      specialArgs = { inherit profiles; };
+    # technitium = {
+    #   autostart = true;
+    #   flake = null;
+    #   updateFlake = null;
+    #   specialArgs = { inherit profiles; };
 
-      config = {
-        networking.hostName = "DNS";
-        imports = [ profiles.micro-vm ];
+    #   config = {
+    #     networking.hostName = "DNS";
+    #     imports = [ profiles.micro-vm ];
 
-        microvm.interfaces = [{
-          type = "tap";
-          id = "tap-technitium";
-          mac = lib.facts.vm.dns.net.mac;
-        }];
+    #     microvm.interfaces = [{
+    #       type = "tap";
+    #       id = "tap-technitium";
+    #       mac = lib.facts.vm.dns.net.mac;
+    #     }];
 
-        microvm.shares = [{
-          source = "/vm-state/technitium";
-          # ERROR; The systemd service is defined with a DynamicUser statement, meaning the
-          # directory "/var/lib/technitium-dns-server" is a symlink into "/var/lib/private/technitium-dns-server"
-          # for additional host sandboxing.
-          # If the service is not run with a dynamic user id, bind the normal "/var/lib/technitium-dns-server" path.
-          mountPoint = "/var/lib/private/technitium-dns-server";
-          tag = "technitium";
-          proto = "virtiofs";
-        }];
+    #     microvm.shares = [{
+    #       source = "/vm-state/technitium";
+    #       # ERROR; The systemd service is defined with a DynamicUser statement, meaning the
+    #       # directory "/var/lib/technitium-dns-server" is a symlink into "/var/lib/private/technitium-dns-server"
+    #       # for additional host sandboxing.
+    #       # If the service is not run with a dynamic user id, bind the normal "/var/lib/technitium-dns-server" path.
+    #       mountPoint = "/var/lib/private/technitium-dns-server";
+    #       tag = "technitium";
+    #       proto = "virtiofs";
+    #     }];
 
-        services.technitium-dns-server.enable = true;
-        services.technitium-dns-server.openFirewall = true;
-      };
-    };
+    #     services.technitium-dns-server.enable = true;
+    #     services.technitium-dns-server.openFirewall = true;
+    #   };
+    # };
 
     # kanidm = {
     #   autostart = true;
