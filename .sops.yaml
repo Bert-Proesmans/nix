@@ -1,0 +1,45 @@
+# Configuration file for SOPS
+# REF; https://github.com/getsops/sops
+
+# This example uses YAML anchors which allows reuse of multiple keys without having to repeat yourself.
+# REF;https://github.com/nix-community/infra/blob/428dc48b4b08c7b02a9512b0c60b84d30c6acce0/.sops.yaml
+keys:
+  # ERROR; Age's extension for Yubikey derived age-keys is not yet merged into sops!
+  # REF; 
+  #- &yubikey_bert_proesmans age1yubikey1...
+  # VAULT transit keychain
+  - &master "http://169.254.245.1:8200/v1/sops/keys/master"
+  # HOST KEYS
+  #- &host_buddy age1...
+
+# NOTE; These rules are in effect when using the SOPS CLI.
+# Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
+#
+# WARN; Creation rules are interpreted sequentially, and a first match is used to calculate/provide key material
+# to the file argument.
+creation_rules:
+  - path_regex: hosts/[^/]+/keys.encrypted.yaml$
+    key_groups:
+      # NOTE; A single key group comprised of 2 different types of encryption keys/methods
+      # By default, to decrypt, at least one decryption key for _each_ keygroup must be present to decrypt secrets.
+      # Since there is exactly one keygroup, any key within can fully decrypt the secrets
+      - age:
+        #- *yubikey_bert_proesmans
+        hc_vault_transit_uri:
+        - *master
+
+  - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
+    key_groups:
+      - age:
+        - *host_buddy
+        hc_vault_transit_uri:
+        - *master
+  
+  # NOTE; No path_regex as fallback option
+  #
+  # WARN; Use `invoke update-sops-files` after updating key assignment to secret files!
+  - key_groups:
+      - age:
+        #- *yubikey_bert_proesmans
+        hc_vault_transit_uri:
+        - *master
