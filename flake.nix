@@ -37,6 +37,13 @@
         lib.genAttrs [ "x86_64-linux" ]
           (system: f inputs.nixpkgs.legacyPackages.${system});
 
+      # Small tool to iterate over each target, but use a customized instantiation of nixpkgs.
+      # NOTE; The nixpkgs-config parameter destructuring is purely for documentation. The entire callflow chain
+      # of nixpkgs ignores unused arguments and typos _will_ cause invisibly broken functionality!
+      eachSystemOverride = { config ? null, overlays ? null, ... }@nixpkgs-config: f:
+        lib.genAttrs [ "x86_64-linux" ]
+          (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
+
       # Automatically include all nixos modules that are not part of the hosts collection.
       # The (nixosModules.)hosts attribute set holds one config per machine, and we turn each into a nixosSystem derivation.
       # NOTE; That one nixos module defining the host configuration is also called a 'toplevel module'.
@@ -109,24 +116,33 @@
 
       # Build development shell with;
       # nix flake develop
-      devShells = eachSystem (pkgs: {
-        default = pkgs.mkShellNoCC {
-          name = "b-NIX development";
+      devShells = eachSystemOverride
+        {
+          config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+            "vault"
+          ];
+        }
+        (pkgs: {
+          default = pkgs.mkShellNoCC {
+            name = "b-NIX development";
 
-          # REF; https://github.com/NixOS/nixpkgs/issues/58624#issuecomment-1576860784
-          inputsFrom = [ ];
+            # REF; https://github.com/NixOS/nixpkgs/issues/58624#issuecomment-1576860784
+            inputsFrom = [ ];
 
-          nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ]
-            ++ builtins.attrValues {
-            # Python packages to easily execute maintenance and build tasks for this flake.
-            # See tasks.py TODO
-            inherit (pkgs.python3.pkgs) invoke deploykit;
+            nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ]
+              ++ builtins.attrValues {
+              # Python packages to easily execute maintenance and build tasks for this flake.
+              # See tasks.py TODO
+              inherit (pkgs.python3.pkgs) invoke deploykit;
+            };
+
+            # Software directly available inside the developer shell
+            packages = builtins.attrValues { inherit (pkgs) nyancat git vault; };
+
+            VAULT_ADDR = "http://[fe80::1]:8200";
+            VAULT_TOKEN = "<none>; run export VAULT_TOKEN='<token>'";
           };
-
-          # Software directly available inside the developer shell
-          packages = builtins.attrValues { inherit (pkgs) nyancat git; };
-        };
-      });
+        });
 
       # nixOS modules are just lambda's with an attribute set as argument (arity of all nix functions is
       # always one), not a derivations. So nixOS modules on their own do nothing.
