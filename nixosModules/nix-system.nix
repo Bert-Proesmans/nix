@@ -59,7 +59,7 @@ in
           # 'pkgs' will contain all unstable package versions.
           # 'pkgs.stable' contains all stable package versions.
           stable = (import nixpkgs-stable) {
-            inherit (config.nixpkgs) config overlay;
+            inherit (config.nixpkgs) config overlays;
             localSystem = config.nixpkgs.hostPlatform;
           };
         })
