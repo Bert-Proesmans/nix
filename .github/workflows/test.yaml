@@ -3,14 +3,14 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
-      - main
+      # - main
     paths-ignore:
       - '.github/**'
       - '.vscode/**'
       - 'docs/**'
   push:
     branches:
-      - main
+      # - main
     paths-ignore:
       - '.github/**'
       - '.vscode/**'
