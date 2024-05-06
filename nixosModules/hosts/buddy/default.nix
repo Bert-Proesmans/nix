@@ -366,15 +366,30 @@
           mountpoint = "/var";
           options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
         };
-        #"safe" = { };
-        #"safe/persist" = {
-        # "safe/persist/vm" = {
-        "safe/persist/vm/state" = {
-          # Stores all state between reboots in a single location
-          # at file/folder granularity
+        #"persist" = { };
+        "persist/home" = {
+          # User data
+          type = "zfs_fs";
+          # WARN; Potential race while mounting, see the note about zfs generators
+          # REF; https://github.com/NixOS/nixpkgs/issues/212762
+          mountpoint = "/home";
+          # Workaround sync hang with SQLite WAL
+          # REF; https://github.com/openzfs/zfs/issues/14290
+          # See also `overlays.atuin`!
+          # options.sync = "disabled";
+        };
+        "persist/replicate" = {
+          # State to be sent/received from cluster
+          type = "zfs_fs";
+          mountpoint = "/replicate";
+        };
+        "persist/vm" = {
+          # Default storage location for vm state data without requirements.
+          # HELP; Create sub datasets to specialize storage behaviour to the application.
           type = "zfs_fs";
           options = {
-            mountpoint = "/vm-state";
+            canmount = "off";
+            mountpoint = "/vm";
             # Qemu does its own application level caching
             # NOTE; Set to none if you'd be storing raw- or qcow backed volumes.
             primarycache = "metadata";
@@ -390,21 +405,14 @@
             setuid = "off";
           };
         };
-        "safe/home" = {
-          # User data
+        "persist/vm/kanidm" = {
+          # Kanidm state is basically a database. This dataset is tuned for that use case.
           type = "zfs_fs";
-          # WARN; Potential race while mounting, see the note about zfs generators
-          # REF; https://github.com/NixOS/nixpkgs/issues/212762
-          mountpoint = "/home";
-          # Workaround sync hang with SQLite WAL
-          # REF; https://github.com/openzfs/zfs/issues/14290
-          # See also `overlays.atuin`!
-          # options.sync = "disabled";
-        };
-        "replicate" = {
-          # State to be sent/received from cluster
-          type = "zfs_fs";
-          mountpoint = "/replicate";
+          options = {
+            mountpoint = "/vm/kanidm"; # Default, but good to be explicit
+            logbias = "latency";
+            recordsize = "64K";
+          };
         };
       };
     };
@@ -638,22 +646,44 @@
     #   };
     # };
 
-    # kanidm = {
-    #   autostart = true;
-    #   flake = null;
-    #   updateFlake = null;
-    #   specialArgs = { inherit profiles; };
+    kanidm = {
+      autostart = true;
+      specialArgs = { inherit profiles; };
 
-    #   # The configuration for the MicroVM.
-    #   # Multiple definitions will be merged as expected.
-    #   config = {
-    #     networking.hostName = "SSO";
-    #     imports = [ profiles.micro-vm ];
+      # The configuration for the MicroVM.
+      # Multiple definitions will be merged as expected.
+      config = {
+        networking.hostName = "SSO";
+        imports = [ profiles.micro-vm ];
 
-    #     # Any other configuration for your MicroVM
-    #     # [...]
-    #   };
-    # };
+        microvm.interfaces = [{
+          type = "tap";
+          id = "tap-kanidm";
+          mac = lib.facts.vm.idm.net.mac;
+        }];
+
+        microvm.shares = [{
+          source = "/vm/kanidm";
+          mountPoint = "/var/lib/kanidm";
+          tag = "kanidm";
+          proto = "virtiofs";
+        }];
+
+        services.kanidm = {
+          enableServer = true;
+          serverSettings = {
+            bindaddress = "<TODO>";
+            domain = "idm.proesmans.eu";
+            origin = "https://idm.proesmans.eu";
+            tls_chain = "<TODO>";
+            tls_key = "<TODO>";
+            db_fs_type = "zfs";
+            role = "WriteReplica";
+            online_backup.versions = 0; # disable online backup
+          };
+        };
+      };
+    };
   };
 
   # Ignore below

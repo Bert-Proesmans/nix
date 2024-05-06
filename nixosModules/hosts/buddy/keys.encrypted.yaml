@@ -1,0 +1,17 @@
+ssh_host_ed25519_key: ENC[AES256_GCM,data:8zS1ZFfulZcz6JibMFMJu4SoZi7girKAX4VOJ5Bu8YH+t6Cmq3c1bjtvEIX9SKsg3ylmTnfpkQIIkf9uKj0AiyjsL/KjSus5GnlEkXDOz6Vg6YhxSQR0EgoLmbpZ207bqurh0N1r26ot2E/N7QZpc8RgC6nEhsSuouN2Go7kklk2OUqBhrIsRCwxeh6IgwSrVsSg3sEoGb9gBwB5x6MnBsHrBzt3Txpd2VcJWyCIv+6sZ1XdFLFp7PTQaNgk9Iq00UI0MhzFFkvyvZCNwemt3YVCBQUre8vH/5pwWVBR80FISx8QSzDy3jfZczmaKKxlu0UiWYucUg23rjX6R99DO9e/atap2ScXjxwXv3DiGNYG8DzCYfL70fg4mgWD3EHf6RJQkDa7ma3kDHoWCdP20mTZx7meKZMI0yPlbbNS1XNuklPR6BAacY+or8AG7aIQV2V0Q/WBgW40gmC7ek43VcWw5H5xVj3JuI5HMLK0RgOGuwOxZH7FpOfXRkkLqDR9KrJ4XKTJHOjQetIHZ4h9GhCZLSo5O29snJuvsZHAVJmgJss=,iv:Z7RETt9octI1LykaB/k6qR2VFnqX7h9WzZIMBQLzopA=,tag:F0rDdxpRJ7f2N82tqqyR0w==,type:str]
+sops:
+    kms: []
+    gcp_kms: []
+    azure_kv: []
+    hc_vault:
+        - vault_address: http://169.254.245.1:8200
+          engine_path: sops
+          key_name: master
+          created_at: "2024-05-06T20:54:33Z"
+          enc: vault:v1:rSKb1kjPrDz92ddFnMictY9QcnwOHRLsUTRM3zXwWhN6k7bhutPcTpUOZznLurof5B2nChpt3jcRzatC
+    age: []
+    lastmodified: "2024-05-06T20:54:33Z"
+    mac: ENC[AES256_GCM,data:zO2IHQkdpY+JpkY8gti738/PxGprAFYMz/CeavFDG9dwRW47KP5Bin+hUO/K8QxQ9s2B2PT41wxw6R2/q4HbT8txH6Eh4bTqOMxL/rasjD40jgVYphDkW4IJVcarm+BGmgbK3RwFdBYuwftzwTF1naIMp0Le3xl0/0LpIZ4POkY=,iv:c2QkoDmLmB7QWs5zC40MaJj5dzX3WpO7LSFttCJtQi8=,tag:kZMa6FsvKLCYFty8eHIvDw==,type:str]
+    pgp: []
+    unencrypted_suffix: _unencrypted
+    version: 3.8.1

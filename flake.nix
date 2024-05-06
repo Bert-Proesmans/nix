@@ -137,7 +137,15 @@
             };
 
             # Software directly available inside the developer shell
-            packages = builtins.attrValues { inherit (pkgs) nyancat git vault; };
+            packages = builtins.attrValues {
+              inherit (pkgs)
+                # For fun
+                nyancat figlet
+                # For development
+                git bat vault
+                # For secret material
+                sops ssh-to-age;
+            };
 
             VAULT_ADDR = "http://169.254.245.1:8200";
             VAULT_TOKEN = "<none>; run export VAULT_TOKEN='<token>'";
