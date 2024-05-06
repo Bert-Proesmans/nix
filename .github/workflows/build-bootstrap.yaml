@@ -1,7 +1,7 @@
 name: "Build bootstrap ISO"
 on:
   workflow_dispatch: # runs whenever I want it to
-  schedule:
+  # schedule:
     # - cron: '0 0 1 * *' # runs monthly at 00:00
   # push:
   #   branches:

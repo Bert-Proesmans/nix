@@ -1,20 +1,20 @@
 name: "Test PRs"
 on:
   workflow_dispatch:
-  pull_request:
-    branches:
-      # - main
-    paths-ignore:
-      - '.github/**'
-      - '.vscode/**'
-      - 'docs/**'
-  push:
-    branches:
-      # - main
-    paths-ignore:
-      - '.github/**'
-      - '.vscode/**'
-      - 'docs/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths-ignore:
+  #     - '.github/**'
+  #     - '.vscode/**'
+  #     - 'docs/**'
+  # push:
+  #   branches:
+  #     - main
+  #   paths-ignore:
+  #     - '.github/**'
+  #     - '.vscode/**'
+  #     - 'docs/**'
 jobs:
   flake-check:
     runs-on: ubuntu-latest
