@@ -669,14 +669,33 @@
           proto = "virtiofs";
         }];
 
+        # ERROR; Number must be unique for each VM!
+        # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
+        #
+        # Send data through socket using socat, which handles connection-wait. The host acts
+        # as a server, the guest is the client.
+        # - host: nc --listen --vsock <cid:2> <port:1234> --send-only < /path/to/local/file > /dev/null
+        # - guest: nc --vsock <port:1234> --recv-only > /path/to/local/file < /dev/null
+        #
+        microvm.vsock.cid = 3;
+        # test = [
+        #   "-device vhost-vsock-pci,guest-cid=3"
+
+        #   # --
+        #   "-device virtio-vsock-pci,id=vsock0,guest-cid=3"
+        #   "-object vhost-vsock-pci,id=hostvm0,guest-cid=3,queues=4"
+        #   "-netdev vhost-vsock,id=hostvm0,chardev=hostvm0"
+        #   "-chardev socket,path=/tmp/vm_socket,server,nowait,id=hostvm0"
+        # ];
+
         services.kanidm = {
           enableServer = true;
           serverSettings = {
             bindaddress = "<TODO>";
             domain = "idm.proesmans.eu";
             origin = "https://idm.proesmans.eu";
-            tls_chain = "<TODO>";
-            tls_key = "<TODO>";
+            tls_chain = "/<TODO>";
+            tls_key = "/<TODO>";
             db_fs_type = "zfs";
             role = "WriteReplica";
             online_backup.versions = 0; # disable online backup
