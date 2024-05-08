@@ -1,4 +1,9 @@
-{ lib, config, pkgs, ... }: {
+{ lib, config, pkgs, profiles, ... }: {
+
+  imports = [
+    profiles.hypervisor
+  ];
+
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.
   boot.kernelModules = [ "kvm-amd" "kvm-intel" ];
@@ -99,15 +104,28 @@
   # eth1 gets a stable link-local address for SSH, because Windows goes fucky wucky with
   # the host bridge network adapter and that's sad because IP's and routes won't stick
   # after a reboot.
-  networking.interfaces.eth0.useDHCP = true;
-  networking.interfaces.eth1.ipv4.addresses = [{
-    address = "169.254.245.139";
-    prefixLength = 24;
-  }];
-  networking.interfaces.eth1.ipv6.addresses = [{
-    address = "fe80::139";
-    prefixLength = 64;
-  }];
+  systemd.network.networks = {
+    "30-upstream" = {
+      matchConfig.Name = "eth0";
+      networkConfig.DHCP = "ipv4";
+      networkConfig.LinkLocalAddressing = "no";
+    };
+
+    "30-link-bridge" = {
+      matchConfig.Name = "eth1";
+      networkConfig.Bridge = "bridge0";
+    };
+
+    "30-link-local" = {
+      matchConfig.Name = "bridge0";
+      networkConfig = {
+        # ERROR; Don't forget to enable MAC address spoofing on the VM network interface
+        # attached to host adapter "Static Net"!
+        Address = [ "169.254.245.139/24" "fe80::139/64" ];
+        LinkLocalAddressing = "no";
+      };
+    };
+  };
 
   # Avoid TOFU MITM with github by providing their public key here.
   programs.ssh.knownHosts = {
