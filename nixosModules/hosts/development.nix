@@ -63,6 +63,8 @@
     pkgs.iperf
     pkgs.dig
     pkgs.traceroute
+    pkgs.socat
+    pkgs.nmap # ncat
   ];
 
   # Note; default firewall package is IPTables
@@ -106,25 +108,30 @@
   # after a reboot.
   systemd.network.networks = {
     "30-upstream" = {
+      # ERROR; Don't forget to enable MAC address spoofing on the VM network interface
+      # attached to host adapter "Static Net"!
+      # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Applicable if using bridged networking, not if NAT'ing
       matchConfig.Name = "eth0";
       networkConfig.DHCP = "ipv4";
       networkConfig.LinkLocalAddressing = "no";
     };
 
-    "30-link-bridge" = {
+    "30-hypervisor-connect" = {
       matchConfig.Name = "eth1";
-      networkConfig.Bridge = "bridge0";
-    };
-
-    "30-link-local" = {
-      matchConfig.Name = "bridge0";
       networkConfig = {
-        # ERROR; Don't forget to enable MAC address spoofing on the VM network interface
-        # attached to host adapter "Static Net"!
         Address = [ "169.254.245.139/24" "fe80::139/64" ];
         LinkLocalAddressing = "no";
       };
     };
+  };
+
+  # [upstream] -> eth0 /NAT/ bridge0 -> tap-*
+  networking.nat = {
+    enable = true;
+    # enableIPv6 = true;
+    # Upstream interface with internet access. Packets are masquerade'd through here
+    externalInterface = "eth0";
+    internalInterfaces = [ "bridge0" ];
   };
 
   # Avoid TOFU MITM with github by providing their public key here.
@@ -140,6 +147,36 @@
     "git.sr.ht".hostNames = [ "git.sr.ht" ];
     "git.sr.ht".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
+  };
+
+  microvm.host.enable = lib.mkForce true;
+  microvm.vms = {
+    test = {
+      autostart = true;
+      specialArgs = { inherit profiles; };
+      config = { lib, pkgs, ... }: {
+        networking.hostName = "test";
+        imports = [ profiles.micro-vm ];
+
+        microvm.interfaces = [{
+          type = "tap";
+          id = "tap-test";
+          mac = "6a:33:06:88:6c:5b"; # randomly generated
+        }];
+
+        microvm.vsock.cid = 55;
+        environment.systemPackages = [
+          pkgs.socat
+          pkgs.tcpdump
+          pkgs.python3
+          pkgs.nmap # ncat
+        ];
+
+        security.sudo.enable = true;
+        security.sudo.wheelNeedsPassword = false;
+        users.users.bert-proesmans.extraGroups = [ "wheel" ];
+      };
+    };
   };
 
   # Ignore below

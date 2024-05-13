@@ -611,6 +611,15 @@
   # Services that are only restarted might be not able to resolve when resolved is stopped before
   systemd.services.systemd-resolved.stopIfChanged = false;
 
+  sops.defaultSopsFile = ./secrets.encrypted.yaml;
+
+  sops.secrets.kanidm_ssh_ed25519_key = {
+    owner = "root";
+  };
+  sops.secrets.other_secret = {
+    owner = "root";
+  };
+
   # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {

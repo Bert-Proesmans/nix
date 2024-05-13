@@ -48,12 +48,28 @@
   systemd.network.networks."20-lan" = {
     matchConfig.Type = "ether";
     networkConfig = {
-      Address = [ "192.168.100.3/24" ];
-      Gateway = "192.168.100.1";
-      DHCP = "ipv4";
-      IPv6AcceptRA = false;
+      # All VM's share the same link local address for stable management access
+      # from host to VM, for example ssh.
+      #
+      # USAGE; ssh fe81::1%tap-<vm-name>
+      #
+      # NOTE; This can be removed after automatic management of local socket for virtual
+      # machines is merged into systemd. This socket should provide a backdoor shell into
+      # the VM from the host.
+      #
+      # ERROR; This is currently broken because of weird (unexplored) behaviour of TAP interfaces
+      # enslaved in a bridge. In short; the interface doesn't become/act like a port.
+      # A "port" is an interface with an IP, which attaches connects the interface to the CPU. The
+      # interface is effectively attached to a control plane that should respond to internet control
+      # messages (ICMP). This is not happening after assigning an IP to the TAP.
+      # Workaround is to have a single VM and connect (ping/ssh) through the bridge0 port.
+      Address = [ "fe81::1/64" ];
+      DHCP = "yes";
+      IPv6AcceptRA = true;
+      LinkLocalAddressing = "yes";
     };
   };
+
   # Required for docker-in-vm
   # systemd.network.networks."19-docker" = {
   #   matchConfig.Name = "veth*";

@@ -11,6 +11,8 @@
     nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
     home-manager.url = "github:nix-community/home-manager";
     # Non-versioned home-manager has the best chance to work with the unstable nixpkgs branch.
     # If nixpkgs happens to be stable by default, then also version the home-manager release!
