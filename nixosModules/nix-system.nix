@@ -18,9 +18,9 @@ let
 in
 {
   options.proesmans.nix = {
-    linux-64 = lib.mkEnableOption (lib.mdDoc "Configure the target system as 64-bit linux");
-    garbage-collect.enable = lib.mkEnableOption (lib.mdDoc "Make the target host automatically cleanup unused reference in the nix store");
-    references-on-disk = lib.mkEnableOption (lib.mdDoc "Copy all files for all stored flake references onto the filesystem") // { default = true; };
+    linux-64 = lib.mkEnableOption "64-bit nix" // { description = "Configure the target system as 64-bit linux"; };
+    garbage-collect.enable = lib.mkEnableOption "cleanup nix/store" // { description = "Make the target host automatically cleanup unused reference in the nix store"; };
+    references-on-disk = lib.mkEnableOption "Store files from inputs" // { description = "Copy all files for all stored flake references onto the filesystem"; };
   };
 
   # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/nix.nix
@@ -77,13 +77,13 @@ in
         "https://nix-community.cachix.org"
         "https://cache.garnix.io"
         "https://numtide.cachix.org"
-	"https://microvm.cachix.org"
+        "https://microvm.cachix.org"
       ];
       nix.settings.trusted-public-keys = [
         "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
         "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
         "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-	"microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
+        "microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
       ];
 
     })

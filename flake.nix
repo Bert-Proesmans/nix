@@ -273,14 +273,69 @@
       #   })
       #   self.homeModules.users);
 
-      # Set with named binaries.
+      # Set of blobs to build, can be applications or ISO's or documents (reports/config files).
+      #
+      # Build with; nix build
+      # eg, nix build --out-link bootstrap.iso => blob bootstrap.iso, can be used to bootstrap new machines with nixos configuration
+      #
       # Run with; nix run .#<binary-name>
-      # eg, packages.x86_64-linux.bootstrap = self.nixosConfigurations.bootstrap.config.formats.vm => nix run .#bootstrap-vm
+      # eg, packages.x86_64-linux.development = self.nixosConfigurations.development.config.formats.vm-nogui => nix run .#development
       packages = eachSystem (pkgs:
         let
           # Force the system architecture to that of the host for native virtualization (no emulation required)
           forced-system = pkgs.system;
-          systems = lib.flip builtins.mapAttrs self.outputs.nixosConfigurations
+
+          # Convert defined nixos hosts into installation iso's for self-installation
+          install-host = lib.nixosSystem {
+            # System is deprecated, it's set within the modules as nixpkgs.hostPlatform
+            system = null;
+            # Inject our own library functions before calling nixosSystem.
+            # The merged attribute set will become the nixosModule argument 'lib'. 'lib' is not directly related to 'pkgs.lib', because 'pkgs'
+            # can be set from within nixosModules. Overridable 'lib' would result in circular dependency because configuration is dependent on
+            # lib.mkIf and similar.
+            lib = lib;
+            # Additional custom arguments to each nixos module
+            specialArgs = {
+              inherit (self.outputs.nixosModules) profiles;
+            };
+            # The toplevel nixos module recursively imports relevant other modules
+            modules = commonNixosModules
+              ++ [
+              self.outputs.nixosModules.profiles.users
+              self.outputs.nixosModules.profiles.remote-iso
+              ({ lib, ... }: {
+                networking.hostName = lib.mkForce "alpha";
+                networking.domain = lib.mkForce "installer.proesmans.eu";
+
+                # Make sure EFI store is writable because we're installing!
+                boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
+
+                # Force machine configuration to match the nix CLI build target attribute path
+                # packages.x86_64-linux builds a x86_64-linux VM.
+                nixpkgs.hostPlatform = lib.mkForce forced-system;
+                # Consistent defaults while updating flake inputs.
+                system.stateVersion = lib.mkForce "23.11";
+              })
+            ];
+          };
+
+          # An installer configuration for each defined nixos host
+          specialized-install-hosts = lib.flip lib.mapAttrs' self.outputs.nixosConfigurations
+            (hostname: _: lib.nameValuePair
+              # Change the attribute name with iso suffix, use like this; nix build .#development-iso
+              ("${hostname}-iso")
+              (install-host.extendModules {
+                modules = [
+                  ({ ... }: {
+                    # Carry the target machine configuration inside this host's store
+                    proesmans.install-script.enable = true;
+                    proesmans.install-script.host-attribute = hostname;
+                  })
+                ];
+              }));
+
+          # A virtual machine for each defined nixos host
+          virtual-hosts = lib.flip builtins.mapAttrs self.outputs.nixosConfigurations
             (_name: configuration: configuration.extendModules {
               modules = [
                 self.outputs.nixosModules.profiles.local-vm-test
@@ -291,9 +346,10 @@
                 })
               ];
             });
+
           # ERROR; The attribute `vm-nogui` creates a script, but not in the form of an application package.
           # The script is wrapped so 'nix run' can find and execute it.
-          wrap-launcher = name: configuration: pkgs.writeShellApplication {
+          vm-launcher-wrapper = name: configuration: pkgs.writeShellApplication {
             name = "launch-wrapper-${name}";
             text = ''
               # All preparations before launching the virtual machine goes here
@@ -301,105 +357,16 @@
             '';
           };
         in
-        (builtins.mapAttrs wrap-launcher systems) // {
-          # Build machine 'development' for bootstrapping new hosts.
-          # Function 'extendModules' on attributes set from nixosSystem is not used because I want to
-          # disable stuff. 'extendModules' works by creating a wrapper around the already configured machine.
-          default = (self.outputs.nixosConfigurations.development.extendModules {
-            modules = [
-              ({ pkgs, lib, config, ... }: {
-                # Force machine configuration to match the nix CLI build target attribute path
-                # packages.x86_64-linux builds a x86_64-linux VM.
-                nixpkgs.hostPlatform = lib.mkForce forced-system;
-                # Make sure EFI store is writable because we're installing!
-                boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
-                # Append all user ssh keys to the root user
-                users.users.root.openssh.authorizedKeys.keys = lib.lists.flatten
-                  # Flatten all public keys into a single list
-                  (lib.attrsets.mapAttrsToList (_: user: user.openssh.authorizedKeys.keys)
-                    # For each user with attribute isNormalUser
-                    (lib.attrsets.filterAttrs (_: user: user.isNormalUser) config.users.users));
+        (builtins.mapAttrs vm-launcher-wrapper virtual-hosts)
+        # Specifically built installer iso's from each configuration
+        // builtins.mapAttrs (_: system: system.config.formats.install-iso) specialized-install-hosts
+        // {
+          # Lightweight bootstrap machine for initiating remote deploys. This configuration doesn't carry
+          # a target host.
+          #default = install-host.config.formats.install-iso;
 
-                # 90+ percentage of the cases I will need this image for virtual machine bootstrapping
-                # ERROR; Dropping the firmware will make this configuration unbootable on real metal!
-                hardware.enableRedistributableFirmware = lib.mkForce false;
-                # Don't store the repo files, only keep a reference for downloading later
-                proesmans.nix.references-on-disk = lib.mkForce false;
-                # Disable the vscode server patch because it's large as fuck
-                services.vscode-server.enable = lib.mkForce false;
-
-                # Nix pointers for the install script to work
-                nix.nixPath = [ "/etc/nix/path" ];
-                # NOTE; This flake (the value of variable 'self') is copied by-value into the bootstrap image.
-                # AKA All files in this repository are copied into the resulting build.
-                environment.etc."nix/path/my-flake".source = self;
-                nix.registry.my-flake.flake = self;
-
-                services.getty.helpLine = lib.mkAfter ''
-                  This machine has been configured with an installer script, run 'install-system' to (ya-know) install the system ☝️
-                '';
-
-                # Provide an installer script that performs all installation steps automagically
-                environment.systemPackages = [
-                  (
-                    let
-                      install-system = pkgs.writeShellApplication {
-                        name = "inner-install-system";
-                        runtimeInputs = [ pkgs.nix pkgs.nixos-install-tools ]; # Cannot use pkgs.sudo, for workaround see 'export PATH' below
-                        text = ''
-                          # Script that formats disks, and mounts partitions, and installs data from the development machine
-                          # NOTE; 'my-flake' is a flake reference, installed through nixos option nix.registry (see above)
-                          # my-flake is a reference to this flake
-
-                          # Fun fact; Sudo does not work in a pure shell. It fails with error 'sudo must be owned by uid 0 and have the setuid bit set'
-                          # Nixos has someting called security wrappers (nixos option security.wrapper) which perform additional 
-                          # setup during the shell init, wrapping sudo and other security related binaries.
-                          # The export below pulls in all programs that were wrapped by the system configuration. Impure, sadly..
-                          export PATH="${config.security.wrapperDir}:$PATH"
-                        
-                          echo "# Install wrapper started"
-
-                          pushd "$(mktemp -d -p "/tmp" install-XXXXXX)"
-                          TEMPD=$(pwd)
-                          trap "exit 1" HUP INT PIPE QUIT TERM
-                          trap "popd" EXIT
-                          echo "# Changed into temporary directory $TEMPD"
-
-                          nix build --out-link disko-script my-flake#nixosConfigurations.development.config.system.build.diskoScript
-                            echo "# Built disk format+mounting script"
-                          nix build --out-link system-closure my-flake#nixosConfigurations.development.config.system.build.toplevel
-                            echo "# Built system configuration"
-
-                          sudo ./disko-script
-                            echo "# Disks formatted"
-                          # NOTE; '0' as value for cores means "use all available cores"
-                          sudo nixos-install --no-channel-copy --no-root-password --max-jobs 4 --cores 0 --system "$(readlink ./system-closure)"
-                            echo "# System installed"
-
-                          echo "# Script done"
-                        '';
-                      };
-                    in
-                    # Wrapper script for capturing the output of the actual installation progress
-                    pkgs.writeShellApplication {
-                      name = "install-system";
-                      runtimeInputs = [ install-system ];
-                      text = ''
-                        # Create a temporary log file with a unique name
-                        log_file="$(mktemp -t install-system.XXXXXX.log)"
-
-                        # Execute the wrapped script, capturing both stdout and stderr
-                        "${lib.getExe install-system}" 2>&1 | tee "$log_file"
-
-                        echo "Execution log is saved at: $log_file"
-                      '';
-                    }
-                  )
-                ];
-              }
-              )
-            ];
-          }).config.formats.install-iso;
+          # Development machine as a package
+          default = specialized-install-hosts.development-iso.config.formats.install-iso;
         });
 
       # Verify flake configurations with;
