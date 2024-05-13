@@ -64,14 +64,14 @@ in
                   randomEncryption = true;
                 };
               };
-	      root = {
-                end = "100%";
+              root = {
+                size = "100%";
                 content = {
                   type = "lvm_pv";
                   vg = "pool";
                 };
               };
-              
+
             };
           };
         };
