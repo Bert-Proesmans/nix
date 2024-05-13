@@ -57,20 +57,21 @@ in
                   mountpoint = "/boot";
                 };
               };
-              root = {
-                end = "-1G";
-                content = {
-                  type = "lvm_pv";
-                  vg = "pool";
-                };
-              };
               encryptedSwap = {
-                size = "100%";
+                size = "2G";
                 content = {
                   type = "swap";
                   randomEncryption = true;
                 };
               };
+	      root = {
+                end = "100%";
+                content = {
+                  type = "lvm_pv";
+                  vg = "pool";
+                };
+              };
+              
             };
           };
         };
