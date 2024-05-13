@@ -97,7 +97,8 @@
           programs.deadnix.enable = true;
           programs.shellcheck.enable = true;
           # Python linting/formatting
-          programs.ruff.enable = true;
+          programs.ruff.check = true;
+          programs.ruff.format = true;
           # Python static typing checker
           programs.mypy = {
             enable = true;
@@ -112,8 +113,8 @@
             };
           };
 
-          # Run ruff linter and formatter, fixing all fixable issues
-          settings.formatter.ruff.options = [ "--fix" ];
+          # Run ruff formatter fixing all fixable issues
+          settings.formatter.ruff-format.options = [ "--fix" ];
         }).config.build.wrapper);
 
       # Build development shell with;
