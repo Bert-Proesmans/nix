@@ -133,22 +133,16 @@ in
       nixpkgs.hostPlatform = lib.systems.examples.gnu64;
     })
     (lib.mkIf cfg.garbage-collect.enable {
-      # Avoid disk full issues
-      nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024);
-      nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024);
+      nix.gc.automatic = true;
+      # Uses the min/max free below, otherwise it's possible to mark and sweep by file age
+      # --delete-older-than will also remove gcroots (aka generations, or direnv pins, or home-manager profiles)
+      # that are older than the designated duration.
+      nix.gc.options = "--delete-older-than 40d";
 
-      # TODO: cargo culted.
-      nix.daemonCPUSchedPolicy = lib.mkDefault "batch";
-      nix.daemonIOSchedClass = lib.mkDefault "idle";
-      nix.daemonIOSchedPriority = lib.mkDefault 7;
-
-      # Make builds to be more likely killed than important services.
-      # 100 is the default for user slices and 500 is systemd-coredumpd@
-      # We rather want a build to be killed than our precious user sessions as builds can be easily restarted.
-      systemd.services.nix-daemon.serviceConfig.OOMScoreAdjust = lib.mkDefault 250;
-
-      # Avoid copying unnecessary stuff over SSH
-      nix.settings.builders-use-substitutes = lib.mkDefault true;
+      # When getting close to this amount of free space..
+      nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024); # 512MB
+      # .. remove this amount of data from the store
+      nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024); # 3GB
 
       # Assist nix-direnv, since project devshells aren't rooted in the computer profile, nor stored in /nix/store
       nix.settings.keep-outputs = lib.mkDefault true;
