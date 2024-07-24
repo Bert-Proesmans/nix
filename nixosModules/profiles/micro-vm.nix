@@ -1,7 +1,7 @@
 # Lambda
 { commonNixosModules }:
 # NixOS Module
-{ lib, ... }: {
+{ lib, pkgs, config, ... }: {
   # Importing the common nixos modules to allow for uniform declarative host configuration between
   # nixos hosts and microVMs.
   imports = commonNixosModules;
@@ -91,6 +91,39 @@
 
   # Allow for remote management
   services.openssh.enable = true;
+  # services.openssh.startWhenNeeded = true;
+  # systemd.sockets."ssh-vsock" = {
+  #   # NOTE; Superseded by Systemd v256+ and available ssh-generator (not immediately packaged in nixos)
+  #   # REF; https://github.com/libvirt/libvirt/blob/e62c26a20dced58ea342d9cb8f5e9164dc3bb023/docs/ssh-proxy.rst#L21
+
+  #   wants = [ "ssh-access.target" ];
+  #   before = [ "ssh-access.target" ];
+
+  #   socketConfig = {
+  #     ListenStream = "vsock::22";
+  #     Accept = "yes";
+  #     PollLimitIntervalSec = "30s";
+  #     PollLimitBurst = "50";
+  #     Service = config.systemd.services."sshd@".name;
+  #   };
+  # };
+  systemd.services."ssh-vsock-proxy" = {
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart =
+        let
+          script = pkgs.writeShellApplication {
+            name = "ssh-vsock-proxy";
+            runtimeInputs = [ pkgs.socat ];
+            text = ''
+              socat VSOCK-LISTEN:22,reuseaddr,fork TCP:localhost:22
+            '';
+          };
+        in
+        lib.getExe script;
+    };
+  };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.
