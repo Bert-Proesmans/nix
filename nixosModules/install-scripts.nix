@@ -1,7 +1,3 @@
-{ outputs }:
-let
-  inherit (outputs) profiles;
-in
 { lib, pkgs, config, ... }:
 let
   cfg = config.proesmans.install-script;

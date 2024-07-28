@@ -1,7 +1,7 @@
 # Lambda
 { commonNixosModules }:
 # NixOS Module
-{ lib, pkgs, config, ... }: {
+{ lib, pkgs, ... }: {
   # Importing the common nixos modules to allow for uniform declarative host configuration between
   # nixos hosts and microVMs.
   imports = commonNixosModules;

@@ -47,7 +47,7 @@
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
 
-# WARN; Superseded by systemd-ssh-generators!
+  # WARN; Superseded by systemd-ssh-generators!
   # Comes with systemd v256+ and the systemd-ssh-generators feature activated!
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
   programs.ssh.extraConfig =
@@ -193,7 +193,7 @@
     test = {
       autostart = true;
       specialArgs = { inherit profiles; };
-      config = { lib, pkgs, ... }: {
+      config = { pkgs, ... }: {
         networking.hostName = "test";
         imports = [ profiles.micro-vm ];
 

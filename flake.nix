@@ -42,7 +42,7 @@
       # Small tool to iterate over each target, but use a customized instantiation of nixpkgs.
       # NOTE; The nixpkgs-config parameter destructuring is purely for documentation. The entire callflow chain
       # of nixpkgs ignores unused arguments and typos _will_ cause invisibly broken functionality!
-      eachSystemOverride = { config ? null, overlays ? null, ... }@nixpkgs-config: f:
+      eachSystemOverride = { ... }@nixpkgs-config: f:
         lib.genAttrs [ "x86_64-linux" ]
           (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
 
@@ -96,6 +96,11 @@
           # Nix cleanup of dead code
           programs.deadnix.enable = true;
           programs.shellcheck.enable = true;
+          programs.shfmt = {
+            enable = true;
+            # Setting option to 'null' configures formatter to follow .editorconfig
+            indent_size = null;
+          };
           # Python linting/formatting
           programs.ruff.check = true;
           programs.ruff.format = true;
@@ -112,9 +117,6 @@
               };
             };
           };
-
-          # Run ruff formatter fixing all fixable issues
-          settings.formatter.ruff-format.options = [ "--fix" ];
         }).config.build.wrapper);
 
       # Build development shell with;
