@@ -145,13 +145,10 @@
                 # For fun
                 nyancat figlet
                 # For development
-                git bat vault
+                git bat
                 # For secret material
-                sops ssh-to-age;
+                sops ssh-to-age rage;
             };
-
-            VAULT_ADDR = "http://169.254.245.1:8200";
-            VAULT_TOKEN = "<none>; run export VAULT_TOKEN='<token>'";
           };
         });
 

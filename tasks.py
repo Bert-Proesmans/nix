@@ -17,6 +17,8 @@ INVOKED_PATH = Path.cwd()
 FLAKE = Path(__file__).parent.resolve()
 os.chdir(FLAKE)
 
+DEV_KEY = (FLAKE / "development.age").absolute()
+
 @task
 # USAGE: invoke check
 def check(c: Any) -> None:
@@ -40,6 +42,9 @@ def update_sops_files(c: Any) -> None:
     Update all sops yaml files according to .sops.yaml rules
     """
     environment = os.environ.copy()
+    environment.pop("SOPS_AGE_KEY_FILE", None)
+    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+    
     subprocess.run(
         """
         find . -type f \\( -iname '*.encrypted.yaml' \\) -print0 | \
@@ -51,7 +56,22 @@ def update_sops_files(c: Any) -> None:
 def private_opener(path: str, flags: int) -> Union[str, int]:
     return os.open(path, flags, 0o400)
 
-def decrypt_host_key(flake_attr: str, tmpdir: str) -> None:
+def decrypt_dev_key() -> str:
+    assert (
+        DEV_KEY.exists()
+    ), "The encrypted development key is not found next to the tasks.py file!"
+
+    age_identity = subprocess.run(
+        f'rage --decrypt "{quote(DEV_KEY.as_posix())}"',
+        shell=True,  # run shell to handle manual password entry
+        text=True,  # stdin/stdout are opened in text mode
+        check=True,  # Throw exception if command fails
+        stdout=subprocess.PIPE,
+    ).stdout.strip()
+
+    return age_identity
+
+def decrypt_host_key(environment: os._Environ, flake_attr: str, tmpdir: str) -> None:
     # Location of encrypted keys for the specified system configuration
     keys_file = FLAKE / "nixosModules" / "hosts" / flake_attr / "keys.encrypted.yaml"
 
@@ -63,9 +83,6 @@ def decrypt_host_key(flake_attr: str, tmpdir: str) -> None:
     host_key.parent.mkdir(parents=True, exist_ok=True) 
 
     with open(host_key, "w", opener=private_opener) as key_handle:
-        environment = os.environ.copy()
-        environment["SOPS_AGE_KEY"] = decrypt_dev_key()
-
         # Decrypt the keys file, extract the value of key 'ssh_host_ed25519_key', push the decrypted value
         # to stdout, redirect stdout to the file at /tmp
         #
@@ -96,8 +113,12 @@ def deploy(c: Any, flake_attr: str, hostname: str) -> None:
     if ask != "y":
         return
 
+    environment = os.environ.copy()
+    environment.pop("SOPS_AGE_KEY_FILE", None)
+    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+
     with TemporaryDirectory() as tmpdir:
-        decrypt_host_key(flake_attr, tmpdir)
+        decrypt_host_key(environment, flake_attr, tmpdir)
 
         deploy_flags = "--debug"
         #deploy_flags += " --no-reboot"
@@ -109,7 +130,6 @@ def deploy(c: Any, flake_attr: str, hostname: str) -> None:
         #
         #deploy_flags += " --option accept-flake-config true"
         
-        environment = os.environ.copy()
         # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
         subprocess.run(
             f"""
@@ -209,3 +229,13 @@ def create_host_key(c: Any, file_path: str) -> None:
             and follow up `invoke update-sops-files` to rekey the encrypted files
             """
         )
+
+@task
+def new_development_key(c: Any, name: str = "development") -> None:
+    """
+    Creates a new development key, password protect it, and store it at path {FLAKE}/<name>.age
+
+    The public part should be provided to SOPS (see '.sops.yaml') for encryption.
+    The private part should be made available, in decrypted form, when deploying secrets.
+    """
+    c.run(f'rage -p -o "{name}.age" <(rage-keygen)')

@@ -3,13 +3,17 @@ sops:
     kms: []
     gcp_kms: []
     azure_kv: []
-    hc_vault:
-        - vault_address: http://169.254.245.1:8200
-          engine_path: sops
-          key_name: master
-          created_at: "2024-05-06T20:54:33Z"
-          enc: vault:v1:rSKb1kjPrDz92ddFnMictY9QcnwOHRLsUTRM3zXwWhN6k7bhutPcTpUOZznLurof5B2nChpt3jcRzatC
-    age: []
+    hc_vault: []
+    age:
+        - recipient: age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
+          enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBMaU5TWE00Y1ZhSnZjTWpm
+            N0owR0ZWeHlQVHpZTXhmcjNBNUZrdE9yN1RrCk9Xb256c2c5ZVc0N1Q5dHFld05h
+            MXlmcHgvcFZQc2Z4cnZDQW9lUWxSeHMKLS0tIGNKNnppK2ZTRks5L0Q1WlBteTN0
+            WkxWNFU4Mk1VdEJWU0lOVk9mMXdGcG8KW3UwmMkLMdPKRbt/y2IO6t3KGheGx6ky
+            xDEtVEySo8txJuIJkXKtZpOPMh0OEjSRzm9Y5TXJdoAUcB9Hbib2bw==
+            -----END AGE ENCRYPTED FILE-----
     lastmodified: "2024-05-06T20:54:33Z"
     mac: ENC[AES256_GCM,data:zO2IHQkdpY+JpkY8gti738/PxGprAFYMz/CeavFDG9dwRW47KP5Bin+hUO/K8QxQ9s2B2PT41wxw6R2/q4HbT8txH6Eh4bTqOMxL/rasjD40jgVYphDkW4IJVcarm+BGmgbK3RwFdBYuwftzwTF1naIMp0Le3xl0/0LpIZ4POkY=,iv:c2QkoDmLmB7QWs5zC40MaJj5dzX3WpO7LSFttCJtQi8=,tag:kZMa6FsvKLCYFty8eHIvDw==,type:str]
     pgp: []

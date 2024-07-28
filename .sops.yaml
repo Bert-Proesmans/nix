@@ -7,8 +7,7 @@ keys:
   # ERROR; Age's extension for Yubikey derived age-keys is not yet merged into sops!
   # REF; https://github.com/getsops/sops/pull/1465
   #- &yubikey_bert_proesmans age1yubikey1...
-  # VAULT transit keychain
-  - &master "http://169.254.245.1:8200/v1/sops/keys/master"
+  - &development age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
   # HOST KEYS
   - &host_buddy age14an6m226h8vu06nv5q83s7vl59ytq8j9dkaujvrwgsdj98kr0ukq0a5k0g
 
@@ -25,15 +24,13 @@ creation_rules:
       # Since there is exactly one keygroup, any key within can fully decrypt the secrets
       - age:
         #- *yubikey_bert_proesmans
-        hc_vault:
-          - *master
+          - *development
 
   - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
           - *host_buddy
-        hc_vault:
-          - *master
+          - *development
   
   # NOTE; No path_regex as fallback option
   #
@@ -41,5 +38,4 @@ creation_rules:
   - key_groups:
       - age:
         #- *yubikey_bert_proesmans
-        hc_vault:
-          - *master
+          - *development
