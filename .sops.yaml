@@ -1,6 +1,14 @@
 # Configuration file for SOPS
 # REF; https://github.com/getsops/sops
 
+stores:
+    json:
+        indent: 2
+    json_binary:
+        indent: 2
+    yaml:
+        indent: 2
+
 # This example uses YAML anchors which allows reuse of multiple keys without having to repeat yourself.
 # REF;https://github.com/nix-community/infra/blob/428dc48b4b08c7b02a9512b0c60b84d30c6acce0/.sops.yaml
 keys:
@@ -17,7 +25,7 @@ keys:
 # WARN; Creation rules are interpreted sequentially, and a first match is used to calculate/provide key material
 # to the file argument.
 creation_rules:
-  - path_regex: hosts/[^/]+/keys\.encrypted\.yaml$
+  - path_regex: hosts/[^/]+/keys\.encrypted\.json$
     key_groups:
       # NOTE; A single key group comprised of 2 different types of encryption keys/methods
       # By default, to decrypt, at least one decryption key for _each_ keygroup must be present to decrypt secrets.
@@ -26,7 +34,7 @@ creation_rules:
         #- *yubikey_bert_proesmans
           - *development
 
-  - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
+  - path_regex: hosts/buddy/[^/]+\.encrypted\.json$
     key_groups:
       - age:
           - *host_buddy

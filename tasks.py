@@ -42,7 +42,7 @@ def format(c: Any) -> None:
 @task
 def update_sops_files(c: Any) -> None:
     """
-    Update all sops yaml files according to .sops.yaml rules
+    Update all sops files according to .sops.yaml rules
     """
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
@@ -50,7 +50,7 @@ def update_sops_files(c: Any) -> None:
 
     subprocess.run(
         """
-        find . -type f \\( -iname '*.encrypted.yaml' \\) -print0 | \
+        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.json' \\) -print0 | \
         xargs -0 -n1 sops updatekeys --yes
         """,
         env=environment,
@@ -81,7 +81,7 @@ def decrypt_dev_key() -> str:
 
 def decrypt_host_key(environment: os._Environ, flake_attr: str, tmpdir: str) -> None:
     # Location of encrypted keys for the specified system configuration
-    keys_file = FLAKE / "nixosModules" / "hosts" / flake_attr / "keys.encrypted.yaml"
+    keys_file = FLAKE / "nixosModules" / "hosts" / flake_attr / "keys.encrypted.json"
 
     # Prepare filepath and secure file access to store sensitive key material
     tmp = Path(tmpdir)
@@ -151,7 +151,7 @@ def deploy(c: Any, flake_attr: str, hostname: str) -> None:
 
 
 @task
-# USAGE; invoke secret-edit nixosModules/hosts/development/secrets.yaml
+# USAGE; invoke secret-edit nixosModules/hosts/development/secrets.json
 def secret_edit(c: Any, file_path: str) -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
@@ -159,22 +159,32 @@ def secret_edit(c: Any, file_path: str) -> None:
 
     # WARN; Path to existing file (for editing), or path to non-existant file for creation by SOPS.
     encrypted_file = (INVOKED_PATH / file_path).absolute()
-    assert encrypted_file.name.endswith("encrypted.yaml"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
+    assert encrypted_file.name.endswith("encrypted.json"), """
+        The convention is to end the filename of encrypted sensitive content with *.encrypted.json.
         Update the provided path argument to align with the above convention!
     """
 
     environment = os.environ.copy()
-    subprocess.run(
+    environment.pop("SOPS_AGE_KEY_FILE", None)
+    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+
+    result = subprocess.run(
         f'sops "{quote(encrypted_file.as_posix())}"',
         env=environment,
         shell=True,
-        check=True,
+        # check=True, # Only verifies exit code 0
     )
+
+    acceptable_sops_exitcodes = [
+        0,
+        200,  # FileHasNotBeenModified
+    ]
+    if result.returncode not in acceptable_sops_exitcodes:
+        raise subprocess.CalledProcessError(result.returncode, result.args)
 
 
 @task
-# USAGE; invoke create-host-key nixosModules/hosts/development/keys.encrypted.yaml
+# USAGE; invoke create-host-key nixosModules/hosts/development/keys.encrypted.json
 def create_host_key(c: Any, file_path: str) -> None:
     """
     Create and encrypt a new SSH private host key.
@@ -183,8 +193,8 @@ def create_host_key(c: Any, file_path: str) -> None:
 
     # WARN; Path to existing file (for editing), or path to non-existant file for creation by SOPS.
     encrypted_file = (INVOKED_PATH / file_path).absolute()
-    assert encrypted_file.name.endswith("encrypted.yaml"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
+    assert encrypted_file.name.endswith("encrypted.json"), """
+        The convention is to end the filename of encrypted sensitive content with *.encrypted.json.
         Update the provided path argument to align with the above convention!
     """
 
@@ -234,10 +244,8 @@ def create_host_key(c: Any, file_path: str) -> None:
                 "--encrypt",
                 "--input-type",
                 "json",
-                # WARN; Explicit conversion json->yaml because I don't want to pull in a python library to
-                # process yaml files correctly.. sops can do this :D
                 "--output-type",
-                "yaml",
+                "json",
                 "--output",
                 encrypted_file.as_posix(),  # Write directly into the output file
                 # Input file
@@ -251,7 +259,7 @@ def create_host_key(c: Any, file_path: str) -> None:
         )
         print(
             """
-            Insert the age-key into the sops.yaml file,
+            Insert the age-key into the .sops.yaml file,
             and follow up `invoke update-sops-files` to rekey the encrypted files
             """
         )

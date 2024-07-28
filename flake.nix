@@ -151,6 +151,26 @@
                 # For secret material
                 sops ssh-to-age rage;
             };
+
+            # Open files within the visual code window
+            EDITOR =
+              let
+                script = pkgs.writeShellApplication {
+                  name = "find-editor";
+                  runtimeInputs = [ pkgs.nano ];
+                  text = ''
+                    if ! type "code" > /dev/null; then
+                      nano "$@"
+                    fi
+
+                    # Since VScode works interactively there is an instant process fork.
+                    # The code calling $EDITOR is (very likely) synchronous, so we want to wait until
+                    # the specific (new) editor pane has closed!
+                    code --wait "$@"
+                  '';
+                };
+              in
+              lib.getExe script;
           };
         });
 
