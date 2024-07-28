@@ -21,6 +21,7 @@
     vscode-server.inputs.nixpkgs.follows = "nixpkgs";
     microvm.url = "github:astro/microvm.nix";
     microvm.inputs.nixpkgs.follows = "nixpkgs";
+    impermanence.url = "github:nix-community/impermanence";
   };
 
   outputs = { self, ... }@inputs:

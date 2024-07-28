@@ -538,11 +538,7 @@
   users.users.bert-proesmans = {
     isNormalUser = true;
     description = "Bert Proesmans";
-    extraGroups = [ "wheel" ]
-      ++ lib.optional config.virtualisation.libvirtd.enable
-      "libvirtd" # NOTE; en-GB
-      ++ lib.optional config.networking.networkmanager.enable
-      "networkmanager";
+    extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
     ];
@@ -671,12 +667,20 @@
           mac = lib.facts.vm.idm.net.mac;
         }];
 
-        microvm.shares = [{
-          source = "/vm/kanidm";
-          mountPoint = "/var/lib/kanidm";
-          tag = "kanidm";
-          proto = "virtiofs";
-        }];
+        microvm.shares = [
+          {
+            source = "/run/secrets/auth_container";
+            mountPoint = "/persistence";
+            tag = "container_kanidm";
+            proto = "virtiofs";
+          }
+          {
+            source = "/vm/kanidm";
+            mountPoint = "/var/lib/kanidm";
+            tag = "kanidm";
+            proto = "virtiofs";
+          }
+        ];
 
         # ERROR; Number must be unique for each VM!
         # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
@@ -686,16 +690,16 @@
         # - host: nc --listen --vsock <cid:2> <port:1234> --send-only < /path/to/local/file > /dev/null
         # - guest: nc --vsock <port:1234> --recv-only > /path/to/local/file < /dev/null
         #
-        microvm.vsock.cid = 3;
-        # test = [
-        #   "-device vhost-vsock-pci,guest-cid=3"
+        microvm.vsock.cid = 300;
 
-        #   # --
-        #   "-device virtio-vsock-pci,id=vsock0,guest-cid=3"
-        #   "-object vhost-vsock-pci,id=hostvm0,guest-cid=3,queues=4"
-        #   "-netdev vhost-vsock,id=hostvm0,chardev=hostvm0"
-        #   "-chardev socket,path=/tmp/vm_socket,server,nowait,id=hostvm0"
-        # ];
+        environment.persistence."/persistent" = {
+          enable = true; # NB: Defaults to true, not needed
+          hideMounts = true;
+          directories = [ ];
+          files = [
+            { file = "/etc/ssh/ssh_host_ed25519_key"; }
+          ];
+        };
 
         services.kanidm = {
           enableServer = true;

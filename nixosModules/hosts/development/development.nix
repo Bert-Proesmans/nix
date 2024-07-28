@@ -203,6 +203,24 @@
           mac = "6a:33:06:88:6c:5b"; # randomly generated
         }];
 
+        microvm.shares = [
+          {
+            source = "/run/secrets/test_container";
+            mountPoint = "/persistence";
+            tag = "container_kanidm";
+            proto = "virtiofs";
+          }
+        ];
+
+        # environment.persistence."/persistent" = {
+        #   enable = true; # NB: Defaults to true, not needed
+        #   hideMounts = true;
+        #   directories = [ ];
+        #   files = [
+        #     { file = "/etc/ssh/ssh_host_ed25519_key"; }
+        #   ];
+        # };
+
         microvm.vsock.cid = 55;
         environment.systemPackages = [
           pkgs.socat
