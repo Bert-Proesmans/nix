@@ -1,12 +1,14 @@
-{ lib, pkgs, config, ... }:
+{ outputs }:
 let
-  cfg = config.proesmans.install-script;
-
   # Converts hostname to the required attribute to install the system
   # This approach also checks for attribute existance, and automatically includes the necessary closure
   # into the installation medium!
   toplevel-build = host-attribute: outputs.nixosConfigurations."${host-attribute}".config.system.build.toplevel;
   disko-script = host-attribute: outputs.nixosConfigurations."${host-attribute}".config.system.build.diskoScript;
+in
+{ lib, pkgs, config, ... }:
+let
+  cfg = config.proesmans.install-script;
 in
 {
   options.proesmans.install-script = {

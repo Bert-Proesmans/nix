@@ -324,8 +324,8 @@
               self.outputs.nixosModules.profiles.users
               self.outputs.nixosModules.profiles.remote-iso
               ({ lib, ... }: {
-                networking.hostName = lib.mkForce "alpha";
-                networking.domain = lib.mkForce "installer.proesmans.eu";
+                networking.hostName = lib.mkForce "installer";
+                networking.domain = lib.mkForce "alpha.proesmans.eu";
 
                 # Make sure EFI store is writable because we're installing!
                 boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
@@ -355,17 +355,20 @@
               }));
 
           # A virtual machine for each defined nixos host
-          virtual-hosts = lib.flip builtins.mapAttrs self.outputs.nixosConfigurations
-            (_name: configuration: configuration.extendModules {
-              modules = [
-                self.outputs.nixosModules.profiles.local-vm-test
-                ({ lib, ... }: {
-                  # Force machine configuration to match the nix CLI build target attribute path
-                  # packages.x86_64-linux builds a x86_64-linux VM.
-                  nixpkgs.hostPlatform = lib.mkForce forced-system;
-                })
-              ];
-            });
+          virtual-hosts = lib.flip lib.mapAttrs' self.outputs.nixosConfigurations
+            (hostname: configuration: lib.nameValuePair
+              # Change the attribute name with vm suffix, use like this; nix build .#development-vm
+              ("${hostname}-vm")
+              (configuration.extendModules {
+                modules = [
+                  self.outputs.nixosModules.profiles.local-vm-test
+                  ({ lib, ... }: {
+                    # Force machine configuration to match the nix CLI build target attribute path
+                    # packages.x86_64-linux builds a x86_64-linux VM.
+                    nixpkgs.hostPlatform = lib.mkForce forced-system;
+                  })
+                ];
+              }));
 
           # ERROR; The attribute `vm-nogui` creates a script, but not in the form of an application package.
           # The script is wrapped so 'nix run' can find and execute it.
@@ -383,10 +386,10 @@
         // {
           # Lightweight bootstrap machine for initiating remote deploys. This configuration doesn't carry
           # a target host.
-          #default = install-host.config.formats.install-iso;
+          default = install-host.config.formats.install-iso;
 
-          # Development machine as a package
-          default = specialized-install-hosts.development-iso.config.formats.install-iso;
+          # NOTE; For a self-deploying development machine, use the #development-iso attribute!
+          # eg; nix build .#development-iso
         });
 
       # Verify flake configurations with;
