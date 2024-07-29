@@ -188,6 +188,10 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
 
+  sops.defaultSopsFile = ./secrets.encrypted.json;
+  sops.defaultSopsFormat = "json";
+  sops.secrets."test-flat" = { };
+
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
     test = {
@@ -204,12 +208,12 @@
         }];
 
         microvm.shares = [
-          {
-            source = "/run/secrets/test_container";
-            mountPoint = "/persistence";
-            tag = "container_kanidm";
-            proto = "virtiofs";
-          }
+          # {
+          #   source = "/run/secrets/test_container";
+          #   mountPoint = "/persistence";
+          #   tag = "container_kanidm";
+          #   proto = "virtiofs";
+          # }
         ];
 
         # environment.persistence."/persistent" = {
