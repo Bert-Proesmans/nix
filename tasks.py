@@ -1,15 +1,14 @@
 import os
 from pathlib import Path
 from typing import Any, Union
-from shlex import quote
 import subprocess
 from tempfile import TemporaryDirectory
 import json
+import warnings
 
 # REF; https://www.pyinvoke.org/
 from invoke import task
 # REF; https://github.com/numtide/deploykit/
-from deploykit import DeployHost
 
 
 INVOKED_PATH = Path.cwd()
@@ -18,6 +17,19 @@ FLAKE = Path(__file__).parent.resolve()
 os.chdir(FLAKE)
 
 DEV_KEY = (FLAKE / "development.age").absolute()
+
+
+def ask_user_input(message: str) -> bool:
+    user_reply = input(f"{message} [y/N]: ")
+    return user_reply in ["yes", "y"]
+
+
+def default_decryptor_encrypted_filename() -> str:
+    return "keys.encrypted.yaml"
+
+
+def default_decryptor_name(hostname: str) -> str:
+    return f"{hostname}_decrypter"
 
 
 @task
@@ -50,7 +62,7 @@ def update_sops_files(c: Any) -> None:
 
     subprocess.run(
         """
-        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.json' \\) -print0 | \
+        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.yaml' \\) -print0 | \
         xargs -0 -n1 sops updatekeys --yes
         """,
         env=environment,
@@ -64,104 +76,145 @@ def private_opener(path: str, flags: int) -> Union[str, int]:
 
 
 def decrypt_dev_key() -> str:
-    assert (
-        DEV_KEY.exists()
-    ), "The encrypted development key is not found next to the tasks.py file!"
+    assert DEV_KEY.exists(), """
+        The encrypted development key is not found next to the tasks.py file!
+    """
 
-    age_identity = subprocess.run(
-        f'rage --decrypt "{quote(DEV_KEY.as_posix())}"',
-        shell=True,  # run shell to handle manual password entry
+    age_key = subprocess.run(
+        ["rage", "--decrypt", DEV_KEY.as_posix()],
         text=True,  # stdin/stdout are opened in text mode
         check=True,  # Throw exception if command fails
-        stdout=subprocess.PIPE,
+        capture_output=True,  # Redirect stdout/stderr
     ).stdout.strip()
 
-    return age_identity
+    assert age_key, """
+        Expected to decrypt an AGE private key, but decrypted an empty string. Something went unexpectedly wrong!
+    """
 
-
-def decrypt_host_key(environment: os._Environ, flake_attr: str, tmpdir: str) -> None:
-    # Location of encrypted keys for the specified system configuration
-    keys_file = FLAKE / "nixosModules" / "hosts" / flake_attr / "keys.encrypted.json"
-
-    # Prepare filepath and secure file access to store sensitive key material
-    tmp = Path(tmpdir)
-    tmp.mkdir(parents=True, exist_ok=True)
-    tmp.chmod(0o755)
-    host_key = tmp / "etc/ssh/ssh_host_ed25519_key"
-    host_key.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(host_key, "w", opener=private_opener) as key_handle:
-        # Decrypt the keys file, extract the value of key 'ssh_host_ed25519_key', push the decrypted value
-        # to stdout, redirect stdout to the file at /tmp
-        #
-        # ERROR; Explicit program and argument syntax (list/bracket form), because we're not using
-        # the shell as intermediate command interpreter
-        subprocess.run(
-            [
-                "sops",
-                "--extract",
-                '["ssh_host_ed25519_key"]',
-                "--decrypt",
-                quote(keys_file.as_posix()),
-            ],
-            env=environment,
-            check=True,
-            stdout=key_handle,
-        )
+    return age_key
 
 
 @task
-# USAGE; invoke deploy --flake-attr development --hostname 10.1.7.100
-def deploy(c: Any, flake_attr: str, hostname: str) -> None:
+# USAGE; invoke deploy development root@10.1.7.100
+def deploy(
+    c: Any, hostname: str, ssh_connection_string: str, secret_name: str = None
+) -> None:
     """
-    Decrypt the private SSH hostkey of the target machine, deploy the machine, upload the private hostkey to
-    the host filesystem.
-    Use this command to do initial configuration (aka installation) of new hosts.
+    Decrypts the secret used for sops-nix, deploys the machine, upload the secret to the host filesystem.
     """
-    ask = input(f"Install configuration {flake_attr} on {hostname}? [y/N] ")
-    if ask != "y":
+
+    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    encrypted_file = host_configuration_dir / default_decryptor_encrypted_filename()
+
+    assert host_configuration_dir.is_dir(), f"""
+        There is no configuration folder found for host {hostname}.
+        Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
+    """
+
+    assert encrypted_file.is_file(), f"""
+        There is no file containing decrypter keys.
+        Create a decrypter key for host {hostname} first!
+    """
+
+    host_attr_path = f".#nixosConfigurations.{hostname}.config.system.build.toplevel"
+
+    print(f"Checking if host {hostname} builds..")
+    subprocess.run(
+        ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+    )
+
+    if not ask_user_input(
+        f"Install configuration {hostname} on {ssh_connection_string}?"
+    ):
         return
+
+    if not secret_name:
+        secret_name = default_decryptor_name(hostname)
+        warnings.warn(f"Defaulting to key name {secret_name}")
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
     environment["SOPS_AGE_KEY"] = decrypt_dev_key()
 
-    with TemporaryDirectory() as tmpdir:
-        decrypt_host_key(environment, flake_attr, tmpdir)
+    print(f"Decrypting AGE identity from {encrypted_file}:{secret_name}..")
+    age_key = subprocess.run(
+        [
+            "sops",
+            "decrypt",
+            "--extract",
+            json.dumps([secret_name]),
+            encrypted_file.as_posix(),
+        ],
+        env=environment,
+        check=True,
+        capture_output=True,
+    ).stdout.strip()
 
-        deploy_flags = "--debug"
-        # deploy_flags += " --no-reboot"
+    assert age_key, """
+        Expected decrypting an AGE private key, but decrypted an empty string. Something went unexpectedly wrong!
+    """
 
-        # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
-        # operations on that flake execution only.
-        # These options are encoded inside the 'nixConfig' output attribute of the flake-schema.
-        # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
-        #
-        # deploy_flags += " --option accept-flake-config true"
+    with TemporaryDirectory() as deploy_directory:
+        # Prepare filepath and secure file access to store sensitive key material
+        deploy_directory = Path(deploy_directory)
+        deploy_directory.mkdir(parents=True, exist_ok=True)
+        deploy_directory.chmod(0o755)
+        decrypter_file_path = deploy_directory / "etc" / "secrets" / "decrypter.age"
+        decrypter_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(decrypter_file_path, "w", opener=private_opener) as file_handle:
+            file_handle.write(age_key)
+
+        deploy_flags = [
+            "--debug"
+            # "--no-reboot"
+            # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
+            # operations on that flake execution only.
+            # These options are encoded inside the 'nixConfig' output attribute of the flake-schema.
+            # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
+            #
+            # "--option accept-flake-config true"
+        ]
 
         # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
         subprocess.run(
-            f"""
-            nix run nixpkgs#nixos-anywhere -- {hostname} --extra-files {tmpdir} --flake .#{flake_attr} {deploy_flags}
-            """,
+            [
+                "nix",
+                "run",
+                "nixpkgs#nixos-anywhere",
+                "--",
+                "--extra-files",
+                deploy_directory,
+                "--flake",
+                hostname,
+            ]
+            + deploy_flags
+            + [ssh_connection_string],
             env=environment,
-            shell=True,
             check=True,
         )
 
 
 @task
-# USAGE; invoke secret-edit nixosModules/hosts/development/secrets.json
-def secret_edit(c: Any, file_path: str) -> None:
+# USAGE; invoke secret-edit development ["secrets.encrypted.yaml"]
+def secret_edit(
+    c: Any, hostname: str, secrets_file: str = "secrets.encrypted.yaml"
+) -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
     """
 
-    # WARN; Path to existing file (for editing), or path to non-existant file for creation by SOPS.
-    encrypted_file = (INVOKED_PATH / file_path).absolute()
-    assert encrypted_file.name.endswith("encrypted.json"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.json.
-        Update the provided path argument to align with the above convention!
+    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    encrypted_file = host_configuration_dir / secrets_file
+
+    assert host_configuration_dir.is_dir(), f"""
+        There is no configuration folder found for host {hostname}.
+        Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
+    """
+
+    assert encrypted_file.name.endswith("encrypted.yaml"), """
+        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
+        Update the provided path argument to align with the convention!
     """
 
     environment = os.environ.copy()
@@ -169,9 +222,8 @@ def secret_edit(c: Any, file_path: str) -> None:
     environment["SOPS_AGE_KEY"] = decrypt_dev_key()
 
     result = subprocess.run(
-        f'sops "{quote(encrypted_file.as_posix())}"',
+        ["sops", encrypted_file.as_posix()],
         env=environment,
-        shell=True,
         # check=True, # Only verifies exit code 0
     )
 
@@ -184,23 +236,33 @@ def secret_edit(c: Any, file_path: str) -> None:
 
 
 @task
-# USAGE; invoke create-host-key nixosModules/hosts/development/keys.encrypted.json
-def create_host_key(c: Any, file_path: str) -> None:
+# USAGE; invoke create-ssh-key development ["secrets.encrypted.yaml"] ["ssh_host_ed25519_key"]
+def create_ssh_key(
+    c: Any,
+    hostname: str,
+    secrets_file: str = "secrets.encrypted.yaml",
+    secret_name: str = "ssh_host_ed25519_key",
+) -> None:
     """
     Create and encrypt a new SSH private host key.
-    Use this command when defining a new host configuration. This is a required step before executing `invoke deploy <host>`.
     """
 
-    # WARN; Path to existing file (for editing), or path to non-existant file for creation by SOPS.
-    encrypted_file = (INVOKED_PATH / file_path).absolute()
-    assert encrypted_file.name.endswith("encrypted.json"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.json.
-        Update the provided path argument to align with the above convention!
+    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    encrypted_file = host_configuration_dir / secrets_file
+
+    assert host_configuration_dir.is_dir(), f"""
+        There is no configuration folder found for host {hostname}.
+        Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    assert not encrypted_file.exists(), """
-        The designated file to store the encrypted key material already exists. This task will not overwrite that file!
-        If it's intentional to overwrite the host key, delete the encrypted file and retry.
+    assert encrypted_file.name.endswith("encrypted.yaml"), """
+        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
+        Update the provided path argument to align with the convention!
+    """
+
+    assert secret_name, """
+        You must provide a name for the secret value. The value is currently set to an empty string!
+        Pass either no argument, or enter a name as argument to this function.
     """
 
     with TemporaryDirectory() as tmpdir:
@@ -210,7 +272,6 @@ def create_host_key(c: Any, file_path: str) -> None:
         tmp.chmod(0o755)
         host_key = tmp / "ssh_host_ed25519_key"
         pub_host_key = host_key.with_suffix(".pub")
-        file_to_encrypt = tmp / "keys.json"
 
         # Create a new key of type 'ed25519', written to the designated filepath
         #
@@ -229,44 +290,59 @@ def create_host_key(c: Any, file_path: str) -> None:
             check=True,
         )
 
-        # Write out a json file with the key material
-        with open(host_key, "r", opener=private_opener) as key_handle:
-            with open(file_to_encrypt, "w", opener=private_opener) as to_encrypt_handle:
-                data = {"ssh_host_ed25519_key": key_handle.read()}
-                json.dump(data, to_encrypt_handle)
+        with open(host_key, "r", opener=private_opener) as file_handle:
+            ssh_private_key = file_handle.read()
 
-        # Encrypt the json file with SOPS
-        # ERROR; It's not possible to programmatically instruct sops to create an encrypted file with exact contents.
-        # The argument is that sops is not a secrets manager, but a secrets editor..
+        with open(pub_host_key, "r") as file_handle:
+            public_key = file_handle.read()
+
+    assert ssh_private_key and public_key, """
+        Empty ssh key files were generated, something went unexpectedly wrong!
+    """
+
+    # ERROR; File must exist for 'sops set' to work
+    if not encrypted_file.is_file():
         subprocess.run(
             [
                 "sops",
-                "--encrypt",
+                "encrypt",
                 "--input-type",
                 "json",
                 "--output-type",
-                "json",
+                "yaml",
                 "--output",
-                encrypted_file.as_posix(),  # Write directly into the output file
+                encrypted_file.as_posix(),
                 # Input file
-                file_to_encrypt.as_posix(),
+                "/dev/stdin",
             ],
+            input=json.dumps({secret_name: ssh_private_key}),
+            text=True,
+            check=True,
+        )
+    else:
+        environment = os.environ.copy()
+        environment.pop("SOPS_AGE_KEY_FILE", None)
+        environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+
+        subprocess.run(
+            [
+                "sops",
+                "set",
+                encrypted_file.as_posix(),
+                json.dumps([secret_name]),  # Key name selector
+                json.dumps(ssh_private_key),  # Value as json string
+            ],
+            env=environment,
             check=True,
         )
 
-        c.run(
-            f'echo "AGE PUB KEY to use in sops config"; cat "{quote(pub_host_key.as_posix())}" | ssh-to-age'
-        )
-        print(
-            """
-            Insert the age-key into the .sops.yaml file,
-            and follow up `invoke update-sops-files` to rekey the encrypted files
-            """
-        )
+    print(
+        f"Private key succesfully encrypted! Below is the corresponding public key\n{public_key}"
+    )
 
 
 @task
-def new_development_key(c: Any, name: str = "development") -> None:
+def create_development_key(c: Any, name: str = "development") -> None:
     """
     Creates a new development key, password protect it, and store it at path {FLAKE}/<name>.age
 
@@ -274,3 +350,80 @@ def new_development_key(c: Any, name: str = "development") -> None:
     The private part should be made available, in decrypted form, when deploying secrets.
     """
     c.run(f'rage -p -o "{name}.age" <(rage-keygen)')
+
+
+@task
+# USAGE; invoke create-decrypter-key development
+def create_decrypter_key(c: Any, hostname: str, secret_name: str = None) -> None:
+    """
+    Create a new AGE key for encrypting/decrypting all secrets provided to a host.
+    """
+    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    encrypted_file = host_configuration_dir / default_decryptor_encrypted_filename()
+
+    if not host_configuration_dir.is_dir():
+        warnings.warn(
+            "There is no configuration folder found for the provided hostname"
+        )
+        if not ask_user_input(
+            f"Do you want to create a folder at path {host_configuration_dir.as_posix()}"
+        ):
+            raise ValueError(f"No configuration folder for host {hostname}")
+        host_configuration_dir.mkdir(exist_ok=True)
+
+    age_key = subprocess.run(
+        "rage-keygen",
+        text=True,  # stdin/stdout are opened in text mode
+        check=True,  # Throw exception if command fails
+        capture_output=True,  # Redirect stdout/stderr
+    ).stdout.strip()
+
+    assert age_key, """
+        Unexpected empty output from rage-keygen command!
+    """
+
+    # Print everything except last line (presumably private key) to the terminal
+    # for the user to further process.
+    print("\n".join(age_key.splitlines()[:-1]))
+
+    if not secret_name:
+        secret_name = default_decryptor_name(hostname)
+        warnings.warn(f"Defaulting to key name {secret_name}")
+
+    # ERROR; File must exist for 'sops set' to work
+    if not encrypted_file.is_file():
+        subprocess.run(
+            [
+                "sops",
+                "encrypt",
+                "--input-type",
+                "json",
+                "--output-type",
+                "yaml",
+                # "--filename-override", # Yes, sops has a very weird CLI -_-
+                "--output",
+                encrypted_file.as_posix(),
+                # Input file
+                "/dev/stdin",
+            ],
+            input=json.dumps({secret_name: age_key}),
+            text=True,
+            check=True,
+        )
+        return
+
+    environment = os.environ.copy()
+    environment.pop("SOPS_AGE_KEY_FILE", None)
+    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+
+    subprocess.run(
+        [
+            "sops",
+            "set",
+            encrypted_file.as_posix(),
+            json.dumps([secret_name]),  # Key name selector
+            json.dumps(age_key),  # Value as json string
+        ],
+        env=environment,
+        check=True,
+    )

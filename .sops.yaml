@@ -18,7 +18,7 @@ keys:
   - &development age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
   # HOST KEYS
   - &host_buddy age14an6m226h8vu06nv5q83s7vl59ytq8j9dkaujvrwgsdj98kr0ukq0a5k0g
-  - &host_development age1pzmmvwcrjueux5yzw6tt7xsurd8revtqh3v0lqmvtpzyuv6k4s6q95sve0
+  - &decryptor_development age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -26,25 +26,16 @@ keys:
 # WARN; Creation rules are interpreted sequentially, and a first match is used to calculate/provide key material
 # to the file argument.
 creation_rules:
-  - path_regex: hosts/[^/]+/keys\.encrypted\.json$
-    key_groups:
-      # NOTE; A single key group comprised of 2 different types of encryption keys/methods
-      # By default, to decrypt, at least one decryption key for _each_ keygroup must be present to decrypt secrets.
-      # Since there is exactly one keygroup, any key within can fully decrypt the secrets
-      - age:
-        #- *yubikey_bert_proesmans
-          - *development
-
-  - path_regex: hosts/buddy/[^/]+\.encrypted\.json$
+  - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
           - *host_buddy
           - *development
 
-  - path_regex: hosts/development/[^/]+\.encrypted\.json$
+  - path_regex: hosts/development/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
-          - *host_development
+          - *decryptor_development
           - *development
   
   # NOTE; No path_regex as fallback option

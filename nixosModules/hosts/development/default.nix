@@ -188,9 +188,20 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
 
-  sops.defaultSopsFile = ./secrets.encrypted.json;
-  sops.defaultSopsFormat = "json";
-  sops.secrets."test-flat" = { };
+  sops = {
+    defaultSopsFile = ./secrets.encrypted.yaml;
+    # Disable deriving secret decrypters from SSH host keys.
+    age.sshKeyPaths = [ ];
+    age.keyFile = lib.facts.sops.keypath;
+    age.generateKey = false;
+  };
+
+  sops.secrets.ssh_host_ed25519_key = {
+    path = "/etc/ssh/ssh_host_ed25519_key";
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    mode = "0400";
+  };
 
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
@@ -207,14 +218,28 @@
           mac = "6a:33:06:88:6c:5b"; # randomly generated
         }];
 
-        microvm.shares = [
-          # {
-          #   source = "/run/secrets/test_container";
-          #   mountPoint = "/persistence";
-          #   tag = "container_kanidm";
-          #   proto = "virtiofs";
-          # }
+        microvm.qemu.extraArgs = [
+          # DOESN'T WORK
+          # "-smbios"
+          # "type=11,value=io.systemd.credential:mycredsm=supersecret"
+          # DOESN'T WORK
+          # "-fw_cfg"
+          # "name=opt/io.systemd.credentials/mycredfw,string=supersecret"
+
+          "-fw_cfg"
+          "name=opt/secret-seeder/file-1,file=/tmp/tmp.DpOJd6Snua/one.txt"
         ];
+
+        microvm.shares = [ ];
+
+        # fileSystems."/test".neededForBoot = true;
+        # environment.persistence."/test" = {
+        #   enable = true;
+        #   hideMounts = true;
+        #   files = [
+        #     { file = "/etc/machine-id"; }
+        #   ];
+        # };
 
         # environment.persistence."/persistent" = {
         #   enable = true; # NB: Defaults to true, not needed
