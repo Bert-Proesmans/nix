@@ -203,16 +203,16 @@ def deploy(
 
 
 @task
-# USAGE; invoke secret-edit development ["secrets.encrypted.yaml"]
+# USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"]
 def secret_edit(
-    c: Any, hostname: str, secrets_file: str = "secrets.encrypted.yaml"
+    c: Any, hostname: str, file: str = "secrets.encrypted.yaml"
 ) -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
     """
 
     host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
-    encrypted_file = host_configuration_dir / secrets_file
+    encrypted_file = host_configuration_dir / file
 
     assert host_configuration_dir.is_dir(), f"""
         There is no configuration folder found for host {hostname}.
@@ -243,19 +243,19 @@ def secret_edit(
 
 
 @task
-# USAGE; invoke create-ssh-key development ["secrets.encrypted.yaml"] ["ssh_host_ed25519_key"]
+# USAGE; invoke create-ssh-key development [-f "secrets.encrypted.yaml"] [-k "ssh_host_ed25519_key"]
 def ssh_key_create(
     c: Any,
     hostname: str,
-    secrets_file: str = "secrets.encrypted.yaml",
-    secret_name: str = "ssh_host_ed25519_key",
+    file: str = "secrets.encrypted.yaml",
+    key: str = "ssh_host_ed25519_key",
 ) -> None:
     """
     Create and encrypt a new SSH private host key.
     """
 
     host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
-    encrypted_file = host_configuration_dir / secrets_file
+    encrypted_file = host_configuration_dir / file
 
     assert host_configuration_dir.is_dir(), f"""
         There is no configuration folder found for host {hostname}.
@@ -267,7 +267,7 @@ def ssh_key_create(
         Update the provided path argument to align with the convention!
     """
 
-    assert secret_name, """
+    assert key, """
         You must provide a name for the secret value. The value is currently set to an empty string!
         Pass either no argument, or enter a name as argument to this function.
     """
@@ -322,12 +322,12 @@ def ssh_key_create(
                 # Input file
                 "/dev/stdin",
             ],
-            input=json.dumps({secret_name: ssh_private_key}),
+            input=json.dumps({key: ssh_private_key}),
             text=True,
             check=True,
         )
     else:
-        if find_string_in_file(encrypted_file, f"{secret_name}:"):
+        if find_string_in_file(encrypted_file, f"{key}:"):
             warnings.warn(
                 "The secret name is found in the encrypted file, it's very likely we're gonna overwrite existing data"
             )
@@ -345,7 +345,7 @@ def ssh_key_create(
                 "sops",
                 "set",
                 encrypted_file.as_posix(),
-                json.dumps([secret_name]),  # Key name selector
+                json.dumps([key]),  # Key name selector
                 json.dumps(ssh_private_key),  # Value as json string
             ],
             env=environment,

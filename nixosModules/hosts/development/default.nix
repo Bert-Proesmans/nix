@@ -211,6 +211,13 @@
     }
   ];
 
+  sops.secrets.vm-test = {
+    sopsFile = ./keys.encrypted.yaml;
+    group = "kvm"; # Hardcoded by microvm.nix
+    mode = "0440";
+    restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
+  };
+
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
     test = {
@@ -219,6 +226,14 @@
       config = { pkgs, ... }: {
         networking.hostName = "test";
         imports = [ profiles.micro-vm ];
+
+        sops = {
+          defaultSopsFile = ./secrets.encrypted.yaml;
+          # Disable deriving secret decrypters from SSH host keys.
+          age.sshKeyPaths = [ ];
+          age.keyFile = lib.facts.sops.keypath;
+          age.generateKey = false;
+        };
 
         microvm.interfaces = [{
           type = "tap";
@@ -235,28 +250,37 @@
           # "name=opt/io.systemd.credentials/mycredfw,string=supersecret"
 
           "-fw_cfg"
-          "name=opt/secret-seeder/file-1,file=/tmp/tmp.DpOJd6Snua/one.txt"
+          "name=opt/secret-seeder/file-1,file=${config.sops.secrets.vm-test.path}"
         ];
 
-        microvm.shares = [ ];
+        systemd.services.secret-seeder = {
+          # WARN; Must copy secrets out of sysfs because the file ergonomy is poor;
+          #   - File size of 'raw' is reported as 0
+          #   - We're supposed to read the entire contents of 'raw' in one syscall
+          description = "Mounts secrets provided from the hypervisor!";
+          #requiredBy = [ "local-fs.target" ];
+          wantedBy = [ "local-fs.target" ];
+          before = [ "local-fs.target" ];
+          conflicts = [ "shutdown.target" ];
 
-        # fileSystems."/test".neededForBoot = true;
-        # environment.persistence."/test" = {
-        #   enable = true;
-        #   hideMounts = true;
-        #   files = [
-        #     { file = "/etc/machine-id"; }
-        #   ];
-        # };
-
-        # environment.persistence."/persistent" = {
-        #   enable = true; # NB: Defaults to true, not needed
-        #   hideMounts = true;
-        #   directories = [ ];
-        #   files = [
-        #     { file = "/etc/ssh/ssh_host_ed25519_key"; }
-        #   ];
-        # };
+          unitConfig.DefaultDependencies = "no";
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = "yes";
+            ExecStart =
+              let
+                copier = pkgs.writers.writePython3Bin "secrets-copier" { } (lib.readFile ./secrets-copier.py);
+                script = pkgs.writeShellApplication {
+                  name = "invoke-secrets-copier";
+                  runtimeInputs = [ copier ];
+                  text = ''
+                    secrets-copier "file-1" "${lib.facts.sops.keypath}"
+                  '';
+                };
+              in
+              lib.getExe script;
+          };
+        };
 
         microvm.vsock.cid = 55;
         environment.systemPackages = [
