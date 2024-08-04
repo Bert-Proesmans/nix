@@ -201,7 +201,15 @@
     owner = config.users.users.root.name;
     group = config.users.users.root.group;
     mode = "0400";
+    restartUnits = [ systemd.services.sshd.name ];
   };
+
+  services.openssh.hostKeys = [
+    {
+      path = "/etc/ssh/ssh_host_ed25519_key";
+      type = "ed25519";
+    }
+  ];
 
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {

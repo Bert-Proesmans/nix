@@ -32,6 +32,21 @@ def default_decryptor_name(hostname: str) -> str:
     return f"{hostname}_decrypter"
 
 
+def find_string_in_file(file_path, needle):
+    try:
+        with open(file_path, "r") as file:
+            for line in file:
+                if needle in line:
+                    return True
+        return False
+    except FileNotFoundError:
+        print(f"find_string_in_file: The file at {file_path} was not found.")
+        raise
+    except Exception as e:
+        print(f"find_string_in_file: An error occurred: {e}")
+        raise
+
+
 @task
 # USAGE: invoke check
 def check(c: Any) -> None:
@@ -43,22 +58,13 @@ def check(c: Any) -> None:
 
 
 @task
-# USAGE: invoke check
-def format(c: Any) -> None:
-    """
-    Format the source code of this repository.
-    """
-    c.run("nix fmt")
-
-
-@task
-def update_sops_files(c: Any) -> None:
+def sops_files_update(c: Any) -> None:
     """
     Update all sops files according to .sops.yaml rules
     """
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
-    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
     subprocess.run(
         """
@@ -75,7 +81,7 @@ def private_opener(path: str, flags: int) -> Union[str, int]:
     return os.open(path, flags, 0o400)
 
 
-def decrypt_dev_key() -> str:
+def dev_key_decrypt() -> str:
     assert DEV_KEY.exists(), """
         The encrypted development key is not found next to the tasks.py file!
     """
@@ -134,7 +140,7 @@ def deploy(
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
-    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
     print(f"Decrypting AGE identity from {encrypted_file}:{secret_name}..")
     age_key = subprocess.run(
@@ -219,7 +225,7 @@ def secret_edit(
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
-    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
     result = subprocess.run(
         ["sops", encrypted_file.as_posix()],
@@ -237,7 +243,7 @@ def secret_edit(
 
 @task
 # USAGE; invoke create-ssh-key development ["secrets.encrypted.yaml"] ["ssh_host_ed25519_key"]
-def create_ssh_key(
+def ssh_key_create(
     c: Any,
     hostname: str,
     secrets_file: str = "secrets.encrypted.yaml",
@@ -320,9 +326,18 @@ def create_ssh_key(
             check=True,
         )
     else:
+        if find_string_in_file(encrypted_file, f"{secret_name}:"):
+            warnings.warn(
+                "The secret name is found in the encrypted file, it's very likely we're gonna overwrite existing data"
+            )
+            if not ask_user_input(
+                "Do you want to keep going and possibly overwrite your encrypted data?"
+            ):
+                raise ValueError("Process canceled as to not overwrite data")
+
         environment = os.environ.copy()
         environment.pop("SOPS_AGE_KEY_FILE", None)
-        environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+        environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
         subprocess.run(
             [
@@ -342,7 +357,7 @@ def create_ssh_key(
 
 
 @task
-def create_development_key(c: Any, name: str = "development") -> None:
+def development_key_create(c: Any, name: str = "development") -> None:
     """
     Creates a new development key, password protect it, and store it at path {FLAKE}/<name>.age
 
@@ -354,7 +369,7 @@ def create_development_key(c: Any, name: str = "development") -> None:
 
 @task
 # USAGE; invoke create-decrypter-key development
-def create_decrypter_key(c: Any, hostname: str, secret_name: str = None) -> None:
+def decrypter_key_create(c: Any, hostname: str, secret_name: str = None) -> None:
     """
     Create a new AGE key for encrypting/decrypting all secrets provided to a host.
     """
@@ -412,9 +427,18 @@ def create_decrypter_key(c: Any, hostname: str, secret_name: str = None) -> None
         )
         return
 
+    if find_string_in_file(encrypted_file, f"{secret_name}:"):
+        warnings.warn(
+            "The secret name is found in the encrypted file, it's very likely we're gonna overwrite existing data"
+        )
+        if not ask_user_input(
+            "Do you want to keep going and possibly overwrite your encrypted data?"
+        ):
+            raise ValueError("Process canceled as to not overwrite data")
+
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
-    environment["SOPS_AGE_KEY"] = decrypt_dev_key()
+    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
     subprocess.run(
         [

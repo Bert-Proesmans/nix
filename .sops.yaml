@@ -15,10 +15,10 @@ keys:
   # ERROR; Age's extension for Yubikey derived age-keys is not yet merged into sops!
   # REF; https://github.com/getsops/sops/pull/1465
   #- &yubikey_bert_proesmans age1yubikey1...
-  - &development age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
+  - &development_key age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
   # HOST KEYS
-  - &host_buddy age14an6m226h8vu06nv5q83s7vl59ytq8j9dkaujvrwgsdj98kr0ukq0a5k0g
-  - &decryptor_development age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
+  - &buddy_decryptor age1c27gckzuezcu4cqf7ksakksnxm4k694kjslysysas80jctjuwevsgd0ew3
+  - &development_decryptor age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -29,14 +29,14 @@ creation_rules:
   - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
-          - *host_buddy
-          - *development
+          - *buddy_decryptor
+          - *development_key
 
   - path_regex: hosts/development/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
-          - *decryptor_development
-          - *development
+          - *development_decryptor
+          - *development_key
   
   # NOTE; No path_regex as fallback option
   #
@@ -44,4 +44,4 @@ creation_rules:
   - key_groups:
       - age:
         #- *yubikey_bert_proesmans
-          - *development
+          - *development_key
