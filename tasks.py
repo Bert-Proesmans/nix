@@ -152,6 +152,7 @@ def deploy(
             encrypted_file.as_posix(),
         ],
         env=environment,
+        text=True,  # stdin/stdout are opened in text mode
         check=True,
         capture_output=True,
     ).stdout.strip()
@@ -168,7 +169,7 @@ def deploy(
         decrypter_file_path = deploy_directory / "etc" / "secrets" / "decrypter.age"
         decrypter_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(decrypter_file_path, "w", opener=private_opener) as file_handle:
+        with open(decrypter_file_path, "wt", opener=private_opener) as file_handle:
             file_handle.write(age_key)
 
         deploy_flags = [
@@ -192,7 +193,7 @@ def deploy(
                 "--extra-files",
                 deploy_directory,
                 "--flake",
-                hostname,
+                f"{FLAKE}#{hostname}",
             ]
             + deploy_flags
             + [ssh_connection_string],
