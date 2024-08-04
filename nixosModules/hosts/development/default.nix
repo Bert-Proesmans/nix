@@ -201,7 +201,7 @@
     owner = config.users.users.root.name;
     group = config.users.users.root.group;
     mode = "0400";
-    restartUnits = [ systemd.services.sshd.name ];
+    restartUnits = [ config.systemd.services.sshd.name ];
   };
 
   services.openssh.hostKeys = [
