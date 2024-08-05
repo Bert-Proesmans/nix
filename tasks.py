@@ -24,11 +24,11 @@ def ask_user_input(message: str) -> bool:
     return user_reply in ["yes", "y"]
 
 
-def default_decryptor_encrypted_filename() -> str:
+def decryptor_encrypted_filename_default() -> str:
     return "keys.encrypted.yaml"
 
 
-def default_decryptor_name(hostname: str) -> str:
+def decryptor_name_default(hostname: str) -> str:
     return f"{hostname}_decrypter"
 
 
@@ -45,36 +45,6 @@ def find_string_in_file(file_path, needle):
     except Exception as e:
         print(f"find_string_in_file: An error occurred: {e}")
         raise
-
-
-@task
-# USAGE: invoke check
-def check(c: Any) -> None:
-    """
-    Evaluate and build all outputs from the flake common schema, including all attribute sets from the output 'checks'.
-    This command does not stop executing after encountering an error, and will run until all tasks have ended.
-    """
-    c.run("nix flake check --keep-going")
-
-
-@task
-def sops_files_update(c: Any) -> None:
-    """
-    Update all sops files according to .sops.yaml rules
-    """
-    environment = os.environ.copy()
-    environment.pop("SOPS_AGE_KEY_FILE", None)
-    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
-
-    subprocess.run(
-        """
-        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.yaml' \\) -print0 | \
-        xargs -0 -n1 sops updatekeys --yes
-        """,
-        env=environment,
-        shell=True,
-        check=True,
-    )
 
 
 def private_opener(path: str, flags: int) -> Union[str, int]:
@@ -101,16 +71,47 @@ def dev_key_decrypt() -> str:
 
 
 @task
-# USAGE; invoke deploy development root@10.1.7.100
-def deploy(
-    c: Any, hostname: str, ssh_connection_string: str, secret_name: str = None
+# USAGE: invoke check
+def check(c: Any) -> None:
+    """
+    Evaluate and build all outputs from the flake common schema, including all attribute sets from the output 'checks'.
+    This command does not stop executing after encountering an error, and will run until all tasks have ended.
+    """
+    c.run("nix flake check --keep-going")
+
+
+@task
+# USAGE: invoke sops-files-update
+def sops_files_update(c: Any) -> None:
+    """
+    Update all sops files according to .sops.yaml rules
+    """
+    environment = os.environ.copy()
+    environment.pop("SOPS_AGE_KEY_FILE", None)
+    environment["SOPS_AGE_KEY"] = dev_key_decrypt()
+
+    subprocess.run(
+        """
+        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.yaml' \\) -print0 | \
+        xargs -0 -n1 sops updatekeys --yes
+        """,
+        env=environment,
+        shell=True,
+        check=True,
+    )
+
+
+@task
+# USAGE; invoke host-deploy development root@10.1.7.100 [-k "development_decrypter"]
+def host_deploy(
+    c: Any, hostname: str, ssh_connection_string: str, key: str = None
 ) -> None:
     """
     Decrypts the secret used for sops-nix, deploys the machine, upload the secret to the host filesystem.
     """
 
     host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
-    encrypted_file = host_configuration_dir / default_decryptor_encrypted_filename()
+    encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
 
     assert host_configuration_dir.is_dir(), f"""
         There is no configuration folder found for host {hostname}.
@@ -134,21 +135,21 @@ def deploy(
     ):
         return
 
-    if not secret_name:
-        secret_name = default_decryptor_name(hostname)
-        warnings.warn(f"Defaulting to key name {secret_name}")
+    if not key:
+        key = decryptor_name_default(hostname)
+        warnings.warn(f"Defaulting to key name {key}")
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
     environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
-    print(f"Decrypting AGE identity from {encrypted_file}:{secret_name}..")
+    print(f"Decrypting AGE identity from {encrypted_file}:{key}..")
     age_key = subprocess.run(
         [
             "sops",
             "decrypt",
             "--extract",
-            json.dumps([secret_name]),
+            json.dumps([key]),
             encrypted_file.as_posix(),
         ],
         env=environment,
@@ -204,9 +205,7 @@ def deploy(
 
 @task
 # USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"]
-def secret_edit(
-    c: Any, hostname: str, file: str = "secrets.encrypted.yaml"
-) -> None:
+def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
     """
@@ -243,7 +242,7 @@ def secret_edit(
 
 
 @task
-# USAGE; invoke create-ssh-key development [-f "secrets.encrypted.yaml"] [-k "ssh_host_ed25519_key"]
+# USAGE; invoke ssh-key-create development [-f "secrets.encrypted.yaml"] [-k "ssh_host_ed25519_key"]
 def ssh_key_create(
     c: Any,
     hostname: str,
@@ -369,13 +368,13 @@ def development_key_create(c: Any, name: str = "development") -> None:
 
 
 @task
-# USAGE; invoke create-decrypter-key development
-def decrypter_key_create(c: Any, hostname: str, secret_name: str = None) -> None:
+# USAGE; invoke decrypter-key-create development [-k "development_decrypter"]
+def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
     """
     Create a new AGE key for encrypting/decrypting all secrets provided to a host.
     """
     host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
-    encrypted_file = host_configuration_dir / default_decryptor_encrypted_filename()
+    encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
 
     if not host_configuration_dir.is_dir():
         warnings.warn(
@@ -402,9 +401,9 @@ def decrypter_key_create(c: Any, hostname: str, secret_name: str = None) -> None
     # for the user to further process.
     print("\n".join(age_key.splitlines()[:-1]))
 
-    if not secret_name:
-        secret_name = default_decryptor_name(hostname)
-        warnings.warn(f"Defaulting to key name {secret_name}")
+    if not key:
+        key = decryptor_name_default(hostname)
+        warnings.warn(f"Defaulting to key name {key}")
 
     # ERROR; File must exist for 'sops set' to work
     if not encrypted_file.is_file():
@@ -422,13 +421,13 @@ def decrypter_key_create(c: Any, hostname: str, secret_name: str = None) -> None
                 # Input file
                 "/dev/stdin",
             ],
-            input=json.dumps({secret_name: age_key}),
+            input=json.dumps({key: age_key}),
             text=True,
             check=True,
         )
         return
 
-    if find_string_in_file(encrypted_file, f"{secret_name}:"):
+    if find_string_in_file(encrypted_file, f"{key}:"):
         warnings.warn(
             "The secret name is found in the encrypted file, it's very likely we're gonna overwrite existing data"
         )
@@ -446,7 +445,7 @@ def decrypter_key_create(c: Any, hostname: str, secret_name: str = None) -> None
             "sops",
             "set",
             encrypted_file.as_posix(),
-            json.dumps([secret_name]),  # Key name selector
+            json.dumps([key]),  # Key name selector
             json.dumps(age_key),  # Value as json string
         ],
         env=environment,
