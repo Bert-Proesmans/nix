@@ -28,11 +28,11 @@ in
     addresses = [
       {
         # Random stable IPv4
-        addressConfig.Address = "10.185.165.236/24";
+        Address = "10.185.165.236/24";
       }
       {
         # Random stable IPv6
-        addressConfig.Address = "fd42:d5a4:b5e7::2d7c:b5bb:9ee1:edae/64";
+        Address = "fd42:d5a4:b5e7::2d7c:b5bb:9ee1:edae/64";
       }
       {
         # Random stable IPv6. Used for connecting to VM's over network
@@ -42,12 +42,12 @@ in
         # ERROR; Address is set on the bridge because the TAP won't send neighbour advertisements
         # for its own address. The bridge _does_. So it's either intentional to do something with
         # enslaved TAP, or the bridge config is wrong and filtering out these control packets :/
-        addressConfig.Address = "fe81::2d7c:b5bb:9ee1:edae/64";
+        Address = "fe81::2d7c:b5bb:9ee1:edae/64";
       }
     ];
     ipv6Prefixes = [{
       # Site-local prefix generated through https://www.unique-local-ipv6.com
-      ipv6PrefixConfig.Prefix = "fd42:d5a4:b5e7::/64";
+      Prefix = "fd42:d5a4:b5e7::/64";
     }];
   };
   # WARN; Allow incoming DHCP requests on the bridge interface
