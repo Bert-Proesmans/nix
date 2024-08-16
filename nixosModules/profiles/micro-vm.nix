@@ -43,6 +43,7 @@ in
     #   SEEALSO; `nixosModules.profiles.hypervisor`
     # - The qemu VM's are not started making use of hugetables
     #   REF; https://github.com/astro/microvm.nix/blob/ac28e21ac336dbe01b1f1bcab01fd31db3855e40/lib/runners/qemu.nix#L210C20-L210C40
+    #
     # ERROR; The parameter below is only used for p9 sharing. This is _not_ the same as virtiofs' accessmode!
     # securityModel = "mapped";
   }];
@@ -130,5 +131,6 @@ in
 
   # Ignore below
   # Consistent defaults accross all machine configurations.
-  system.stateVersion = "23.11";
+  # system.stateVersion = "23.11";
+  system.stateVersion = lib.versions.majorMinor lib.version; # roll me baby
 }

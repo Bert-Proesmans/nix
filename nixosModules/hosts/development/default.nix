@@ -211,91 +211,116 @@
     }
   ];
 
-  sops.secrets.vm-test = {
-    sopsFile = ./keys.encrypted.yaml;
-    group = "kvm"; # Hardcoded by microvm.nix
-    mode = "0440";
+  sops.secrets."test-vm/ssh_host_ed25519_key" = {
+    #group = "kvm"; # Hardcoded by microvm.nix
+    #mode = "0440";
+
+    # For virtio ssh
+    mode = "0400";
     restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
   };
 
   microvm.host.enable = lib.mkForce true;
-  microvm.vms = {
-    test = {
-      autostart = true;
-      specialArgs = { inherit profiles; };
-      config = { pkgs, ... }: {
-        networking.hostName = "test";
-        imports = [ profiles.micro-vm ];
+  microvm.vms =
+    let
+      host-config = config;
+    in
+    {
+      test = {
+        autostart = true;
+        specialArgs = { inherit profiles; };
+        config = { pkgs, ... }: {
+          networking.hostName = "test";
+          imports = [ profiles.micro-vm ];
 
-        sops = {
-          defaultSopsFile = ./secrets.encrypted.yaml;
-          # Disable deriving secret decrypters from SSH host keys.
-          age.sshKeyPaths = [ ];
-          age.keyFile = lib.facts.sops.keypath;
-          age.generateKey = false;
+          microvm.vsock.cid = 55;
+          microvm.interfaces = [{
+            type = "tap";
+            id = "tap-test";
+            mac = "6a:33:06:88:6c:5b"; # randomly generated
+          }];
+
+          microvm.shares = [{
+            source = "/run/secrets/test-vm";
+            mountPoint = "/seeds";
+            tag = "secret-seeds";
+            proto = "virtiofs";
+          }];
+
+          services.openssh.hostKeys = [
+            {
+              path = "/seeds/ssh_host_ed25519_key";
+              type = "ed25519";
+            }
+          ];
+          systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
+          systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
+
+          # microvm.preStart = ''
+          #   set -e
+
+          #   contents="/run/secrets/test-vm"
+          #   ls -laa "$contents"
+
+          #   d=
+          #   trap '[[ "$d" && -e "$d" ]] && rm -r "$d"' EXIT
+          #   d=$(mktemp -d)
+          #   pushd "$d"
+
+          #   (set -e; umask 077; ${pkgs.cdrtools}/bin/mkisofs -R -uid 0 -gid 0 -V secret-seeds -o secrets.iso "$contents")
+          #   popd
+
+          #   rm "/var/lib/microvms/test/secrets.iso"
+          #   ln --force --symbolic "$d/secrets.iso" "/var/lib/microvms/test/secrets.iso"
+          # '';
+
+          microvm.qemu.extraArgs = [
+            # DOESN'T WORK
+            # "-smbios"
+            # "type=11,value=io.systemd.credential:mycredsm=supersecret"
+            # DOESN'T WORK
+            # "-fw_cfg"
+            # "name=opt/io.systemd.credentials/mycredfw,string=supersecret"
+            # "-fw_cfg"
+            # "name=opt/secret-seeder/file-1,file=${config.sops.secrets.vm-test.path}"
+
+            # "-drive"
+            # "file=/var/lib/microvms/test/secrets.iso,format=raw,id=secret-seeds,if=none,read-only=on,werror=report"
+            # "-device"
+            # "virtio-blk-pci,drive=secret-seeds"
+          ];
+
+          # boot.initrd.availableKernelModules = [ "iso9660" ];
+
+          # fileSystems."/seeds" = lib.mkVMOverride {
+          #   device = "/dev/disk/by-label/secret-seeds";
+          #   fsType = "iso9660";
+          #   options = [ "ro" ];
+          # };
+
+          # systemd.services.demo-secret-access = {
+          #   description = "Demonstrate access to secret";
+          #   wants = [ "seeds.mount" ];
+          #   after = [ "seeds.mount" ];
+          #   wantedBy = [ "multi-user.target" ];
+          #   script = ''
+          #     echo "Demo: The secret is: $(cat /seeds/secret)" >&2
+          #   '';
+          # };
+
+          environment.systemPackages = [
+            pkgs.socat
+            pkgs.tcpdump
+            pkgs.python3
+            pkgs.nmap # ncat
+          ];
+
+          security.sudo.enable = true;
+          security.sudo.wheelNeedsPassword = false;
+          users.users.bert-proesmans.extraGroups = [ "wheel" ];
         };
-
-        microvm.interfaces = [{
-          type = "tap";
-          id = "tap-test";
-          mac = "6a:33:06:88:6c:5b"; # randomly generated
-        }];
-
-        microvm.qemu.extraArgs = [
-          # DOESN'T WORK
-          # "-smbios"
-          # "type=11,value=io.systemd.credential:mycredsm=supersecret"
-          # DOESN'T WORK
-          # "-fw_cfg"
-          # "name=opt/io.systemd.credentials/mycredfw,string=supersecret"
-
-          "-fw_cfg"
-          "name=opt/secret-seeder/file-1,file=${config.sops.secrets.vm-test.path}"
-        ];
-
-        systemd.services.secret-seeder = {
-          # WARN; Must copy secrets out of sysfs because the file ergonomy is poor;
-          #   - File size of 'raw' is reported as 0
-          #   - We're supposed to read the entire contents of 'raw' in one syscall
-          description = "Mounts secrets provided from the hypervisor!";
-          #requiredBy = [ "local-fs.target" ];
-          wantedBy = [ "local-fs.target" ];
-          before = [ "local-fs.target" ];
-          conflicts = [ "shutdown.target" ];
-
-          unitConfig.DefaultDependencies = "no";
-          serviceConfig = {
-            Type = "oneshot";
-            RemainAfterExit = "yes";
-            ExecStart =
-              let
-                copier = pkgs.writers.writePython3Bin "secrets-copier" { } (lib.readFile ./secrets-copier.py);
-                script = pkgs.writeShellApplication {
-                  name = "invoke-secrets-copier";
-                  runtimeInputs = [ copier ];
-                  text = ''
-                    secrets-copier "file-1" "${lib.facts.sops.keypath}"
-                  '';
-                };
-              in
-              lib.getExe script;
-          };
-        };
-
-        microvm.vsock.cid = 55;
-        environment.systemPackages = [
-          pkgs.socat
-          pkgs.tcpdump
-          pkgs.python3
-          pkgs.nmap # ncat
-        ];
-
-        security.sudo.enable = true;
-        security.sudo.wheelNeedsPassword = false;
-        users.users.bert-proesmans.extraGroups = [ "wheel" ];
       };
     };
-  };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.
