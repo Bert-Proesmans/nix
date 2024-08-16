@@ -34,7 +34,13 @@
 
   # ZFS setup
   #
-  # Creates a RAIDZ1 pool from 3 disks.
+  # Rundown;
+  #   - pool ZLOCAL, mounted at null
+  #     - /nix
+  #     - /tmp -> trades lower memory usage for storage
+  #   - pool ZSTORAGE, mounted at 
+  #
+  # Creates a RAIDZ1 pool from 3 disks + 1 SLOG device.
   # The pool partitions are aligned and all have a fixed size, the remaining size is kept for swap space.
   # Swap can work in round robin, so each disk provides some amount of swap into the total swap pool.
   #
@@ -53,12 +59,14 @@
   #   means 1 mebibyte
   #   - if the disk reports bigger sector sizes, the 2048 sector alignment is recalculated to
   #     a multiple of 8 sectors with target around 1 mebibyte
-  # - don't calculate in sectors manually
-  # - don't work with sizes less than 1 mebibyte
   #
-  # If the disks, anno 2024, do not contain 4096-byte sectors they contain 8192-byte pages. 1 mebibyte is
+  # Basically, don't worry about it if you DO all of the following;
+  #   - don't calculate in sectors manually
+  #   - don't work with sizes less than 1 mebibyte
+  #
+  # If the disks, anno 2024, do not contain 4096-byte sectors they will contain 8192-byte pages. 1 mebibyte is
   # a multiple of both 4096 and 8192 bytes, which means going for 8192 alignment (ashift=13) will not
-  # introduce performance issues due to misalignment.
+  # introduce performance issues due to page misalignment.
   # There is no performance loss because the sector sizes are used as a unit of contiguous writes. The reverse,
   # smaller contiguous writes than physical sectors, will induce a performance penalty because of the
   # copy+update+overwrite cycle _per write_.
@@ -73,6 +81,8 @@
   # With the consideration that every disk is either an SSD/NVME or managed through ZFS it's
   # better to disable the scheduler by default for all disks ({ boot.kernelParams = [ "elevator=none" ]; }).
   # Manually enable the scheduler again per-disk that requires it.
+  # HELP; Since 23.11, NixOS includes the necessary UDEV rules to disable the I/O scheduler when ZFS device/partition
+  # is found.
   disko.devices = {
     disk.slog = {
       type = "disk";
@@ -105,8 +115,8 @@
       };
     };
     # Using `boot.loader.grub.mirroredBoots` (GRUB bootloader) to keep the boot data in sync accross disks.
-    # I much prefer the clean presentation of systemd-boot though ..
-    disk.raid-one = {
+    # I much prefer the clean presentation of systemd-boot, compared to grub, though ..
+    disk.storage-one = {
       type = "disk";
       device = "/dev/disk/by-id/ata-WDC_WD40EFPX-68C6CN0_WD-WX22D93FVL17";
       content = {
@@ -146,7 +156,7 @@
         };
       };
     };
-    disk.raid-two = {
+    disk.storage-two = {
       type = "disk";
       device = "/dev/disk/by-id/ata-WDC_WD40EFRX-68N32N0_WD-WCC7K3VE4XDK";
       content = {
@@ -186,7 +196,7 @@
         };
       };
     };
-    disk.raid-three = {
+    disk.storage-three = {
       type = "disk";
       device = "/dev/disk/by-id/ata-WDC_WD40EFRX-68N32N0_WD-WCC7K0EYF88K";
       content = {
@@ -244,22 +254,23 @@
         autotrim = "on";
       };
       # Configure the pool (aka pool-root aka dataset-parent) filesystem.
-      # WARN; These settings are automatically inherited
+      # WARN; Most of these settings are automatically inherited, check the documentation
       rootFsOptions = {
         # NOTE; No mounting/auto-mounting
         canmount = "off";
         # NOTE; Datasets do not inherit a parent mountpoint.
-        # Default; Name of pool, 'zpool' in this case
+        # Default; Name of pool, 'zstorage' in this case
         mountpoint = "none";
         # NOTE; Fletcher is by far the fastest
         # Only change checksumming algorithm if dedup is a requirement, blake3 is a cryptographic
         # hasher for higher security on clash resistance
         checksum = "fletcher4";
         # NOTE; ZSTD-1 mode, performs better compression with ballpark same throughput of LZ4.
-        # Doesn't require overwriting on sub-datasets
+        # HELP; Doesn't require overwriting on sub-datasets
         compression = "zstd-fast-1";
-        # NOTE; Enable extended access control lists because owner/group/other is restrictive as frick!
-        acltype = "posixacl";
+        # NOTE; Disable extended access control lists and use owner/group/other!
+        # HELP; Set this parameter to `posixacl` when required, check documentation of your software!
+        acltype = "off";
         # NOTE; Store file metadata as extensions in inode structure (for performance)
         xattr = "sa";
         # NOTE; Increase inode size, if ad-hoc necessary, from the default 512-byte
@@ -276,27 +287,42 @@
         # NOTE; Compare filenames after normalizing using KC unicode conversion table. This turns characters into
         # equivalent characters; fullwidth "Ａ" (U+FF21) -> "A" (U+0041) [lossy conversion!!]
         normalization = "formKC";
-        # NOTE; Activate ZIL direct mode. This reduces pool fragmentation while burning through an (old) SSD SLOG device.
-        # NOTE; ZIL blocks (aka the journal) are ephemeral, after the transaction commit they are erased. If those blocks were written
-        # to the data vdevs, this causes data holes of various sizes aka bad fragmentation.
-        # NOTE; Continuous and/or random writes are collected into the ZIL until a continuous block of `recordsize` data is present. Then
-        # that data gets written to the data vdevs on next commit (or filesystem sync request). The ZIL is part of the pool, but `recordsize`
-        # depends on the target dataset configuration.
+        # NOTE; ZIL latency (duplicated) mode reduces pool fragmentation while burning through an (old) SSD SLOG device.
+        # NOTE; ZIL blocks (aka the journal) are ephemeral, after the transaction commits they are erased. If those blocks were written
+        # to the storage vdevs, this causes data holes of various sizes aka bad fragmentation.
+        #
+        # WARN; The ZIL is only used on synchronous writes (database storage, hypervisor I/O)! 
+        # NOTE; For synchronous writes, continuous and/or random writes are collected into the ZIL until a continuous 
+        # block of `recordsize` data is present. Then that data gets written to the storage vdevs on next commit.
+        # The ZIL is part of the pool, but the amount of `recordsize` is taken from the target dataset configuration.
         # AKA; A bittorrent client might be performing small random writes accross the files until downloading completes, but the to-disk
-        # behaviour of ZFS is not actually that small nor random! (Given there is no program requesting filesystem syncs)
+        # behaviour of ZFS is not actually that small nor random! (Given there is no program repeatedly performing synchronous writes)
         #
-        # Bias ZIL on throughput
-        # When ZIL indirect mode writes records to the data vdevs, it writes data blocks to the data vdevs too. The data is 
-        # 'already at the desired offset into the pool', will not move anymore unless unlinked, and pointers to 
-        # those locations are stored into the ZIL journal. The effect being less disk seeks and less reads on asynchronous writes.
-        # Synchronous writes will take the perfmance hit of a fragmented pool, and during cleanup operations of the async writes.
+        # WARN; Asynchronous writes follow the default path of being held in RAM and complete after being written to **storage vdev**.
+        # WARN; You cannot directly improve performance of asynchronous writes (2024), but having an SLOG will free up disk IOPS by storing
+        # synchronous write data outside the pool (onto the SLOG)!
         #
-        # Bias ZIL on latency
-        # ZIL direct (synchronous) mode duplicates all data (up to size defined by zfs_immediate_write_sz) into the ZIL journal.
+        # WARN; Not many applications perform a synchronous write by default.
+        # HELP; You can *not* force a dataset to use the synchronous write-path to improve performance. AKA Setting `sync=always`
+        # does not improve latency of asynchronous writes, but uses the ZIL to double-write data for replaying purposes 
+        # after crash or power loss.
+        #
+        # - Bias ZIL on throughput -
+        # When ZIL throughput (normal) mode writes records to the pool, data blocks are written to the storage vdevs. The data is then
+        # 'already at the desired offset into the pool', and will not move anymore unless unlinked, and pointers to 
+        # those locations are stored into the ZIL journal. To reiterate; The ZIL holds metadata, and data is already inside the storage vdev.
+        # The effect being;
+        #   - Less disk seeks and less -reads on asynchronous writes
+        #       - Remember that synchronous writes are entirely written to ZIL first
+        #   - Synchronous writes will take the performance hit of a fragmented pool, and during cleanup operations of the async writes
+        #
+        # - Bias ZIL on latency -
+        # ZIL latency (duplicated) mode writes all data (up to size defined by zfs_immediate_write_sz) into the ZIL journal. This results
+        # in writing data twice before it ends up at the storage vdev!
         # Latency is (supposed to be) lower because the write operation returns after persisting the journal, which is either 
-        # on the data vdevs or SLOG.
+        # on the storage vdevs or SLOG.
         # ZIL operations are a single threaded operation. Writting the ZIL to an SSD special device improves latency, but not necessary
-        # throughput. Then a ZIL on pool performs better.
+        # throughput. For throughput a ZIL on pool often performs better.
         #
         # Optimizing the pool into a default mode and custom config for specific dataloads is hard, better is to simplify incorporating
         # the pool layout and physical device performance. Datasets should be designed to cluster related synchronous writes as much as possible.
@@ -311,12 +337,22 @@
         # The SSD burn rate will be directly correlated to the write patterns on the (preferrably) few datasets that 
         # _are configured with latency bias_.
         #
-        # WARN; Always use an SLOG, because the ZIL is always created and consequently stored on the data vdevs (disks)
-        # if no special device is attached to the pool.
+        # HELP; Always use an SLOG, because the ZIL is always created and consequently stored on the storage vdevs (disks) without
+        # pool-attached special device.
         # An indirect sync (happens on big file size writes), or setting logbias to throughput, will cause fragmentation 
         # between data and related metadata. A steady state pool will encounter double/triple read overhead 
         # due to this fragmentation. Consider burning away old SSD's for this purpose, only ~4GiB is necessary
         # and keep the rest overprovisioned. Erase first, use 'blkdiscard' to trim all sectors of the drive!
+        #
+        # HELP; Fun fact about SSD's; the total terabytes written (TBW) numbers assume the absolute worst environmental/binning cases.
+        # If you have a reputable brand SSD, those things go into PETABYTES writes on lifetime! For any desktop use case (and as SLOG) you're
+        # more likely to encounter a fried drive than hit the TBW limit in 20 years.
+        # Pray for no firmware issues though! 🙏
+        #
+        # HELP; You'll notice that I haven't talked about mirroring devices into the SLOG. Because all data is always written to RAM, and
+        # on synchronous writes copied into SLOG, I do need guarantees against the case when the system crashes together with an SSD failure.
+        # A PSU failure could causes this effect, and that would also very likely fry my disks. I also do not have any more free SATA ports!
+        # Combining this all leads me into "get a solid and tested backup solution", instead of trying to fix physical SLOG redundancy.
         #
         logbias = "latency";
         # NOTE; Enable record sizes larger than 128KiB
@@ -335,8 +371,10 @@
       # The datasets that mount on those paths will be loaded during stage-1-boot under the zpool import action. The zpool import
       # happens before changing root, but ZFS is unaware of the soon-to-be root.
       # Nix automatically calculates the required mounts for the above paths, and will manually mount the datasets on the
-      # soon-to-be root. An error will occur if that dataset was auto-mounted by pool import, so the dataset needs option
-      # 'mountpoint=legacy' to prevent this.
+      # soon-to-be root. An error will occur if that dataset was auto-mounted by pool import, so the datasets linked to any of the
+      # above mountpoints needs option `mountpoint=legacy` to prevent this double-mount-error.
+      # NOTE; "legacy" in NixOS means that the `filesystem.<mount-point>` option will (declaratively ofcourse) perform the mounting
+      # at stage-1 boot. Any other option invokes on dynamic runtime behaviour, hence the error, and cannot be declaratively built upon.
       #
       # WARN; Switching root will unmount everything recursively and swap into the new root filesystem. That means the datasets
       # that were automounted are unmounted again. After systemd start, there is a single unit "zfs-mount.service" that remounts
@@ -346,44 +384,11 @@
       # lack of ordering between units.
       # There is an upstream solution (i think, dunno what it exactly does) called ZFS automount generator (generators are a systemd
       # concept). This presumably solves shizzle? The ZFS automount generator script hasn't been turned into nixos options yet,
-      # but it is accessible through the ZFS upstream package. So try it out, maybe it helps.
+      # but it is accessible through the ZFS upstream package. So try it out, it will probably work because of the interlinking order
+      # of dataset hierarchy.
       #
       datasets = {
-        #"local" = {};
-        "local/root" = {
-          # Root filesystem, a catch-all
-          type = "zfs_fs";
-          mountpoint = "/";
-          postCreateHook = ''
-            # Generate snapshot in preparation for impermanence
-            zfs list -t snapshot -H -o name | grep -E '^zstorage/local/root@empty$' || zfs snapshot 'zstorage/local/root@empty'
-          '';
-          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
-        };
-        "local/var" = {
-          # Services data, contains state and logs
-          type = "zfs_fs";
-          mountpoint = "/var";
-          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
-        };
-        #"persist" = { };
-        "persist/home" = {
-          # User data
-          type = "zfs_fs";
-          # WARN; Potential race while mounting, see the note about zfs generators
-          # REF; https://github.com/NixOS/nixpkgs/issues/212762
-          mountpoint = "/home";
-          # Workaround sync hang with SQLite WAL
-          # REF; https://github.com/openzfs/zfs/issues/14290
-          # See also `overlays.atuin`!
-          # options.sync = "disabled";
-        };
-        "persist/replicate" = {
-          # State to be sent/received from cluster
-          type = "zfs_fs";
-          mountpoint = "/replicate";
-        };
-        "persist/vm" = {
+        "vm" = {
           # Default storage location for vm state data without requirements.
           # HELP; Create sub datasets to specialize storage behaviour to the application.
           type = "zfs_fs";
@@ -391,7 +396,8 @@
             canmount = "off";
             mountpoint = "/vm";
             # Qemu does its own application level caching
-            # NOTE; Set to none if you'd be storing raw- or qcow backed volumes.
+            # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
+            # NOTE; My virtual machines will run from a tmpfs by default!
             primarycache = "metadata";
             # Asynchronous IO for maximal volume performance
             logbias = "throughput";
@@ -405,8 +411,25 @@
             setuid = "off";
           };
         };
-        "persist/vm/kanidm" = {
-          # Kanidm state is basically a database. This dataset is tuned for that use case.
+        "vm/vault" = {
+          # Basically file storage
+          type = "zfs_fs";
+          mountpoint = "/vm/vault";
+        };
+        "vm/vault/media" = {
+          # Basically file storage
+          type = "zfs_fs";
+          mountpoint = "/vm/vault/media";
+          options = {
+            atime = "off";
+            recordsize = "16M";
+            # TODO NFS mounting
+            # TODO Sub layout
+          };
+        };
+        # "vm/vault/torrent" = {};
+        "vm/kanidm" = {
+          # Kanidm state is basically an SQLite database. This dataset is tuned for that use case.
           type = "zfs_fs";
           options = {
             mountpoint = "/vm/kanidm"; # Default, but good to be explicit
@@ -441,8 +464,37 @@
         "com.sun:auto-snapshot" = "false";
       };
       datasets = {
-        #"local" = {};
-        "local/nix" = {
+        "root" = {
+          # Root filesystem, a catch-all
+          type = "zfs_fs";
+          mountpoint = "/";
+          postCreateHook = ''
+            # Generate empty snapshot in preparation for impermanence
+            zfs list -t snapshot -H -o name | grep -E '^zlocal/root@empty$' || zfs snapshot 'zlocal/root@empty'
+          '';
+          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
+        };
+        #"persist" = {
+        # In preparation for impermanence
+        #};
+        "persist/logs" = {
+          # Stores systemd logs
+          type = "zfs_fs";
+          mountpoint = "/var/log";
+          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
+        };
+        # "persist/home" = {
+        #   # User data
+        #   type = "zfs_fs";
+        #   # WARN; Potential race while mounting, see the note about zfs generators
+        #   # REF; https://github.com/NixOS/nixpkgs/issues/212762
+        #   mountpoint = "/home";
+        #   # Workaround sync hang with SQLite WAL
+        #   # REF; https://github.com/openzfs/zfs/issues/14290
+        #   # See also `overlays.atuin`!
+        #   # options.sync = "disabled";
+        # };
+        "nix" = {
           # Nix filestore, contains no state
           type = "zfs_fs";
           mountpoint = "/nix";
@@ -457,12 +509,25 @@
             mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
           };
         };
-        "local/temporary" = {
+        "nix/reserve" = {
+          # Reserved space to allow copy-on-write deletes
+          type = "zfs_fs";
+          mountpoint = "none";
+          options = {
+            canmount = "off";
+            # Reserve disk space for files without incorporating snapshot and clone numbers.
+            # WARN; Storage statistics are (almost) never straight up "this is the sum size of your data"
+            # and incorporate reservations, snapshots, clones, metadata from self+child datasets.
+            refreservation = "1G";
+          };
+        };
+        "temporary" = {
+          # Put /tmp on storage to save on RAM
           type = "zfs_fs";
           mountpoint = "/tmp";
           options = {
             compression = "lz4"; # High throughput lowest latency
-            sync = "disabled"; # No sync writes
+            #sync = "disabled"; # No sync writes
             devices = "off"; # No mounting of devices
             setuid = "off"; # No hackery with user tokens on this filesystem
           };
@@ -471,17 +536,18 @@
     };
   };
 
-  boot.kernelParams = lib.optionals (config.boot.zfs.enabled) [
-    # Set default I/O (disk) scheduler to `none` for all disks.
-    # ERROR; Kernel argument doesn't work anymore, use UDEV rules to apply the correct I/O scheduler!
-    # NOTE; Since 23.11, NixOS includes the necessary UDEV rules
-    # FAILS "elevator=none"
-
-    # Workaround for openzfs/zfs issue #9810
-    # "spl.spl_taskq_thread_dynamic=0"
-  ];
-
   # Tune ZFS
+  #
+  # NOTE; Not tackling limited free space performance impact. Due to the usage of AVL trees to track free space,
+  # a highly fragmented or simply a full pool results in more overhead to find free space. There is actually no
+  # robust solution for this problem, there is no quick or slow fix (defragmentation). Your pool should be sized
+  # at maximum required space +- ~10% from the beginning.
+  # If your pool is full => expand it by a large amount. If your pool is fragmented => create a new dataset and
+  # move your data out of the old dataset + purge old dataset + move back into the new dataset.
+  #
+  # HELP; A way to solve used space performance impact is to set dataset quota's to limit space usage to ~90%.
+  # With a 90% usage limit there is backpressure to cleanup earlier snapshots. Doesn't work if your pool is
+  # full though!
   boot.extraModprobeConfig = ''
     # Fix the commit timeout (seconds), because the default has changed before
     options zfs zfs_txg_timeout=5
@@ -491,11 +557,11 @@
     options zfs zfs_arc_max=8589934592
 
     # Data writes less than this amount (bytes) are written in sync, while writes larger are written async.
-    # ERROR; Only has effect when no SLOG special device is attached to the pool to be written to.
+    # WARN; Only has effect when no SLOG special device is attached to the pool to be written to.
     #
     # ERROR; Data writes larger than the recordsize are automatically async, to prevent complexities while handling
     # multiple block pointers in a ZIL log record.
-    # Set this value equal to or less than the largest recordsize written on this system/pool.
+    # Set this value equal to or less than the largest recordsize written on this system/pool. (bytes?)
     options zfs zfs_immediate_write_sz=1048576
 
     # Enable prefetcher. Zfs proactively reads data from spinning disks, expecting inflight or future requests, into
