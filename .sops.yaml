@@ -19,7 +19,6 @@ keys:
   # HOST KEYS
   - &buddy_decryptor age1c27gckzuezcu4cqf7ksakksnxm4k694kjslysysas80jctjuwevsgd0ew3
   - &development_decryptor age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
-  - &test_decryptor age1g3uk5y7nhwrht7xskgpagnlc0h5rwg7z90zesqndutlx3ff56plqs20335
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -27,16 +26,15 @@ keys:
 # WARN; Creation rules are interpreted sequentially, and a first match is used to calculate/provide key material
 # to the file argument.
 creation_rules:
+  - path_regex: keys\.encrypted\.yaml$
+    key_groups:
+      - age:
+          - *development_key
+  
   - path_regex: hosts/buddy/[^/]+\.encrypted\.yaml$
     key_groups:
       - age:
           - *buddy_decryptor
-          - *development_key
-
-  - path_regex: hosts/development/test\.encrypted\.yaml$
-    key_groups:
-      - age:
-          - *test_decryptor
           - *development_key
 
   - path_regex: hosts/development/[^/]+\.encrypted\.yaml$

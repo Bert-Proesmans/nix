@@ -188,14 +188,7 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
 
-  sops = {
-    defaultSopsFile = ./secrets.encrypted.yaml;
-    # Disable deriving secret decrypters from SSH host keys.
-    age.sshKeyPaths = [ ];
-    age.keyFile = lib.facts.sops.keypath;
-    age.generateKey = false;
-  };
-
+  sops.defaultSopsFile = ./secrets.encrypted.yaml;
   sops.secrets.ssh_host_ed25519_key = {
     path = "/etc/ssh/ssh_host_ed25519_key";
     owner = config.users.users.root.name;

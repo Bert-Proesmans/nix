@@ -691,6 +691,20 @@
   systemd.services.systemd-resolved.stopIfChanged = false;
 
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
+  sops.secrets.ssh_host_ed25519_key = {
+    path = "/etc/ssh/ssh_host_ed25519_key";
+    owner = config.users.users.root.name;
+    group = config.users.users.root.group;
+    mode = "0400";
+    restartUnits = [ config.systemd.services.sshd.name ];
+  };
+
+  services.openssh.hostKeys = [
+    {
+      path = "/etc/ssh/ssh_host_ed25519_key";
+      type = "ed25519";
+    }
+  ];
 
   sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
     mode = "0400";
