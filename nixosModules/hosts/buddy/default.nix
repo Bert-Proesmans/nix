@@ -260,7 +260,7 @@
         canmount = "off";
         # NOTE; Datasets do not inherit a parent mountpoint.
         # Default; Name of pool, 'zstorage' in this case
-        mountpoint = "none";
+        mountpoint = "none"; # WARN; Dataset options must be set to `null`
         # NOTE; Fletcher is by far the fastest
         # Only change checksumming algorithm if dedup is a requirement, blake3 is a cryptographic
         # hasher for higher security on clash resistance
@@ -476,7 +476,7 @@
         # NOTE; No mounting/auto-mounting
         canmount = "off";
         # NOTE; Datasets do not inherit a parent mountpoint.
-        mountpoint = "none";
+        mountpoint = "none"; # WARN; Dataset options must be set to `null`
         # NOTE; Opt out of built-in snapshotting, sanoid is used
         "com.sun:auto-snapshot" = "false";
       };
@@ -529,7 +529,7 @@
         "nix/reserve" = {
           # Reserved space to allow copy-on-write deletes
           type = "zfs_fs";
-          mountpoint = "none";
+          mountpoint = null;
           options = {
             canmount = "off";
             # Reserve disk space for files without incorporating snapshot and clone numbers.
