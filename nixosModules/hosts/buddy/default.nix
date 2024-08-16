@@ -675,48 +675,16 @@
 
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
 
-  sops.secrets.kanidm_ssh_ed25519_key = {
-    owner = "root";
+  sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
+    mode = "0400";
   };
-  sops.secrets.other_secret = {
-    owner = "root";
+  sops.secrets."kanidm-vm/ssh_host_ed25519_key" = {
+    mode = "0400";
   };
 
   # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
-    # technitium = {
-    #   autostart = true;
-    #   flake = null;
-    #   updateFlake = null;
-    #   specialArgs = { inherit profiles; };
-
-    #   config = {
-    #     networking.hostName = "DNS";
-    #     imports = [ profiles.micro-vm ];
-
-    #     microvm.interfaces = [{
-    #       type = "tap";
-    #       id = "tap-technitium";
-    #       mac = lib.facts.vm.dns.net.mac;
-    #     }];
-
-    #     microvm.shares = [{
-    #       source = "/vm-state/technitium";
-    #       # ERROR; The systemd service is defined with a DynamicUser statement, meaning the
-    #       # directory "/var/lib/technitium-dns-server" is a symlink into "/var/lib/private/technitium-dns-server"
-    #       # for additional host sandboxing.
-    #       # If the service is not run with a dynamic user id, bind the normal "/var/lib/technitium-dns-server" path.
-    #       mountPoint = "/var/lib/private/technitium-dns-server";
-    #       tag = "technitium";
-    #       proto = "virtiofs";
-    #     }];
-
-    #     services.technitium-dns-server.enable = true;
-    #     services.technitium-dns-server.openFirewall = true;
-    #   };
-    # };
-
     kanidm = {
       autostart = true;
       specialArgs = { inherit profiles; };
@@ -724,6 +692,15 @@
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
       config = {
+        # ERROR; Number must be unique for each VM!
+        # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
+        #
+        # Send data through socket using socat, which handles connection-wait. The host acts
+        # as a server, the guest is the client.
+        # - host: nc --listen --vsock <cid:2> <port:1234> --send-only < /path/to/local/file > /dev/null
+        # - guest: nc --vsock <port:1234> --recv-only > /path/to/local/file < /dev/null
+        #
+        microvm.vsock.cid = 300;
         networking.hostName = "SSO";
         imports = [ profiles.micro-vm ];
 
@@ -735,8 +712,8 @@
 
         microvm.shares = [
           {
-            source = "/run/secrets/auth_container";
-            mountPoint = "/persistence";
+            source = "/run/secrets/kanidm-vm";
+            mountPoint = "/seeds";
             tag = "container_kanidm";
             proto = "virtiofs";
           }
@@ -748,38 +725,28 @@
           }
         ];
 
-        # ERROR; Number must be unique for each VM!
-        # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-        #
-        # Send data through socket using socat, which handles connection-wait. The host acts
-        # as a server, the guest is the client.
-        # - host: nc --listen --vsock <cid:2> <port:1234> --send-only < /path/to/local/file > /dev/null
-        # - guest: nc --vsock <port:1234> --recv-only > /path/to/local/file < /dev/null
-        #
-        microvm.vsock.cid = 300;
+        services.openssh.hostKeys = [
+          {
+            path = "/seeds/ssh_host_ed25519_key";
+            type = "ed25519";
+          }
+        ];
+        systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
+        systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
 
-        environment.persistence."/persistent" = {
-          enable = true; # NB: Defaults to true, not needed
-          hideMounts = true;
-          directories = [ ];
-          files = [
-            { file = "/etc/ssh/ssh_host_ed25519_key"; }
-          ];
-        };
-
-        services.kanidm = {
-          enableServer = true;
-          serverSettings = {
-            bindaddress = "<TODO>";
-            domain = "idm.proesmans.eu";
-            origin = "https://idm.proesmans.eu";
-            tls_chain = "/<TODO>";
-            tls_key = "/<TODO>";
-            db_fs_type = "zfs";
-            role = "WriteReplica";
-            online_backup.versions = 0; # disable online backup
-          };
-        };
+        # services.kanidm = {
+        #   enableServer = true;
+        #   serverSettings = {
+        #     bindaddress = "<TODO>";
+        #     domain = "idm.proesmans.eu";
+        #     origin = "https://idm.proesmans.eu";
+        #     tls_chain = "/<TODO>";
+        #     tls_key = "/<TODO>";
+        #     db_fs_type = "zfs";
+        #     role = "WriteReplica";
+        #     online_backup.versions = 0; # disable online backup
+        #   };
+        # };
       };
     };
   };
