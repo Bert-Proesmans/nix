@@ -422,7 +422,24 @@
           mountpoint = "/vm/vault/media";
           options = {
             atime = "off";
-            recordsize = "16M";
+            # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
+            # Back of enveloppe calculation; HDD seek time is ~10 ms, reading 16MB is ~130ms.
+            # The record is split accross 2 disks (data + 1 parity) so each disk is held for
+            # 75ms PER record. This literally kills our IOPS (cut by factor 7) in relation 
+            # to 128kb (~11ms latency) on record miss.
+            # NOW.. an average NAS diskstation will have 150-250 ms latency, so is 700% latency
+            # difference _worst case_ really that bad?
+            # HELP; To properly solve this I should build another pool for database storage
+            # AKA all other storage types that won't be impacted by the higher latency.
+            #
+            # WARN; Records are processed in full, aka full 16M in RAM, full 16M checksummed.
+            # A defect means the full 16MB must be resilvered.
+            #
+            # NOTE; ~45ms aka 20-25 IOPS seems like an OK(?) situation, also considering 
+            # ARC prefetching is enabled and database caches should be in RAM.
+            # HELP; HEAVILY VIRTUALIZE INTO RAM BOIISS
+            recordsize = "8M";
+            compression = "zstd-3";
             # TODO NFS mounting
             # TODO Sub layout
           };
