@@ -1,4 +1,4 @@
-{ modulesPath, lib, config, profiles, ... }: {
+{ modulesPath, lib, pkgs, config, profiles, ... }: {
 
   imports = [
     "${modulesPath}/hardware/video/radeon.nix" # AMD Vega GPU (Radeon = pre-amdgpu)
@@ -714,6 +714,83 @@
     mode = "0400";
   };
 
+  sops.secrets."cloudflare-proesmans-key" = { };
+  sops.secrets."cloudflare-zones-key" = { };
+  security.acme = {
+    acceptTerms = true;
+    defaults = {
+      email = lib.facts.acme.email;
+      dnsProvider = "cloudflare";
+      credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" = config.sops.secrets."cloudflare-proesmans-key".path;
+      credentialFiles."CLOUDFLARE_ZONE_API_TOKEN_FILE" = config.sops.secrets."cloudflare-zones-key".path;
+
+      # ERROR; Lego uses DNS requests within the certificate workflow. It must use an external DNS directly since
+      # all validation uses external DNS records.
+      # NOTE; The system resolver is very likely to implement a split-horizon DNS.
+      dnsResolver = "1.1.1.1:53";
+    };
+
+    certs."idm.proesmans.eu" = {
+      # This block requests a wildcard certificate.
+      domain = "*.idm.proesmans.eu";
+      # Squash permissions for 1:1 mapping into vm through virtiofs
+      # WARN; Mount path /var/lib/microvms/kanidm/certs into the vm!
+      #
+      # REF; https://gitlab.com/virtio-fs/virtiofsd/-/issues/152#note_2005451839
+      #
+      # OR Not required anymore when virtiofsd gets updated with internal UID/GID mapping (host-side)!
+      # REF; https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/237
+      # OR Not required anymore when virtiofsd gets updated for mount UID/GID mapping (vm-side)!
+      # REF; https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/245
+      postRun =
+        let
+          script = pkgs.writeShellApplication {
+            name = "squash-permission-mount-certs";
+            runtimeInputs = [ pkgs.util-linux ];
+            text = ''
+              destination="/var/lib/microvms/kanidm/certs"
+
+              certdir=$(pwd)
+              owner=$(stat -c '%U' "$certdir")
+              owner_uid=$(id -u "$owner")
+
+              if [ -e "$destination" ]; then
+                  if [ -d "$destination" ]; then
+                      echo "$destination is a directory."
+                  else                      
+                      if mountpoint -q "$destination"; then
+                          echo "$destination is a mount point. Unmounting..."
+                          umount "$destination"
+                      else
+                          echo "$destination is a special node. Attempting to unmount..."
+                          umount "$destination" || echo "Failed to unmount $destination. It might not be a mount point."
+                      fi
+                  fi
+              fi
+
+              if [ ! -d "$destination" ]; then
+                echo "Creating directory $destination..."
+                mkdir --parents "$destination"
+              fi
+
+              # Certdir is mounted at destination with permissions remapped from original owner to root
+              mount -o bind,ro,X-mount.idmap=u:"$owner_uid":0:1 "$certdir" "$destination"
+            '';
+          };
+        in
+        lib.getExe script;
+
+      # WARN; Currently no mechanism to reload services inside the vm directly.
+      # TODO
+      reloadServices = [ "microvm@kanidm.service" ];
+    };
+  };
+
+  systemd.targets."microvms" = {
+    wants = [ "acme-finished-idm.proesmans.eu.target" ];
+    after = [ "acme-finished-idm.proesmans.eu.target" ];
+  };
+
   # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
   microvm.host.enable = lib.mkForce true;
   microvm.vms = {
@@ -723,16 +800,10 @@
 
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
-      config = {
+      config = { config, ... }: {
         # ERROR; Number must be unique for each VM!
         # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-        #
-        # Send data through socket using socat, which handles connection-wait. The host acts
-        # as a server, the guest is the client.
-        # - host: nc --listen --vsock <cid:2> <port:1234> --send-only < /path/to/local/file > /dev/null
-        # - guest: nc --vsock <port:1234> --recv-only > /path/to/local/file < /dev/null
-        #
-        microvm.vsock.cid = 300;
+        microvm.vsock.cid = lib.facts.vm.idm.vsock-id;
         networking.hostName = "SSO";
         imports = [ profiles.micro-vm ];
 
@@ -751,8 +822,14 @@
           }
           {
             source = "/vm/kanidm";
-            mountPoint = "/var/lib/kanidm";
-            tag = "kanidm";
+            mountPoint = "/data/state";
+            tag = "state-kanidm";
+            proto = "virtiofs";
+          }
+          {
+            source = "/var/lib/microvms/kanidm/certs";
+            mountPoint = "/data/certs";
+            tag = "certs-kanidm";
             proto = "virtiofs";
           }
         ];
@@ -764,21 +841,74 @@
           }
         ];
         systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
-        systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
 
-        # services.kanidm = {
-        #   enableServer = true;
-        #   serverSettings = {
-        #     bindaddress = "<TODO>";
-        #     domain = "idm.proesmans.eu";
-        #     origin = "https://idm.proesmans.eu";
-        #     tls_chain = "/<TODO>";
-        #     tls_key = "/<TODO>";
-        #     db_fs_type = "zfs";
-        #     role = "WriteReplica";
-        #     online_backup.versions = 0; # disable online backup
-        #   };
-        # };
+        # DEBUG
+        security.sudo.enable = true;
+        security.sudo.wheelNeedsPassword = false;
+        users.users.bert-proesmans.extraGroups = [ "wheel" ];
+        # DEBUG
+
+        networking.firewall.enable = true;
+        networking.firewall.allowedTCPPorts = [ 443 ];
+
+        services.kanidm = {
+          enableServer = true;
+          serverSettings = {
+            bindaddress = "0.0.0.0:443"; # Requires CAP_NET_BIND_SERVICE
+            domain = "idm.proesmans.eu";
+            origin = "https://idm.proesmans.eu";
+            # Customized because a lack of permissions
+            tls_chain = "/run/data/certs/fullchain.pem";
+            tls_key = "/run/data/certs/key.pem";
+            db_fs_type = "zfs";
+            role = "WriteReplica";
+            online_backup.versions = 0; # disable online backup
+          };
+        };
+
+        # NOTE; Assign /run/data/certs as certdir
+        systemd.tmpfiles.rules = [
+          "d /run/data                0700 root   root    - -"
+          "d /run/data/certs          0700 kanidm kanidm  - -"
+        ];
+        systemd.services.kanidm.unitConfig.ConditionPathExists = "/data/certs/fullchain.pem";
+        systemd.services.kanidm.serviceConfig = {
+          AmbientCapabilities = [ "NET_BIND_SERVICE" ];
+          CapabilityBoundingSet = [ "NET_BIND_SERVICE" ];
+          # /data/state (root-owned) -> /var/lib/kanidm-mount (bind as-is) 
+          # -> /var/lib/kanidm-mount/rw-data (+ rw dir rw-data) -> /var/lib/kanidm (symlink to rw-data)
+          StateDirectory = [
+            # NOTE; Use systemd's permission skip ability to create a rw-folder inside the root-owned
+            # virtiofs mount.
+            "kanidm-mount/rw-data:/var/lib/kanidm"
+          ];
+          BindPaths = [
+            "/data/state:/var/lib/kanidm-mount"
+          ];
+
+          # /data/certs (root-owned) -> /run/kanidm/certs (file copy) -> chown kanidm
+          # RuntimeDirectory = [
+          #   "kanidm/certs" # Assign /run/kanidm/certs as certdir
+          # ];
+          # NOTE; Assign /run/data/certs as certdir
+          ExecStartPre =
+            let
+              script = pkgs.writeShellApplication {
+                name = "copy-kanidm-certs";
+                runtimeInputs = [ ];
+                text = ''
+                  # source="/data/certs"
+                  # destination="/run/data/certs" 
+
+                  # (umask 077; cp "$source"/*.pem "$destination"/)
+                  # chown kanidm:kanidm "$destination"/*.pem
+                '';
+              };
+            in
+            # NOTE; Run as root
+            "+${lib.getExe script}";
+        };
+
       };
     };
   };

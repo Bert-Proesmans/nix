@@ -86,6 +86,12 @@ in
         "microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
       ];
 
+      # Avoid copying unnecessary stuff over SSH
+      nix.settings.builders-use-substitutes = lib.mkDefault true;
+
+      # Assist nix-direnv, since project devshells aren't rooted in the computer profile, nor stored in /nix/store
+      nix.settings.keep-outputs = lib.mkDefault true;
+      nix.settings.keep-derivations = lib.mkDefault true;
     })
     (lib.mkIf (!cfg.references-on-disk) {
       # Make legacy nix commands consistent with flake sources!
@@ -137,16 +143,12 @@ in
       # Uses the min/max free below, otherwise it's possible to mark and sweep by file age
       # --delete-older-than will also remove gcroots (aka generations, or direnv pins, or home-manager profiles)
       # that are older than the designated duration.
-      nix.gc.options = "--delete-older-than 40d";
+      nix.gc.options = lib.mkDefault "--delete-older-than 14d";
 
       # When getting close to this amount of free space..
       nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024); # 512MB
       # .. remove this amount of data from the store
       nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024); # 3GB
-
-      # Assist nix-direnv, since project devshells aren't rooted in the computer profile, nor stored in /nix/store
-      nix.settings.keep-outputs = lib.mkDefault true;
-      nix.settings.keep-derivations = lib.mkDefault true;
     })
   ];
 }

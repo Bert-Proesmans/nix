@@ -21,6 +21,10 @@
   proesmans.filesystem.simple-disk.systemd-boot.enable = true;
   proesmans.nix.linux-64 = true;
   proesmans.nix.garbage-collect.enable = true;
+  # Garbage collect less often, so we don't drop build artifacts from other systems
+  nix.gc.dates = "monthly";
+  # Keep roots for longer, and remove maximum x data each time
+  nix.gc.options = lib.mkForce "--delete-older-than 90d --max-freed $((5 * 1024**3))"; # 5GB
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
@@ -46,45 +50,6 @@
   # Allow for remote management
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
-
-  # WARN; Superseded by systemd-ssh-generators!
-  # Comes with systemd v256+ and the systemd-ssh-generators feature activated!
-  # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
-  programs.ssh.extraConfig =
-    let
-      tunnel-script = pkgs.writeShellApplication {
-        name = "tunnel-vsock-ssh";
-        runtimeInputs = [ pkgs.socat ];
-        text = ''
-          if [ $# -ne 1 ]; then
-            echo "Usage: $0 'vsock/<VM CID>'"
-            exit 1
-          fi
-
-          # Extract the VM CID from the host argument
-          host=$1
-          vm_cid=$(echo "$host" | awk -F'/' '{print $2}')
-
-          # Validate CID
-          if [ -z "$vm_cid" ]; then
-              echo "Error: VM CID is not specified."
-              exit 1
-          fi
-
-          # Establish socat tunnel!
-          socat - VSOCK-CONNECT:"$vm_cid":22
-        '';
-      };
-    in
-    ''
-      # Usage 'ssh vsock/55', where 55 is the VM Context identifier (CID)
-      # VM CID, see option microvm.vsock.cid in the virtual machine configuration
-      Host vsock/*
-        HostName localhost
-        StrictHostKeyChecking no
-        UserKnownHostsFile=/dev/null
-        ProxyCommand ${lib.getExe tunnel-script} %n
-    '';
 
   # Allow privilege elevation to administrator role
   security.sudo.enable = true;

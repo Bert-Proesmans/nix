@@ -61,6 +61,7 @@
   programs.ssh.matchBlocks = {
     "development".hostname = "fe80::1";
     "buddy".hostname = "192.168.88.10";
+    "buddy".forwardAgent = true;
   };
 
   programs.atuin.enable = true;
