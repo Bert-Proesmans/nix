@@ -82,7 +82,7 @@ in
 
         setup-invoker = pkgs.writeShellApplication {
           name = "install-host";
-          runtimeInputs = [ ];
+          runtimeInputs = [ pkgs.screen ];
           text = ''
             # Create a temporary log file in /tmp
             LOGFILE=$(mktemp /tmp/user_command.XXXXXX.log)
@@ -91,7 +91,7 @@ in
             screen -S monitoringSession -d -m
 
             # Create a vertical split
-            screen -S monitoringSession -X split
+            screen -S monitoringSession -X split -v
 
             # Start the expect monitoring script in the second pane (pane 1)
             screen -S monitoringSession -p 1 -X stuff "${lib.getExe monitor} '$LOGFILE'\n"
