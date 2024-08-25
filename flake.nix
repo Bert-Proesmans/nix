@@ -58,8 +58,7 @@
       # NOTE; This library set is extended into the nixpkgs library set later, see let .. in above.
       lib = { }
         // (import ./library/importers.nix (inputs.nixpkgs.lib))
-        #// (import ./library/network.nix (inputs.nixpkgs.lib));
-      ;
+        // (import ./library/network.nix (inputs.nixpkgs.lib));
 
       # Format entire flake with;
       # nix fmt
