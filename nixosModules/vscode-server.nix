@@ -1,15 +1,9 @@
-# This is a function-lambda (Any) -> (Any/nixosModule)
-{ inputs }:
-let
-  vscode-module = inputs.vscode-server.nixosModules.default;
-in
-# This is a nixOS module; (AttrSet) -> (AttrSet)
-{ config, lib, pkgs, ... }:
+{ lib, pkgs, flake-inputs, config, ... }:
 let
   cfg = config.proesmans.vscode;
 in
 {
-  imports = [ vscode-module ];
+  imports = [ flake-inputs.vscode-server.nixosModules.default ];
 
   options.proesmans.vscode = {
     enable = lib.mkEnableOption (lib.mdDoc "Enable vscode server compatibility");

@@ -1,13 +1,7 @@
-# Lambda
-{ inputs, commonNixosModules }:
-let
-  impermanence-module = inputs.impermanence.nixosModules.impermanence;
-in
-# NixOS Module
-{ lib, pkgs, ... }: {
-  # Importing the common nixos modules to allow for uniform declarative host configuration between
-  # nixos hosts and microVMs.
-  imports = commonNixosModules ++ [ impermanence-module ];
+{ lib, pkgs, flake-inputs, ... }: {
+  imports = [
+    flake-inputs.impermanence.nixosModules.impermanence
+  ];
 
   # Generate a nixos module with for each defined vm containing all hypervisor
   # relevant option values.

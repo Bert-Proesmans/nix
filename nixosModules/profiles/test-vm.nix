@@ -1,17 +1,15 @@
-{ inputs }:
-let
-  # WARN; Importing attribute 'all-formats' will provide the expected
-  # config.formats.<format> attributes coinciding with the documentation.
-  # Importing a single nixosModule format will bake that configuration into
-  # the toplevel machine configuration!
-  generators-all = inputs.nixos-generators.nixosModules.all-formats;
-in
-{ lib, ... }:
+{ lib, flake-inputs, ... }:
 let
   mkVMDefault = lib.mkOverride 900;
 in
 {
-  imports = [ generators-all ];
+  imports = [
+    # WARN; Importing attribute 'all-formats' will provide the expected
+    # config.formats.<format> attributes coinciding with the documentation.
+    # Importing a single nixosModule format will bake that configuration into
+    # the toplevel machine configuration!
+    flake-inputs.nixos-generators.nixosModules.all-formats
+  ];
 
   formatConfigs.vm-nogui = { lib, ... }: {
     virtualisation.cores = 2;

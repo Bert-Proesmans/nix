@@ -1,3 +1,4 @@
+# DEPRECATED
 _lib:
 {
   # NOTE; The "locally administrated"-bit must be set for generated MAC addresses to make the change of random collision impossible!

@@ -1,15 +1,9 @@
-# This is a lambda. Any -> (Any -> Any)
-{ inputs }:
-let
-  disko-module = inputs.disko.nixosModules.disko;
-in
-# This is a nixos module. NixOSArgs -> AttrSet
-{ config, lib, options, ... }:
+{ lib, flake-inputs, config, options, ... }:
 let
   cfg = config.proesmans.filesystem;
 in
 {
-  imports = [ disko-module ];
+  imports = [ flake-inputs.disko.nixosModules.disko ];
 
   options.proesmans.filesystem = {
     simple-disk.enable = lib.mkEnableOption (lib.mdDoc "Enable a simple disk layout");

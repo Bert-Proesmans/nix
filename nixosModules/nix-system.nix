@@ -1,34 +1,45 @@
-{ inputs, outputs }:
-let
-  nixpkgs-stable = inputs.nixpkgs-stable;
-  nixpkgs-overlays = builtins.attrValues outputs.overlays;
+# { inputs, outputs }:
+# let
+#   nixpkgs-stable = inputs.nixpkgs-stable;
+#   nixpkgs-overlays = builtins.attrValues outputs.overlays;
 
-  # Add additional package repositories (input flakes) below.
-  # nixpkgs is a symlink to the stable source, kept for consistency with online guides
-  nix-registry = { inherit (inputs) nixpkgs nixpkgs-stable nixpkgs-unstable; };
+#   # Add additional package repositories (input flakes) below.
+#   # nixpkgs is a symlink to the stable source, kept for consistency with online guides
+#   nix-registry = { inherit (inputs) nixpkgs nixpkgs-stable nixpkgs-unstable; };
 
-  get-inputs-revision = flake-reference: inputs."${flake-reference}".sourceInfo.rev;
-  nix-revs = builtins.listToAttrs (
-    builtins.map (name: { inherit name; value = get-inputs-revision name; }) [ "nixpkgs" "nixpkgs-stable" "nixpkgs-unstable" ]
-  );
-in
-{ config, lib, ... }:
+#   get-inputs-revision = flake-reference: inputs."${flake-reference}".sourceInfo.rev;
+#   nix-revs = builtins.listToAttrs (
+#     builtins.map (name: { inherit name; value = get-inputs-revision name; }) [ "nixpkgs" "nixpkgs-stable" "nixpkgs-unstable" ]
+#   );
+# in
+{ config, lib, flake-inputs, flake-overlays, ... }:
 let
   cfg = config.proesmans.nix;
+  nixpkgs = flake-inputs.nixpkgs;
+  nixpkgs-stable = flake-inputs.nixpkgs-stable;
+  nixpkgs-unstable = flake-inputs.nixpkgs-unstable;
 in
 {
   options.proesmans.nix = {
-    linux-64 = lib.mkEnableOption "64-bit nix" // { description = "Configure the target system as 64-bit linux"; };
-    garbage-collect.enable = lib.mkEnableOption "cleanup nix/store" // { description = "Make the target host automatically cleanup unused reference in the nix store"; };
-    references-on-disk = lib.mkEnableOption "Store files from inputs" // { description = "Copy all files for all stored flake references onto the filesystem"; };
+    garbage-collect.enable = lib.mkEnableOption "cleanup of nix/store" // { description = "Make the target host automatically cleanup unused reference in the nix store"; };
+    garbage-collect.development-schedule.enable = lib.mkEnableOption "lower frequency runs" // { description = "Lower the frequency of gc and adjusted the amount of data to cleanup"; };
+
+    # registry.references = lib.mkOption {
+    #   description = "The index archives to store on the host";
+    #   type = lib.types.listOf (lib.types.oneOf [ lib.types.str lib.types.path ]);
+    #   default = [
+    #     nixpkgs
+    #     nixpkgs-stable
+    #     nixpkgs-unstable
+    #   ];
+    # };
+    registry.fat = lib.mkEnableOption "storing input archives" // { description = "Copy all files from the referenced archives to the host, instead of a link to their online location"; };
   };
 
   # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/nix.nix
   # Nix configuration
   config = lib.mkMerge [
     ({
-      # Force nix flake check to evaluate and build derivation of this module->config->nixosSystem
-      _module.check = true;
       # Fallback quickly if substituters are not available.
       nix.settings.connect-timeout = lib.mkDefault 5;
       # Enable flakes
@@ -40,7 +51,7 @@ in
 
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
       # defined from options nixpkgs.*
-      nixpkgs.overlays = nixpkgs-overlays
+      nixpkgs.overlays = (builtins.attrValues flake-overlays)
         ++ [
         (_self': _super: {
           # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
@@ -50,14 +61,15 @@ in
           # lib = super.lib // self.outputs.lib;
 
           # Inject stable packages, initialised with the same configuration as nixpkgs, as pkgs.stable.
-          # The default nixpkgs follows nixpkgs-unstable, so the pkgs.stable is a way to (temporarily) stabilise changes.
+          # WARN; This code assumes nixpkgs follows nixpkgs-*un*stable, so the pkgs.stable package set is a way to 
+          # (temporarily) stabilise changes.
           # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same 
           # as loading from '<flake>/flake.nix'! flake.nix includes nixos library functions, the old default.nix doesn't.
           #   - '(import nixpkgs).lib' will not have the nixos library function
           #   - 'inputs.nixpkgs.lib' has the nixos library functions
           #
-          # 'pkgs' will contain all unstable package versions.
-          # 'pkgs.stable' contains all stable package versions.
+          # Attribute 'pkgs' will contain all unstable package versions.
+          # Attribute 'pkgs.stable' contains all stable package versions.
           stable = (import nixpkgs-stable) {
             inherit (config.nixpkgs) config overlays;
             localSystem = config.nixpkgs.hostPlatform;
@@ -65,14 +77,9 @@ in
         })
       ];
 
-      # Need to explicitly set trusted users so they can push additional content to the machine
-      # TODO; Figure out what trusted-users exactly means; proper usage might involve a two-step process
-      # by privileged publishing to a build cache, and pulling from trusted build caches. Probably need a dedicated
-      # build host too.
-      # REF; https://nixos.wiki/wiki/Nixos-rebuild
+      # Trusted users can manage and ad-hoc use substituters, also maintain the nix/store without limits (import and cleanup)
       nix.settings.trusted-users = [ "@wheel" ];
 
-      # Enroll some more trusted binary caches
       nix.settings.trusted-substituters = [
         "https://nix-community.cachix.org"
         "https://cache.garnix.io"
@@ -93,51 +100,6 @@ in
       nix.settings.keep-outputs = lib.mkDefault true;
       nix.settings.keep-derivations = lib.mkDefault true;
     })
-    (lib.mkIf (!cfg.references-on-disk) {
-      # Make legacy nix commands consistent with flake sources!
-      # Register versioned flake inputs into the nix registry for flake subcommands
-      # Register versioned flake inputs as channels for nix (v2) commands
-
-      # Map channels to the pinned references inside the flake registry
-      # eg; "nixpkgs=flake:nixpkgs"
-      #
-      # See also `nix.registry.<name>` for the registry definitions
-      nix.nixPath = lib.mapAttrsToList (name: _: "${name}=flake:${name}") nix-revs;
-
-      # Create a binding from a flake reference to a flake repository, at the correct revision.
-      # eg; nix.registry.nixpkgs.to.{..repo = "nixpkgs"} => references github:nixos/nixpkgs
-      #
-      # See also `nix.registry.<name>.flake` for loading the flake 
-      nix.registry = builtins.mapAttrs
-        (_: rev: {
-          to = {
-            type = "github";
-            owner = "NixOS";
-            repo = "nixpkgs";
-            ref = rev;
-          };
-        })
-        nix-revs;
-    })
-    (lib.mkIf cfg.references-on-disk {
-      # Append searchpath for channel package indexes
-      nix.nixPath = [ "/etc/nix/path" ];
-      # Link package index files (aka flake source) into the right filesystem location for channel data lookup
-      environment.etc = lib.mapAttrs' (name: value: { name = "nix/path/${name}"; value.source = value.flake; }) config.nix.registry;
-
-      # The option nix.registry.<name>.flake is a shortcut for storing metadata about a flake reference.
-      # eg; 'nix.registry.nixpkgs.flake => nixpkgs = /nix/store/<output hash at git revision>/<files>'
-      #
-      # NOTE; The trick here is that the nix store paths will match exactly on the build and target host;
-      #   - build host; nix store files are loaded by nix flake commands
-      #   - target host; nix store files are installed because they are part of the entire system closure,
-      #     see `environment.etc."/nix/path/nixpkgs"`.
-      nix.registry = lib.mapAttrs (_: flake: { inherit flake; }) nix-registry;
-    })
-    (lib.mkIf cfg.linux-64 {
-      # Define the platform type of the target configuration
-      nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-    })
     (lib.mkIf cfg.garbage-collect.enable {
       nix.gc.automatic = true;
       # Uses the min/max free below, otherwise it's possible to mark and sweep by file age
@@ -148,7 +110,55 @@ in
       # When getting close to this amount of free space..
       nix.settings.min-free = lib.mkDefault (512 * 1024 * 1024); # 512MB
       # .. remove this amount of data from the store
-      nix.settings.max-free = lib.mkDefault (3000 * 1024 * 1024); # 3GB
+      nix.settings.max-free = lib.mkDefault (10 * 1024 * 1024 * 1024); # 10GB
+    })
+    (lib.mkIf cfg.garbage-collect.development-schedule.enable {
+      nix.gc.dates = "monthly";
+      # Keep roots for longer, and remove maximum x data each time
+      nix.gc.options = "--delete-older-than 90d --max-freed $((2 * 1024**3))"; # 2GB
+    })
+    ({
+      # NOTE; Code similar to <nixpkgs>/nixos/modules/misc/nixpkgs-flake.nix, but adapted for multiple references!
+      # REF; https://github.com/NixOS/nixpkgs/blob/master/nixos/modules/misc/nixpkgs-flake.nix
+
+      # Synchronise sources for nix cli v2 and cli v3. V2 uses channels, while we in v3 use flakes.
+      nix.nixPath = lib.attrValues (lib.mapAttrs (name: _: "${name}=flake:${name}") config.nix.registry);
+
+      nix.registry = lib.mkMerge [
+        # Store sources into the registry as references
+        (lib.mkIf (!cfg.registry.fat) (
+          builtins.mapAttrs
+            (_: value: {
+              to = {
+                type = "github";
+                # WARN; Cannot freely accept inputs because the original reference information has been
+                # consumed and we only get a data revision string back.
+                # We only know the location of nixpkgs, that's it. If you require more references you'll have
+                # to set option nix.registry yourself.
+                owner = "NixOS";
+                repo = "nixpkgs";
+                ref = value.rev;
+              };
+            })
+            {
+              inherit nixpkgs nixpkgs-stable nixpkgs-unstable;
+            }
+        ))
+
+        # Store sources as paths (embedded into the host)
+        (lib.mkIf (cfg.registry.fat) (
+          builtins.mapAttrs
+            (_: value: {
+              to = {
+                type = "path";
+                path = value;
+              };
+            })
+            {
+              inherit nixpkgs nixpkgs-stable nixpkgs-unstable;
+            }
+        ))
+      ];
     })
   ];
 }

@@ -1,5 +1,5 @@
 # REF; https://github.com/divnix/digga/blob/baa54f8641ee9128cdda8b508553284c331fc9f1/src/importers.nix
-lib:
+nixpkgs-lib:
 let
   flattenTree =
     /* *
@@ -91,11 +91,11 @@ let
     let
       seive = file: type:
         # Only rake `.nix` files or directories
-        (type == "regular" && lib.hasSuffix ".nix" file)
+        (type == "regular" && nixpkgs-lib.hasSuffix ".nix" file)
         || (type == "directory");
 
       collect = file: type: {
-        name = lib.removeSuffix ".nix" file;
+        name = nixpkgs-lib.removeSuffix ".nix" file;
         value =
           let path = dirPath + "/${file}";
           in if (type == "regular") || (type == "directory"
@@ -106,8 +106,8 @@ let
             rakeLeaves path;
       };
 
-      files = lib.filterAttrs seive (builtins.readDir dirPath);
+      files = nixpkgs-lib.filterAttrs seive (builtins.readDir dirPath);
     in
-    lib.filterAttrs (_n: v: v != { }) (lib.mapAttrs' collect files);
+    nixpkgs-lib.filterAttrs (_n: v: v != { }) (nixpkgs-lib.mapAttrs' collect files);
 in
 { inherit rakeLeaves flattenTree; }

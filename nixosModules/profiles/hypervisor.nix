@@ -1,9 +1,6 @@
-{ inputs }:
-let
-  microvm-host-module = inputs.microvm.nixosModules.host;
-in
-{ lib, pkgs, ... }: {
-  imports = [ microvm-host-module ];
+{ lib, pkgs, flake-inputs, config, ... }:
+{
+  imports = [ flake-inputs.microvm.nixosModules.host ];
 
   microvm.host.enable = lib.mkDefault false;
   microvm.autostart = [ ];
@@ -15,6 +12,14 @@ in
   #     "--inode-file-handles=mandatory"
   #   ];
   # };
+
+  # ERROR; Doesn't work because nix thinks the set is open-ended.
+  # microvm.vms = builtins.listToAttrs (builtins.map
+  #   (name: {
+  #     inherit name;
+  #     value = {};
+  #   })
+  #   vm-names);
 
   # The hypervisor infrastructure is ran by the systemd framework
   networking.useNetworkd = true;

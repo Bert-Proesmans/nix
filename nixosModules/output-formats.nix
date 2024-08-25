@@ -1,13 +1,11 @@
-{ inputs }:
-let
-  # WARN; Importing attribute 'all-formats' will provide the expected
-  # config.formats.<format> attributes coinciding with the documentation.
-  # Importing a single nixosModule format will bake that configuration into
-  # the toplevel machine configuration!
-  generators-all = inputs.nixos-generators.nixosModules.all-formats;
-in
-{ lib, ... }: {
-  imports = [ generators-all ];
+{ lib, pkgs, flake-inputs, ... }: {
+  imports = [
+    # WARN; Importing attribute 'all-formats' will provide the expected
+    # config.formats.<format> attributes coinciding with the documentation.
+    # Importing a single nixosModule format will, on the other hand, bake 
+    # that configuration into the toplevel machine configuration!
+    flake-inputs.nixos-generators.nixosModules.all-formats
+  ];
 
   formatConfigs = lib.mkMerge
     (
@@ -41,7 +39,7 @@ in
             proesmans.nix.references-on-disk = lib.mkForce false;
             system.installer.channel.enable = lib.mkForce false;
 
-            # No BIOS boot
+            # No BIOS boot (breaks bare-metal boot)
             isoImage.makeBiosBootable = lib.mkForce false;
             isoImage.makeEfiBootable = lib.mkForce true;
 
@@ -58,6 +56,7 @@ in
             environment.defaultPackages = lib.mkForce [ ];
 
             # Only in-tree supported filesystems are desired
+            # Breaks bare-metal boot(?)
             boot.supportedFilesystems = lib.mkForce [ ];
 
             # Workarounds

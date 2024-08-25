@@ -1,16 +1,12 @@
-# This is a lambda. Any -> (Any -> Any)
-{ inputs }:
-let
-  sops-module = inputs.sops-nix.nixosModules.sops;
-in
-# This is a nixos module. NixOSArgs -> AttrSet
-{ lib, ... }:
-{
+{ lib, pkgs, flake-inputs, config, ... }: {
   # Basic usage of sops-nix, showing the interaction between the encrypted file and nixos configuration.
   # REF; https://github.com/Mic92/sops-nix?tab=readme-ov-file#usage-example
-  imports = [ sops-module ];
+  imports = [ flake-inputs.sops-nix.nixosModules.sops ];
 
   config = {
+    # Prevent replacing the running kernel w/o reboot
+    security.protectKernelImage = true;
+
     sops = {
       # ERROR; Each host must set its own secrets file, like below
       # sops.defaultSopsFile = ./secrets.encrypted.yaml;
@@ -20,10 +16,17 @@ in
       # both independently.
       gnupg.sshKeyPaths = [ ];
       age.sshKeyPaths = [ ];
-      age.keyFile = lib.facts.sops.keypath;
+      age.keyFile = "/etc/secrets/decrypter.age";
       age.generateKey = false;
     };
 
-    # TODO
+    users.users.bert-proesmans = {
+      isNormalUser = true;
+      description = "Bert Proesmans";
+      extraGroups = [ ];
+      openssh.authorizedKeys.keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
+      ];
+    };
   };
 }
