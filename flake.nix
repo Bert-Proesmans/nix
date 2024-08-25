@@ -99,27 +99,36 @@
           };
         }).config.build.wrapper);
 
-      # Build development shell with;
+      # Build and run development shell with;
       # nix flake develop
-      devShells = eachSystemOverride
-        {
-          config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-            "vault"
-          ];
-        }
-        (pkgs: {
-          default = pkgs.mkShellNoCC {
-            name = "b-NIX development";
+      devShells = eachSystem (pkgs:
+        let
+          deployment-shell = pkgs.mkShellNoCC {
+            name = "deployment";
 
-            # REF; https://github.com/NixOS/nixpkgs/issues/58624#issuecomment-1576860784
-            inputsFrom = [ ];
-
-            nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ]
-              ++ builtins.attrValues {
+            nativeBuildInputs = builtins.attrValues {
               # Python packages to easily execute maintenance and build tasks for this flake.
               # See tasks.py TODO
               inherit (pkgs.python3.pkgs) invoke deploykit;
             };
+
+            packages = builtins.attrValues {
+              inherit (pkgs)
+                # For secret material
+                sops ssh-to-age rage;
+            };
+          };
+        in
+        {
+          inherit deployment-shell;
+
+          default = pkgs.mkShellNoCC {
+            name = "b-NIX development";
+
+            # REF; https://github.com/NixOS/nixpkgs/issues/58624#issuecomment-1576860784
+            inputsFrom = [ deployment-shell ];
+
+            nativeBuildInputs = [ self.outputs.formatter.${pkgs.system} ];
 
             # Software directly available inside the developer shell
             packages = builtins.attrValues {
@@ -127,9 +136,7 @@
                 # For fun
                 nyancat figlet
                 # For development
-                git bat
-                # For secret material
-                sops ssh-to-age rage;
+                git bat;
             };
 
             # Open files within the visual code window

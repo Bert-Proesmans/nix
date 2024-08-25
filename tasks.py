@@ -56,6 +56,7 @@ def dev_key_decrypt() -> str:
         The encrypted development key is not found next to the tasks.py file!
     """
 
+    warnings.warn("Decrypting the development key for usage!")
     age_key = subprocess.run(
         ["rage", "--decrypt", DEV_KEY.as_posix()],
         text=True,  # stdin/stdout are opened in text mode

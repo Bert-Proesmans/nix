@@ -1,7 +1,6 @@
 { lib, config, pkgs, flake-inputs, profiles, ... }: {
 
   imports = [
-    profiles.server
     profiles.hypervisor
     ./hardware-configuration.nix
   ];
@@ -19,9 +18,20 @@
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
   proesmans.home-manager.enable = true;
+  proesmans.installer.enable = true;
+
+  sops.defaultSopsFile = ./secrets.encrypted.yaml;
+  sops.age.keyFile = "/etc/secrets/decrypter.age";
 
   # Make me an admin!
-  users.users.bert-proesmans.extraGroups = [ "wheel" ];
+  users.users.bert-proesmans = {
+    isNormalUser = true;
+    description = "Bert Proesmans";
+    extraGroups = [ "wheel" ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
+    ];
+  };
 
   # Allow for remote management
   services.openssh.enable = true;
@@ -52,31 +62,6 @@
     5201 # Allow incoming IPerf traffic when acting as a server
   ];
 
-  # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/networking.nix
-
-  # Networking configuration
-  # Allow PMTU / DHCP
-  networking.firewall.allowPing = true;
-
-  # Keep dmesg/journalctl -k output readable by NOT logging
-  # each refused connection on the open internet.
-  networking.firewall.logRefusedConnections = false;
-
-  # The notion of "online" is a broken concept
-  # https://github.com/systemd/systemd/blob/e1b45a756f71deac8c1aa9a008bd0dab47f64777/NEWS#L13
-  systemd.services.NetworkManager-wait-online.enable = false;
-  systemd.network.wait-online.enable = false;
-
-  # FIXME: Maybe upstream?
-  # Do not take down the network for too long when upgrading,
-  # This also prevents failures of services that are restarted instead of stopped.
-  # It will use `systemctl restart` rather than stopping it with `systemctl stop`
-  # followed by a delayed `systemctl start`.
-  systemd.services.systemd-networkd.stopIfChanged = false;
-  # Services that are only restarted might be not able to resolve when resolved is stopped before
-  systemd.services.systemd-resolved.stopIfChanged = false;
-
-
   # [upstream] -> eth0 /NAT/ bridge0 -> tap-*
   networking.nat = {
     enable = true;
@@ -101,7 +86,6 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
 
-  sops.defaultSopsFile = ./secrets.encrypted.yaml;
   sops.secrets.ssh_host_ed25519_key = {
     path = "/etc/ssh/ssh_host_ed25519_key";
     owner = config.users.users.root.name;
