@@ -7,8 +7,6 @@
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
-    nixos-generators.url = "github:nix-community/nixos-generators";
-    nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
     sops-nix.url = "github:Mic92/sops-nix";
@@ -49,6 +47,8 @@
       # REF; https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/default.nix
       eachSystemOverride = nixpkgs-config: f: lib.genAttrs systems
         (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
+
+      profiles-nixos = lib.rakeLeaves ./nixosModules/profiles;
     in
     {
 
@@ -114,7 +114,10 @@
             packages = builtins.attrValues {
               inherit (pkgs)
                 # For secret material
-                sops ssh-to-age rage;
+                sops ssh-to-age rage
+                # For deploying new hosts
+                nixos-anywhere
+                ;
             };
           };
         in
@@ -169,11 +172,9 @@
       # TODO
       nixosConfigurations =
         let
-          profiles = lib.rakeLeaves ./nixosModules/profiles;
-
           meta-module = { ... }: {
             # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
-            _file = "./flake.nix";
+            _file = ./flake.nix;
 
             # Make all custom nixos options available to the host configurations.
             imports = builtins.attrValues self.outputs.nixosModules;
@@ -202,7 +203,7 @@
               # for all else use _module.args option.
               # See also; meta-module, above
               flake-inputs = inputs;
-              inherit profiles;
+              profiles = profiles-nixos;
             };
             modules = [
               meta-module
@@ -218,7 +219,7 @@
               # for all else use _module.args option.
               # See also; meta-module, above
               flake-inputs = inputs;
-              inherit profiles;
+              profiles = profiles-nixos;
             };
             modules = [
               meta-module
@@ -242,105 +243,96 @@
       # I'm not doing that though, since the nixos integrated approach works well for me.
       # SEE ALSO; ./home/modules/home-manager.nix
 
+      # TODO
+      packages = eachSystem (pkgs:
+        let
+          forced-system = pkgs.system;
 
-      # Set of blobs to build, can be applications or ISO's or documents (reports/config files).
-      #
-      # Build with; nix build
-      # eg, nix build --out-link bootstrap.iso => blob bootstrap.iso, can be used to bootstrap new machines with nixos configuration
-      #
-      # Run with; nix run .#<binary-name>
-      # eg, packages.x86_64-linux.development = self.nixosConfigurations.development.config.formats.vm-nogui => nix run .#development
-      # packages = eachSystem (pkgs:
-      #   let
-      #     # Force the system architecture to that of the host for native virtualization (no emulation required)
-      #     forced-system = pkgs.system;
+          # NOTE; Minimal installer based host to get new hosts up and running
+          bootstrap = lib.nixosSystem {
+            system = null;
+            lib = lib;
+            specialArgs = {
+              flake-inputs = inputs;
+              profiles = profiles-nixos;
+            };
+            modules = [
+              ({ lib, modulesPath, config, ... }: {
+                # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
+                _file = ./flake.nix;
 
-      #     # Convert defined nixos hosts into installation iso's for self-installation
-      #     install-host = lib.nixosSystem {
-      #       # System is deprecated, it's set within the modules as nixpkgs.hostPlatform
-      #       system = null;
-      #       # Inject our own library functions before calling nixosSystem.
-      #       # The merged attribute set will become the nixosModule argument 'lib'. 'lib' is not directly related to 'pkgs.lib', because 'pkgs'
-      #       # can be set from within nixosModules. Overridable 'lib' would result in circular dependency because configuration is dependent on
-      #       # lib.mkIf and similar.
-      #       lib = lib;
-      #       # Additional custom arguments to each nixos module
-      #       specialArgs = {
-      #         inherit (self.outputs.nixosModules) profiles;
-      #       };
-      #       # The toplevel nixos module recursively imports relevant other modules
-      #       modules = commonNixosModules
-      #         ++ [
-      #         self.outputs.nixosModules.profiles.users
-      #         self.outputs.nixosModules.profiles.remote-iso
-      #         ({ lib, ... }: {
-      #           networking.hostName = lib.mkForce "installer";
-      #           networking.domain = lib.mkForce "alpha.proesmans.eu";
+                imports = [
+                  "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
+                  # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
+                ];
 
-      #           # Make sure EFI store is writable because we're installing!
-      #           boot.loader.efi.canTouchEfiVariables = lib.mkForce true;
+                config = {
+                  networking.hostName = lib.mkForce "installer";
+                  networking.domain = lib.mkForce "alpha.proesmans.eu";
 
-      #           # Force machine configuration to match the nix CLI build target attribute path
-      #           # packages.x86_64-linux builds a x86_64-linux VM.
-      #           nixpkgs.hostPlatform = lib.mkForce forced-system;
-      #           # Consistent defaults while updating flake inputs.
-      #           system.stateVersion = lib.mkForce "23.11";
-      #         })
-      #       ];
-      #     };
+                  # Fallback quickly if substituters are not available.
+                  nix.settings.connect-timeout = lib.mkForce 5;
+                  # Enable flakes
+                  nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
+                  # The default at 10 is rarely enough.
+                  nix.settings.log-lines = lib.mkForce 25;
+                  # Dirty git repo warnings become tiresome really quickly...
+                  nix.settings.warn-dirty = lib.mkForce false;
 
-      #     # An installer configuration for each defined nixos host
-      #     specialized-install-hosts = lib.flip lib.mapAttrs' self.outputs.nixosConfigurations
-      #       (hostname: _: lib.nameValuePair
-      #         # Change the attribute name with iso suffix, use like this; nix build .#development-iso
-      #         ("${hostname}-iso")
-      #         (install-host.extendModules {
-      #           modules = [
-      #             ({ ... }: {
-      #               # Carry the target machine configuration inside this host's store
-      #               proesmans.install-script.enable = true;
-      #               proesmans.install-script.host-attribute = hostname;
-      #             })
-      #           ];
-      #         }));
+                  # Faster and (almost) equally as good compression
+                  isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 15";
+                  # Ensure sshd starts at boot
+                  systemd.services.sshd.wantedBy = [ "multi-user.target" ];
+                  # No Wifi
+                  networking.wireless.enable = lib.mkForce false;
+                  # No docs
+                  documentation.enable = lib.mkForce false;
+                  documentation.nixos.enable = lib.mkForce false;
 
-      #     # A virtual machine for each defined nixos host
-      #     virtual-hosts = lib.flip lib.mapAttrs' self.outputs.nixosConfigurations
-      #       (hostname: configuration: lib.nameValuePair
-      #         # Change the attribute name with vm suffix, use like this; nix build .#development-vm
-      #         ("${hostname}-vm")
-      #         (configuration.extendModules {
-      #           modules = [
-      #             self.outputs.nixosModules.profiles.local-vm-test
-      #             ({ lib, ... }: {
-      #               # Force machine configuration to match the nix CLI build target attribute path
-      #               # packages.x86_64-linux builds a x86_64-linux VM.
-      #               nixpkgs.hostPlatform = lib.mkForce forced-system;
-      #             })
-      #           ];
-      #         }));
+                  # Drop ~400MB firmware blobs from nix/store, but this will make the host not boot on bare-metal!
+                  # hardware.enableRedistributableFirmware = lib.mkForce false;
+                  # ERROR; The mkForce is required to _reset_ the lists to empty! While the default
+                  # behaviour is to make a union of all list components!
+                  # No GCC toolchain
+                  system.extraDependencies = lib.mkForce [ ];
+                  # Remove default packages not required for a bootable system
+                  environment.defaultPackages = lib.mkForce [ ];
 
-      #     # ERROR; The attribute `vm-nogui` creates a script, but not in the form of an application package.
-      #     # The script is wrapped so 'nix run' can find and execute it.
-      #     vm-launcher-wrapper = name: configuration: pkgs.writeShellApplication {
-      #       name = "launch-wrapper-${name}";
-      #       text = ''
-      #         # All preparations before launching the virtual machine goes here
-      #         ${configuration.config.formats.vm-nogui}
-      #       '';
-      #     };
-      #   in
-      #   (builtins.mapAttrs vm-launcher-wrapper virtual-hosts)
-      #   # Specifically built installer iso's from each configuration
-      #   // builtins.mapAttrs (_: system: system.config.formats.install-iso) specialized-install-hosts
-      #   // {
-      #     # Lightweight bootstrap machine for initiating remote deploys. This configuration doesn't carry
-      #     # a target host.
-      #     default = install-host.config.formats.install-iso;
+                  nixpkgs.hostPlatform = lib.mkForce forced-system;
+                  system.stateVersion = lib.mkForce config.system.nixos.version;
+                };
+              })
+            ];
+          };
+        in
+        {
+          # NOTE; You can find the generated iso file at ./result/iso/*.iso
+          default = bootstrap.config.system.build.isoImage;
 
-      #     # NOTE; For a self-deploying development machine, use the #development-iso attribute!
-      #     # eg; nix build .#development-iso
-      #   });
+          development-iso = (bootstrap.extendModules {
+            modules = [
+              # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
+              ({ profiles, ... }: {
+                # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
+                _file = ./flake.nix;
+                key = "${./flake.nix}?development-iso";
+
+                imports = [ profiles.development-bootstrap ];
+
+                config = {
+                  isoImage.storeContents = [
+                    # NOTE; The development machine toplevel derivation is included as a balancing act;
+                    # Bigger ISO image size <-> 
+                    #     + Less downloading 
+                    #     + Less RAM usage (nix/store is kept in RAM on live boots!)
+                    self.outputs.nixosConfigurations.development.config.system.build.toplevel
+                  ];
+                };
+              })
+            ];
+          }).config.system.build.isoImage;
+        }
+      );
 
       # Verify flake configurations with;
       # nix flake check --no-eval-cache
@@ -383,6 +375,7 @@
       # These attributes are lambda's that don't do anything on their own. Use the `overlay`
       # options to incorporate them into your configuration.
       # eg; (nixos options) nixpkgs.overlays = self.outputs.overlays;
+      # eg; (nix extensible attr set) _ = lib.extends (lib.composeManyExtensions (builtins.attrValues self.outputs.overlays));
       #
       # See also; nixosModules.nix-system
       overlays = {

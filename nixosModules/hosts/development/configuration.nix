@@ -18,7 +18,6 @@
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
   proesmans.home-manager.enable = true;
-  proesmans.installer.enable = true;
 
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   sops.age.keyFile = "/etc/secrets/decrypter.age";

@@ -46,7 +46,7 @@ in
       nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
       # The default at 10 is rarely enough.
       nix.settings.log-lines = lib.mkDefault 25;
-      # Dirty git repo becomes tiresome really quickly...
+      # Dirty git repo warnings become tiresome really quickly...
       nix.settings.warn-dirty = false;
 
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
