@@ -271,6 +271,15 @@
                   networking.hostName = lib.mkForce "installer";
                   networking.domain = lib.mkForce "alpha.proesmans.eu";
 
+                  users.users.bert-proesmans = {
+                    isNormalUser = true;
+                    description = "Bert Proesmans";
+                    extraGroups = [ "wheel" ];
+                    openssh.authorizedKeys.keys = [
+                      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
+                    ];
+                  };
+
                   # Fallback quickly if substituters are not available.
                   nix.settings.connect-timeout = lib.mkForce 5;
                   # Enable flakes

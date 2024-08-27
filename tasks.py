@@ -185,6 +185,16 @@ def host_deploy(
             # "--option accept-flake-config true"
         ]
 
+        # NOTE; The (nixos-anywhere) default is to let the target pull packages from the caches first, and if they not exist there
+        # the current (buildhost) host will push the packages.
+        # There are more situations where uploading from current host first is desired, as opposed to downloading from 
+        # the internet caches!
+        local_targets_marker = ["localhost" "127.0.0.1"]
+        if any(x in ssh_connection_string for x in local_targets_marker):
+            # Since we have a populated nix store, and this is a local install; do not let the target pull from
+            # the external nix caches.
+            deploy_flags.append("--no-substitute-on-destination")
+
         # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
         subprocess.run(
             [
