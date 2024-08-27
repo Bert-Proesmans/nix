@@ -26,10 +26,10 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v3
       - name: Build default package
         run: |
-          nix build --log-format raw --out-link "bootstrap.iso"
+          nix build --log-format raw
       - name: Create Github release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest --prerelease --generate-notes "bootstrap.iso"
+          gh release create latest --prerelease --generate-notes "result/iso/nixos-*.iso"
