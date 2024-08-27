@@ -1,4 +1,4 @@
-{
+rec {
   description = "Bert Proesmans's NixOS configuration";
 
   inputs = {
@@ -22,8 +22,23 @@
     impermanence.url = "github:nix-community/impermanence";
   };
 
-  outputs = { self, ... }@inputs:
+  outputs = { self, ... }@args:
     let
+      # The original input metadata can be reused when building the nix registry configuration of
+      # the hosts. Using this information bounds the hosts to the lockfile of this flake explicitly!
+      #
+      # SEEALSO; nixos option nix.registry
+      # SEEALSO; ./nixosModules/nix-system.nix
+      flake-meta.inputs = inputs;
+    in
+    let
+      # Rebinding of args to the name 'inputs'.
+      #
+      # ERROR; Needs a double let .. in binding as to not clobber the variable `inputs`.
+      # `inputs` is canonically the variable used to reference all _resolved_ inputs, but
+      # we're also interested in the unresolved inputs!
+      inputs = args;
+
       # Each target we want to (cross-)compile for
       # NOTE; Cross-compiling requires additional configuration on the build host
       systems = [ "x86_64-linux" ];
@@ -48,10 +63,14 @@
       eachSystemOverride = nixpkgs-config: f: lib.genAttrs systems
         (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
 
+      # NixosModules that hold a fixed set of configuration that is re-usable accross different hosts.
+      # eg; dns server program configuration, reused by all the dns server hosts (OSI layer 7 high-availability)
+      # eg; virtual machine guest configuration, reused by all hosts that are running on top of a hypervisor
+      #
+      # SEEALSO; self.outputs.nixosModules
       profiles-nixos = lib.rakeLeaves ./nixosModules/profiles;
     in
     {
-
       # Builds an attribute set of all our library code.
       # Each library file is applied with the lib from nixpkgs.
       #
@@ -107,7 +126,7 @@
 
             nativeBuildInputs = builtins.attrValues {
               # Python packages to easily execute maintenance and build tasks for this flake.
-              # See tasks.py TODO
+              # See tasks.py for details on the operational workings of managing the nixos hosts.
               inherit (pkgs.python3.pkgs) invoke deploykit;
             };
 
@@ -163,13 +182,47 @@
           };
         });
 
-      # TODO
+      # nixOS modules are just lambda's with an attribute set as the first argument (arity of all nix functions is
+      # always one). NixOS modules on their own do nothing, but need to be incorporated into a nixosConfiguration.
       #
-      # NOTE; The type is list[attrSet[<name>, path]]
-      # Nix will automatically convert the relative path into a fully qualified one during evaluation (before application).
+      # Refer to nixosModules.hosts (or the filepath ./nixosModules/hosts) for the definition/configuration 
+      # of each machine. Starting from the configuration.nix file, other nixos module files are imported.
+      # The collective set of all imported modules is turned into a host configuration.
+      # Because the configuration.nix file is typically imported first, it's called the toplevel (nixos) module.
+      #
+      # NOTE; The type of this value is attrSet[<name>, <path>]
+      # eg {filesystem = ./nixosModules/filesystem.nix;}
+      #
+      # NOTE; Paths are a value type in nix, and nix will resolve these paths to their fixed store path
+      # (eg /nix/store/aaabbbcccdddd/nixosModules/filesystem.nix) during/after evaluation (before derivations are created).
+      # The prefix is the resulting path (/aaabbbcccddd) comes from the outPath attribute of this flake.
       nixosModules = lib.filterAttrs (name: _: name != "hosts" && name != "profiles" && name != "debug") (lib.rakeLeaves ./nixosModules);
 
-      # TODO
+      # nixosConfigurations hold the full interconnected configuration data to build a host, either pieces of it or
+      # in its entirety.
+      #
+      # WARN; Deployment of hosts in this flake is handled by the "invoke" command, the nixos-anywhere info below is
+      # kept to provide information on deeper internals.
+      # SEEALSO; self.outputs.devShells.deployment-shell
+      # SEEALSO; ./tasks.py file
+      #
+      #
+      # Deploy with nixos-anywhere; nix run github:nix-community/nixos-anywhere -- --flake .#<machine-name (property of nixosConfigurations)> <user>@<ip address>
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations so that property component can be ommited from the command line
+      # NOTE; <user> must be root or have passwordless sudo
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
+      #
+      #
+      # Update with; nixos-rebuild switch --flake .#<machine-name> --target-host <user>@<ip address>
+      # NOTE; nixos-rebuild will automatically look under #nixosConfigurations so that property component can be ommited from the command line
+      # NOTE; <user> must be root or have passwordless sudo
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine
+      #
+      #
+      # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. 
+      # Using this optimization depends on the conditions of the build-host and target-host.
+      # eg use it when the upload speed of the build-host is slower than the download speed of the target-host.
+      #
       nixosConfigurations =
         let
           meta-module = { ... }: {
@@ -183,7 +236,7 @@
               # Flake inputs are used for importing additional nixos modules.
               # ERROR; Attributes that must be resolved during import evaluation _must_ be passed into the nixos
               # configuration through specialArgs!
-              #_module.args.flake-inputs = inputs;
+              # _module.args.flake.inputs = args;
 
               _module.args.flake-overlays = self.outputs.overlays;
 
@@ -202,7 +255,8 @@
               # Set here arguments that must be be resolvable at module import stage,
               # for all else use _module.args option.
               # See also; meta-module, above
-              flake-inputs = inputs;
+              flake.inputs = inputs;
+              flake.meta.inputs = flake-meta.inputs;
               profiles = profiles-nixos;
             };
             modules = [
@@ -218,7 +272,8 @@
               # Set here arguments that must be be resolvable at module import stage,
               # for all else use _module.args option.
               # See also; meta-module, above
-              flake-inputs = inputs;
+              flake.inputs = inputs;
+              flake.meta.inputs = flake-meta.inputs;
               profiles = profiles-nixos;
             };
             modules = [
@@ -236,12 +291,21 @@
       # include other modules defining more options, a tree of dependencies could be built with those sets
       # at the root (or top). This turns those modules into toplevel modules.
       #
+      # WARN; nix flake check will warn about this attribute existing because it's not defined within the
+      # standard nix flake output schema. Harmless message.
       homeModules = (lib.rakeLeaves ./homeModules);
 
       # NOTE; Home modules above can be incorporated in a standalone configuration that evaluates independently
       # of nixos host configurations.
-      # I'm not doing that though, since the nixos integrated approach works well for me.
+      # This is the same distinction that exists between nixosModules and nixosConfiguration, the latter is a 
+      # compilation of all option values defined within nixosModules.
+      #
+      # I'm not doing homeConfigurations though, since the nixos integrated approach works well for me.
       # SEE ALSO; ./home/modules/home-manager.nix
+      #
+      # WARN; nix flake check will warn about this attribute existing because it's not defined within the
+      # standard nix flake output schema. Harmless message.
+      homeConfigurations = { };
 
       # TODO
       packages = eachSystem (pkgs:
@@ -253,7 +317,8 @@
             system = null;
             lib = lib;
             specialArgs = {
-              flake-inputs = inputs;
+              flake.inputs = inputs;
+              flake.meta.inputs = flake-meta.inputs;
               profiles = profiles-nixos;
             };
             modules = [
@@ -280,34 +345,6 @@
                     ];
                   };
 
-                  # Fallback quickly if substituters are not available.
-                  nix.settings.connect-timeout = lib.mkForce 5;
-                  # Enable flakes
-                  nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
-                  # The default at 10 is rarely enough.
-                  nix.settings.log-lines = lib.mkForce 25;
-                  # Dirty git repo warnings become tiresome really quickly...
-                  nix.settings.warn-dirty = lib.mkForce false;
-
-                  # Faster and (almost) equally as good compression
-                  isoImage.squashfsCompression = lib.mkForce "zstd -Xcompression-level 15";
-                  # Ensure sshd starts at boot
-                  systemd.services.sshd.wantedBy = [ "multi-user.target" ];
-                  # No Wifi
-                  networking.wireless.enable = lib.mkForce false;
-                  # No docs
-                  documentation.enable = lib.mkForce false;
-                  documentation.nixos.enable = lib.mkForce false;
-
-                  # Drop ~400MB firmware blobs from nix/store, but this will make the host not boot on bare-metal!
-                  # hardware.enableRedistributableFirmware = lib.mkForce false;
-                  # ERROR; The mkForce is required to _reset_ the lists to empty! While the default
-                  # behaviour is to make a union of all list components!
-                  # No GCC toolchain
-                  system.extraDependencies = lib.mkForce [ ];
-                  # Remove default packages not required for a bootable system
-                  environment.defaultPackages = lib.mkForce [ ];
-
                   nixpkgs.hostPlatform = lib.mkForce forced-system;
                   system.stateVersion = lib.mkForce config.system.nixos.version;
                 };
@@ -319,15 +356,19 @@
           # NOTE; You can find the generated iso file at ./result/iso/*.iso
           default = bootstrap.config.system.build.isoImage;
 
+          # Using the handy extendModules function to append more contents to the basic bootstrap image.
+          # The entire point of this ISO is to work the size <-> RAM usage balance, see option isoImage.storeContents.
           development-iso = (bootstrap.extendModules {
             modules = [
-              # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
               ({ profiles, ... }: {
                 # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
                 _file = ./flake.nix;
                 key = "${./flake.nix}?development-iso";
 
-                imports = [ profiles.development-bootstrap ];
+                imports = [
+                  profiles.development-bootstrap
+                  # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
+                ];
 
                 config = {
                   isoImage.storeContents = [
@@ -352,33 +393,7 @@
       # Add custom derivations, like nixos-tests or custom format outputs of nixosSystem, to this attribute set for
       # automated validation through a CLI-oneliner.
       #
-      # Test individual machine configurations with;
-      # nix build .#checks.<system>.<machine-name>-test --no-eval-cache --print-build-logs
-      # eg, nix build .#checks.x86_64-linux.bootstrap-test --no-eval-cache --print-build-logs
-      #
-      # REF; https://nixos.org/manual/nixos/stable/#sec-running-nixos-tests-interactively
-      # You can test interactively with;
-      # nix build .#checks.<system>.<machine-name>-test.driverInteractive --no-eval-cache && ./result/bin/nixos-test-driver
-      # This will drop you in a python shell to control your machines. Type start_all() launch all test nodes,
-      # follow up by machine.shell_interact() to drop into a shell on the node "machine".
-      # checks = eachSystem (pkgs: lib.pipe ./checks [
-      #   # Read checks folder, outputs the file structure containing tests
-      #   (lib.rakeLeaves)
-      #   # Flatten nested attribute sets, outputs name-value pairs on a single level
-      #   (lib.flattenTree)
-      #   # Keep the nix file paths
-      #   (builtins.attrValues)
-      #   # Import file, outputs lambdas that produce test derivations
-      #   (builtins.map (file-path: (import file-path)))
-      #   # Apply lambdas, outputs test derivations
-      #   (builtins.map (lambda: lambda {
-      #     inherit self lib pkgs commonNixosModules;
-      #     inherit (self) inputs outputs;
-      #   }))
-      #   # Shallow merge the attribute set, results in exported checks
-      #   # ERROR; Last attribute set wins in case of name conflicts (that's why fold-left)
-      #   (builtins.foldl' (final: part: final // part) { /* starts with empty set */ })
-      # ]);
+      checks = eachSystem (pkgs: { });
 
       # Overwrite (aka patch) functionality defined by the inputs, mostly nixpkgs.
       #

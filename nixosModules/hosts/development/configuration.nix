@@ -1,4 +1,4 @@
-{ lib, config, pkgs, flake-inputs, profiles, ... }: {
+{ lib, config, pkgs, flake, profiles, ... }: {
 
   imports = [
     profiles.hypervisor
@@ -13,7 +13,6 @@
   proesmans.nix.garbage-collect.enable = true;
   # Garbage collect less often, so we don't drop build artifacts from other systems
   proesmans.nix.garbage-collect.development-schedule.enable = true;
-  proesmans.nix.registry.fat = true;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
@@ -117,7 +116,7 @@
     {
       # test = {
       #   autostart = false;
-      #   specialArgs = { inherit flake-inputs; };
+      #   specialArgs = { inherit flake.inputs; };
       #   config = { lib, ... }: {
       #     imports = [
       #       ../test-vm.nix

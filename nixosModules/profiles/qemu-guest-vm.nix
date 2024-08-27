@@ -1,6 +1,6 @@
-{ lib, pkgs, flake-inputs, ... }: {
+{ lib, pkgs, flake, ... }: {
   imports = [
-    flake-inputs.impermanence.nixosModules.impermanence
+    flake.inputs.impermanence.nixosModules.impermanence
   ];
 
   # Generate a nixos module with for each defined vm containing all hypervisor

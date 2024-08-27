@@ -1,7 +1,7 @@
-{ lib, pkgs, flake-inputs, config, ... }: {
+{ lib, pkgs, flake, config, ... }: {
   # Basic usage of sops-nix, showing the interaction between the encrypted file and nixos configuration.
   # REF; https://github.com/Mic92/sops-nix?tab=readme-ov-file#usage-example
-  imports = [ flake-inputs.sops-nix.nixosModules.sops ];
+  imports = [ flake.inputs.sops-nix.nixosModules.sops ];
 
   sops = {
     # ERROR; Each host must set its own secrets file, like below

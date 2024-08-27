@@ -1,11 +1,11 @@
-{ lib, flake-inputs, home-configurations, config, ... }:
+{ lib, flake, home-configurations, config, ... }:
 let
   cfg = config.proesmans.home-manager;
   cfg-users = config.users.users;
   types = lib.types;
 in
 {
-  imports = [ flake-inputs.home-manager.nixosModules.default ];
+  imports = [ flake.inputs.home-manager.nixosModules.default ];
 
   options.proesmans.home-manager = {
     enable = lib.mkEnableOption (lib.mdDoc "Enable user profile configuration for the users on the system");

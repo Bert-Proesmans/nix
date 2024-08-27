@@ -1,39 +1,23 @@
-# { inputs, outputs }:
-# let
-#   nixpkgs-stable = inputs.nixpkgs-stable;
-#   nixpkgs-overlays = builtins.attrValues outputs.overlays;
-
-#   # Add additional package repositories (input flakes) below.
-#   # nixpkgs is a symlink to the stable source, kept for consistency with online guides
-#   nix-registry = { inherit (inputs) nixpkgs nixpkgs-stable nixpkgs-unstable; };
-
-#   get-inputs-revision = flake-reference: inputs."${flake-reference}".sourceInfo.rev;
-#   nix-revs = builtins.listToAttrs (
-#     builtins.map (name: { inherit name; value = get-inputs-revision name; }) [ "nixpkgs" "nixpkgs-stable" "nixpkgs-unstable" ]
-#   );
-# in
-{ config, lib, flake-inputs, flake-overlays, ... }:
+{ config, lib, flake, flake-overlays, ... }:
 let
   cfg = config.proesmans.nix;
-  nixpkgs = flake-inputs.nixpkgs;
-  nixpkgs-stable = flake-inputs.nixpkgs-stable;
-  nixpkgs-unstable = flake-inputs.nixpkgs-unstable;
+
+  # Information on where to find the flake sources files
+  flake-references = flake.meta.inputs;
+  # Information on the flake source files in the /nix/store
+  flake-sources = flake.inputs;
 in
 {
   options.proesmans.nix = {
     garbage-collect.enable = lib.mkEnableOption "cleanup of nix/store" // { description = "Make the target host automatically cleanup unused reference in the nix store"; };
     garbage-collect.development-schedule.enable = lib.mkEnableOption "lower frequency runs" // { description = "Lower the frequency of gc and adjusted the amount of data to cleanup"; };
 
-    # registry.references = lib.mkOption {
-    #   description = "The index archives to store on the host";
-    #   type = lib.types.listOf (lib.types.oneOf [ lib.types.str lib.types.path ]);
-    #   default = [
-    #     nixpkgs
-    #     nixpkgs-stable
-    #     nixpkgs-unstable
-    #   ];
-    # };
-    registry.fat = lib.mkEnableOption "storing input archives" // { description = "Copy all files from the referenced archives to the host, instead of a link to their online location"; };
+    registry.nixpkgs.fat = lib.mkEnableOption "adding inputs to closure" // {
+      description = ''
+        Copy all files from the nixpkgs inputs (stable + unstable) to the host, instead of a link to their online location.
+        Adding the files will increase the closure size more than storing only a reference.
+      '';
+    };
   };
 
   # REF; https://github.com/nix-community/srvos/blob/bf8e511b1757bc66f4247f1ec245dd4953aa818c/nixos/common/nix.nix
@@ -70,7 +54,7 @@ in
           #
           # Attribute 'pkgs' will contain all unstable package versions.
           # Attribute 'pkgs.stable' contains all stable package versions.
-          stable = (import nixpkgs-stable) {
+          stable = (import flake-sources.nixpkgs-stable) {
             inherit (config.nixpkgs) config overlays;
             localSystem = config.nixpkgs.hostPlatform;
           };
@@ -124,40 +108,33 @@ in
       # Synchronise sources for nix cli v2 and cli v3. V2 uses channels, while we in v3 use flakes.
       nix.nixPath = lib.attrValues (lib.mapAttrs (name: _: "${name}=flake:${name}") config.nix.registry);
 
+      # Setup universally relevant registries by references.
       nix.registry = lib.mkMerge [
-        # Store sources into the registry as references
-        (lib.mkIf (!cfg.registry.fat) (
-          builtins.mapAttrs
-            (_: value: {
-              to = {
-                type = "github";
-                # WARN; Cannot freely accept inputs because the original reference information has been
-                # consumed and we only get a data revision string back.
-                # We only know the location of nixpkgs, that's it. If you require more references you'll have
-                # to set option nix.registry yourself.
-                owner = "NixOS";
-                repo = "nixpkgs";
-                ref = value.rev;
-              };
-            })
-            {
-              inherit nixpkgs nixpkgs-stable nixpkgs-unstable;
-            }
-        ))
+        (lib.mkIf (cfg.registry.nixpkgs.fat == false) {
+          # WARN; Assumes nixpkgs follows input nixpkgs-unstable. This is hardcoded instead of the robust implementation
+          # of resolving all follow links to find the proper url!
+          #
+          # WARN; Assumes all inputs are defined with 'url' attribute instead of the full syntax
+          # eg; {type = "github", "owner" = "NixOS", repo = "nixpkgs" ... }
+          nixpkgs.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url;
+          nixpkgs-unstable.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url;
+          nixpkgs-stable.to = builtins.parseFlakeRef flake-references.nixpkgs-stable.url;
+        })
 
-        # Store sources as paths (embedded into the host)
-        (lib.mkIf (cfg.registry.fat) (
-          builtins.mapAttrs
-            (_: value: {
-              to = {
-                type = "path";
-                path = value;
-              };
-            })
-            {
-              inherit nixpkgs nixpkgs-stable nixpkgs-unstable;
-            }
-        ))
+        (lib.mkIf (cfg.registry.nixpkgs.fat == true) {
+          nixpkgs.to = {
+            type = "path";
+            path = flake-sources.nixpkgs;
+          };
+          nixpkgs-unstable.to = {
+            type = "path";
+            path = flake-references.nixpkgs-unstable;
+          };
+          nixpkgs-stable.to = {
+            type = "path";
+            path = flake-references.nixpkgs-stable;
+          };
+        })
       ];
     })
   ];

@@ -1,6 +1,6 @@
-{ lib, pkgs, flake-inputs, config, ... }:
+{ lib, pkgs, flake, config, ... }:
 {
-  imports = [ flake-inputs.microvm.nixosModules.host ];
+  imports = [ flake.inputs.microvm.nixosModules.host ];
 
   microvm.host.enable = lib.mkDefault false;
   microvm.autostart = [ ];
