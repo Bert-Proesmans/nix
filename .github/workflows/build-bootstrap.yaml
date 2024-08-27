@@ -32,4 +32,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --cleanup-tag --yes || true
-          gh release create latest --prerelease --generate-notes "result/iso/nixos-*.iso"
+          image=$(find $(readlink -f ./result) -name 'nixos-*iso' -xtype f -print -quit)
+          gh release create latest --prerelease --generate-notes "$image"
