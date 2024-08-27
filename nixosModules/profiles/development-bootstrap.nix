@@ -23,13 +23,19 @@
 
       deployment-script = pkgs.writeShellApplication {
         name = "develop-host-install";
-        runtimeInputs = [ pkgs.nix ];
+        runtimeInputs = [ pkgs.nix pkgs.openssh ];
         # ERROR; The host-deploy task must know how to deploy the hostconfiguration
         # by name "development" !
         text = ''
+          if ! ssh-add -L >/dev/null 2>&1
+          then
+            echo "-- WARNING --"
+            echo "No SSH keys were found, so you'll have to use password login. Make sure to set a root password with \`sudo passwd\`"
+          fi
+
           nix develop "${devShells "deployment-shell"}" \
             --command bash \
-            -c "invoke host-deploy development root@localhost"
+            -c "invoke --search-root ${flake-inputs.self} host-deploy development root@localhost"
         '';
       };
 
