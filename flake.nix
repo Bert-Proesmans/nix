@@ -257,12 +257,13 @@
               profiles = profiles-nixos;
             };
             modules = [
-              ({ lib, modulesPath, config, ... }: {
+              ({ lib, profiles, modulesPath, config, ... }: {
                 # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
                 _file = ./flake.nix;
 
                 imports = [
                   "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
+                  profiles.remote-iso
                   # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
                 ];
 

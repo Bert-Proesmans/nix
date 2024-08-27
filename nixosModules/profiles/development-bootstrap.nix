@@ -11,7 +11,15 @@
   environment.systemPackages =
     let
       system = config.nixpkgs.hostPlatform.system;
-      devShells = flake-inputs.self.outputs.devShells."${system}";
+      # ERROR; nix develop does not work with derivation outPaths! We must pass it a derivation by itself.
+      #
+      # WARN; To ensure the development shell exists, its full attribute path is evaluated. Afterwards
+      # the interactive string reference is returned that points to the same derivation.
+      devShells = shell-attribute: (
+        builtins.seq
+          flake-inputs.self.outputs.devShells."${system}"."${shell-attribute}"
+          "${flake-inputs.self}#${shell-attribute}"
+      );
 
       deployment-script = pkgs.writeShellApplication {
         name = "develop-host-install";
@@ -19,7 +27,7 @@
         # ERROR; The host-deploy task must know how to deploy the hostconfiguration
         # by name "development" !
         text = ''
-          nix develop ${devShells.deployment-shell} \
+          nix develop "${devShells "deployment-shell"}" \
             --command bash \
             -c "invoke host-deploy development root@localhost"
         '';
