@@ -225,7 +225,16 @@ rec {
       #
       nixosConfigurations =
         let
-          meta-module = { ... }: {
+          # Read details from each host to share them with all other hosts.
+          #
+          # NOTE; The facts are collected through the use of a nixos module that shapes the data into "freeform schema".
+          # Freeform schema here means there is a limited schema pre-defined, and individual configurations can add 
+          # more schema nodes to their facts collection as required.
+          configuration-facts = builtins.mapAttrs (_: v: v.config.proesmans.facts) self.outputs.nixosConfigurations;
+          # Prevent the footgun of infinite recursion by preventing hosts from accessing their own facts table.
+          # facts-no-circular = hostname: lib.filterAttrs (name: _: name != hostname) configuration-facts;
+
+          meta-module = hostname: { config, ... }: {
             # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
             _file = ./flake.nix;
 
@@ -239,11 +248,13 @@ rec {
               # _module.args.flake.inputs = args;
 
               _module.args.flake-overlays = self.outputs.overlays;
-
               _module.args.home-configurations = self.outputs.homeModules.users;
+              # TODO
+              _module.args.facts = { }; #configuration-facts;
 
-              # TODO Load facts from all nixosConfigurations and make them available to all configurations.
-              _module.args.facts = { };
+              # The hostname of each configuration _must_ match their attribute name.
+              # This prevent the footgun of desynchronized identifiers.
+              networking.hostName = lib.mkForce hostname;
             };
           };
         in
@@ -260,7 +271,7 @@ rec {
               profiles = profiles-nixos;
             };
             modules = [
-              meta-module
+              (meta-module "development")
               ./nixosModules/hosts/development/configuration.nix
             ];
           };
@@ -277,7 +288,7 @@ rec {
               profiles = profiles-nixos;
             };
             modules = [
-              meta-module
+              (meta-module "buddy")
               ./nixosModules/hosts/buddy/configuration.nix
             ];
           };

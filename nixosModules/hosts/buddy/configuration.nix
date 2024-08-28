@@ -94,13 +94,13 @@
     netdevConfig = {
       Name = "bridge0";
       Kind = "bridge";
-      MACAddress = lib.facts.buddy.net.management.mac;
+      MACAddress = "4a:5c:7c:d1:8a:35";
     };
   };
   systemd.network.networks = {
     # Attach the physical interface to the bridge. This allows network access to the VMs
     "30-lan" = {
-      matchConfig.MACAddress = [ lib.facts.buddy.net.physical.mac ];
+      matchConfig.MACAddress = [ "b4:2e:99:15:33:a6" ];
       networkConfig = {
         Bridge = "bridge0";
       };
@@ -145,7 +145,7 @@
   security.acme = {
     acceptTerms = true;
     defaults = {
-      email = lib.facts.acme.email;
+      email = "bproesmans@hotmail.com";
       dnsProvider = "cloudflare";
       credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" = config.sops.secrets."cloudflare-proesmans-key".path;
       credentialFiles."CLOUDFLARE_ZONE_API_TOKEN_FILE" = config.sops.secrets."cloudflare-zones-key".path;
@@ -234,17 +234,17 @@
 
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
-      config = { config, ... }: {
+      config = { config, profiles, ... }: {
         # ERROR; Number must be unique for each VM!
         # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-        microvm.vsock.cid = lib.facts.vm.idm.vsock-id;
+        microvm.vsock.cid = 300;
         networking.hostName = "SSO";
-        imports = [ profiles.micro-vm ];
+        imports = [ profiles.qemu-guest-vm ];
 
         microvm.interfaces = [{
           type = "tap";
           id = "tap-kanidm";
-          mac = lib.facts.vm.idm.net.mac;
+          mac = "9e:30:e8:e8:b1:d0";
         }];
 
         microvm.shares = [
