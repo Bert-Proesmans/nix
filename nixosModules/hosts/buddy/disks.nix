@@ -328,7 +328,7 @@
       canmount = "off";
       # NOTE; Datasets do not inherit a parent mountpoint.
       # Default; Name of pool, 'zstorage' in this case
-      mountpoint = "none"; # WARN; Dataset option for mountpoint must be set to `null`
+      mountpoint = "none"; # WARN; All ZFS options must be set to "none", but outer (disko) settings must be null
       # NOTE; Fletcher is by far the fastest
       # Only change checksumming algorithm if dedup is a requirement, blake3 is a cryptographic
       # hasher for higher security on clash resistance
@@ -460,9 +460,9 @@
         # Default storage location for vm state data without requirements.
         # HELP; Create sub datasets to specialize storage behaviour to the application.
         type = "zfs_fs";
+        mountpoint = null; # ERROR; Triggers race-condition and pauses boot
         options = {
           canmount = "off";
-          mountpoint = "/vm";
           # Qemu does its own application level caching
           # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
           # NOTE; My virtual machines will run from a tmpfs by default!
@@ -482,7 +482,7 @@
       "vm/vault" = {
         # Basically file storage
         type = "zfs_fs";
-        mountpoint = "/vm/vault";
+        mountpoint = null; # ERROR; Triggers race-condition and pauses boot
       };
       "vm/vault/media" = {
         # Basically file storage
