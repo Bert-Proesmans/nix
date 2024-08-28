@@ -16,48 +16,6 @@
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.home-manager.enable = true;
 
-  # Leave ZFS pool alone!
-  boot.zfs.forceImportRoot = false;
-  boot.zfs.forceImportAll = false;
-
-  # Tune ZFS
-  #
-  # NOTE; Not tackling limited free space performance impact. Due to the usage of AVL trees to track free space,
-  # a highly fragmented or simply a full pool results in more overhead to find free space. There is actually no
-  # robust solution for this problem, there is no quick or slow fix (defragmentation). Your pool should be sized
-  # at maximum required space +- ~10% from the beginning.
-  # If your pool is full => expand it by a large amount. If your pool is fragmented => create a new dataset and
-  # move your data out of the old dataset + purge old dataset + move back into the new dataset.
-  #
-  # HELP; A way to solve used space performance impact is to set dataset quota's to limit space usage to ~90%.
-  # With a 90% usage limit there is backpressure to cleanup earlier snapshots. Doesn't work if your pool is
-  # full though!
-  boot.extraModprobeConfig = ''
-    # Fix the commit timeout (seconds), because the default has changed before
-    options zfs zfs_txg_timeout=5
-
-    # This is a hypervisor server, and ZFS ARC is sometimes slow with giving back RAM.
-    # It defaults to 50% of total RAM, but we fix it to 8 GiB (bytes)
-    options zfs zfs_arc_max=8589934592
-
-    # Data writes less than this amount (bytes) are written in sync, while writes larger are written async.
-    # WARN; Only has effect when no SLOG special device is attached to the pool to be written to.
-    #
-    # ERROR; Data writes larger than the recordsize are automatically async, to prevent complexities while handling
-    # multiple block pointers in a ZIL log record.
-    # Set this value equal to or less than the largest recordsize written on this system/pool. (bytes?)
-    options zfs zfs_immediate_write_sz=1048576
-
-    # Enable prefetcher. Zfs proactively reads data from spinning disks, expecting inflight or future requests, into
-    # the ARC.
-    options zfs zfs_prefetch_disable=0
-  '';
-
-  services.fstrim.enable = true;
-  services.zfs.trim.enable = true;
-  services.zfs.autoScrub.enable = true;
-  services.zfs.autoScrub.interval = "weekly";
-
   # Make me a user!
   users.users.bert-proesmans = {
     isNormalUser = true;
@@ -136,9 +94,6 @@
   sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
     mode = "0400";
   };
-  sops.secrets."kanidm-vm/ssh_host_ed25519_key" = {
-    mode = "0400";
-  };
 
   sops.secrets."cloudflare-proesmans-key" = { };
   sops.secrets."cloudflare-zones-key" = { };
@@ -150,9 +105,9 @@
       credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" = config.sops.secrets."cloudflare-proesmans-key".path;
       credentialFiles."CLOUDFLARE_ZONE_API_TOKEN_FILE" = config.sops.secrets."cloudflare-zones-key".path;
 
-      # ERROR; Lego uses DNS requests within the certificate workflow. It must use an external DNS directly since
-      # all validation uses external DNS records.
-      # NOTE; The system resolver is very likely to implement a split-horizon DNS.
+      # ERROR; The system resolver is very likely to implement a split-horizon DNS.
+      # NOTE; Lego uses DNS requests within the certificate workflow. It must use an external DNS directly since
+      # all verification uses external DNS records.
       dnsResolver = "1.1.1.1:53";
     };
 
@@ -227,130 +182,6 @@
 
   # MicroVM has un-nix-like default of true for enable option, so we need to force it on here.
   microvm.host.enable = lib.mkForce true;
-  microvm.vms = {
-    kanidm = {
-      autostart = true;
-      specialArgs = { inherit profiles; };
-
-      # The configuration for the MicroVM.
-      # Multiple definitions will be merged as expected.
-      config = { config, profiles, ... }: {
-        # ERROR; Number must be unique for each VM!
-        # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-        microvm.vsock.cid = 300;
-        networking.hostName = "SSO";
-        imports = [ profiles.qemu-guest-vm ];
-
-        microvm.interfaces = [{
-          type = "tap";
-          id = "tap-kanidm";
-          mac = "9e:30:e8:e8:b1:d0";
-        }];
-
-        microvm.shares = [
-          {
-            source = "/run/secrets/kanidm-vm";
-            mountPoint = "/seeds";
-            tag = "container_kanidm";
-            proto = "virtiofs";
-          }
-          {
-            source = "/vm/kanidm";
-            mountPoint = "/data/state";
-            tag = "state-kanidm";
-            proto = "virtiofs";
-          }
-          {
-            source = "/var/lib/microvms/kanidm/certs";
-            mountPoint = "/data/certs";
-            tag = "certs-kanidm";
-            proto = "virtiofs";
-          }
-        ];
-
-        services.openssh.hostKeys = [
-          {
-            path = "/seeds/ssh_host_ed25519_key";
-            type = "ed25519";
-          }
-        ];
-        systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
-
-        # DEBUG
-        security.sudo.enable = true;
-        security.sudo.wheelNeedsPassword = false;
-        users.users.bert-proesmans.extraGroups = [ "wheel" ];
-        # DEBUG
-
-        networking.firewall.enable = true;
-        networking.firewall.allowedTCPPorts = [ 443 ];
-
-        services.kanidm = {
-          enableServer = true;
-          serverSettings = {
-            bindaddress = "0.0.0.0:443"; # Requires CAP_NET_BIND_SERVICE
-            domain = "idm.proesmans.eu";
-            origin = "https://idm.proesmans.eu";
-            # Customized because a lack of permissions
-            tls_chain = "/run/data/certs/fullchain.pem";
-            tls_key = "/run/data/certs/key.pem";
-            db_fs_type = "zfs";
-            role = "WriteReplica";
-            online_backup.versions = 0; # disable online backup
-          };
-        };
-
-        # NOTE; Assign /run/data/certs as certdir
-        systemd.tmpfiles.rules = [
-          "d /run/data                0700 root   root    - -"
-          "d /run/data/certs          0700 kanidm kanidm  - -"
-        ];
-        systemd.services.kanidm.serviceConfig = {
-          # AmbientCapabilities = [ "NET_BIND_SERVICE" ];
-          # CapabilityBoundingSet = [ "NET_BIND_SERVICE" ];
-          # /data/state (root-owned) -> /var/lib/kanidm-mount (bind as-is) 
-          # -> /var/lib/kanidm-mount/rw-data (+ rw dir rw-data) -> /var/lib/kanidm (symlink to rw-data)
-          StateDirectory = [
-            # NOTE; Use systemd's permission skip ability to create a rw-folder inside the root-owned
-            # virtiofs mount.
-            "kanidm-mount/rw-data:/var/lib/kanidm"
-          ];
-          BindPaths = [
-            "/data/state:/var/lib/kanidm-mount"
-          ];
-        };
-        systemd.services."kanidm-secrets-init" = {
-          description = "Copies over secrets for the kanidm service";
-          wantedBy = [ config.systemd.services.kanidm.name ];
-          before = [ config.systemd.services.kanidm.name ];
-
-          unitConfig.ConditionPathExists = "/data/certs/fullchain.pem";
-          serviceConfig.Type = "oneshot";
-          # /data/certs (root-owned) -> /run/kanidm/certs (file copy) -> chown kanidm
-          # RuntimeDirectory = [
-          #   "kanidm/certs" # Assign /run/kanidm/certs as certdir
-          # ];
-          # NOTE; Assign /run/data/certs as certdir
-          serviceConfig.ExecStart =
-            let
-              script = pkgs.writeShellApplication {
-                name = "copy-kanidm-certs";
-                runtimeInputs = [ ];
-                text = ''
-                  source="/data/certs"
-                  destination="/run/data/certs" 
-
-                  (umask 077; cp "$source"/*.pem "$destination"/)
-                  chown kanidm:kanidm "$destination"/*.pem
-                '';
-              };
-            in
-            lib.getExe script;
-        };
-
-      };
-    };
-  };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

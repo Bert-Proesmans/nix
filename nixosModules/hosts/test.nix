@@ -18,4 +18,6 @@
   ];
   systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
   systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
+
+  system.stateVersion = "24.05";
 }

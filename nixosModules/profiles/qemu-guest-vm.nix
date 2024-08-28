@@ -68,14 +68,6 @@
     };
   };
 
-  # Required for docker-in-vm
-  # systemd.network.networks."19-docker" = {
-  #   matchConfig.Name = "veth*";
-  #   linkConfig = {
-  #     Unmanaged = true;
-  #   };
-  # };
-
   users.users.bert-proesmans = {
     isNormalUser = true;
     description = "Bert Proesmans";
@@ -87,24 +79,8 @@
     ];
   };
 
-  # Allow for remote management
+  # Allow remote management
   services.openssh.enable = true;
-  # services.openssh.startWhenNeeded = true;
-  # systemd.sockets."ssh-vsock" = {
-  #   # NOTE; Superseded by Systemd v256+ and available ssh-generator (not immediately packaged in nixos)
-  #   # REF; https://github.com/libvirt/libvirt/blob/e62c26a20dced58ea342d9cb8f5e9164dc3bb023/docs/ssh-proxy.rst#L21
-
-  #   wants = [ "ssh-access.target" ];
-  #   before = [ "ssh-access.target" ];
-
-  #   socketConfig = {
-  #     ListenStream = "vsock::22";
-  #     Accept = "yes";
-  #     PollLimitIntervalSec = "30s";
-  #     PollLimitBurst = "50";
-  #     Service = config.systemd.services."sshd@".name;
-  #   };
-  # };
   systemd.services."ssh-vsock-proxy" = {
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
@@ -122,9 +98,4 @@
         lib.getExe script;
     };
   };
-
-  # Ignore below
-  # Consistent defaults accross all machine configurations.
-  # system.stateVersion = "23.11";
-  system.stateVersion = lib.versions.majorMinor lib.version; # roll me baby
 }
