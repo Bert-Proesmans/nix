@@ -61,15 +61,6 @@
     5201 # Allow incoming IPerf traffic when acting as a server
   ];
 
-  # [upstream] -> eth0 /NAT/ bridge0 -> tap-*
-  networking.nat = {
-    enable = true;
-    # enableIPv6 = true;
-    # Upstream interface with internet access. Packets are masquerade'd through here
-    externalInterface = "eth0";
-    internalInterfaces = [ "bridge0" ];
-  };
-
   # Avoid TOFU MITM with github by providing their public key here.
   programs.ssh.knownHosts = {
     "github.com".hostNames = [ "github.com" ];

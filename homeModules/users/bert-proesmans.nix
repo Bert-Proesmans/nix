@@ -60,7 +60,7 @@
   programs.ssh.forwardAgent = false;
   programs.ssh.matchBlocks = {
     "development".hostname = "fe80::1";
-    "buddy".hostname = "192.168.88.10";
+    "buddy".hostname = "192.168.88.11";
     "buddy".forwardAgent = true;
   };
 

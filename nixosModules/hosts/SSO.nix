@@ -1,4 +1,11 @@
-{ ... }: {
+{ lib, pkgs, profiles, config, ... }: {
+  services.openssh.hostKeys = [
+    {
+      path = "/seeds/ssh_host_ed25519_key";
+      type = "ed25519";
+    }
+  ];
+  systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
 
   # DEBUG
   security.sudo.enable = true;
@@ -15,62 +22,33 @@
       bindaddress = "0.0.0.0:443"; # Requires CAP_NET_BIND_SERVICE
       domain = "idm.proesmans.eu";
       origin = "https://idm.proesmans.eu";
-      # Customized because a lack of permissions
-      tls_chain = "/run/data/certs/fullchain.pem";
-      tls_key = "/run/data/certs/key.pem";
       db_fs_type = "zfs";
       role = "WriteReplica";
       online_backup.versions = 0; # disable online backup
+
+      # Path prefix '/run/credentials/<unit name>/' is expanded value of '%d' and
+      # '$CREDENTIALS_DIRECTORY' aka SystemD credentials directory.
+      # SEEALSO; systemd.services.kanidm.serviceConfig.LoadCredential`
+      #
+      # NOTE; These certificate paths are automatically added as read-only bind paths
+      # by the upstream nixos module.
+      tls_chain = "/run/credentials/kanidm/FULLCHAIN_PEM";
+      tls_key = "/run/credentials/kanidm/KEY_PEM";
     };
   };
 
-  # NOTE; Assign /run/data/certs as certdir
-  systemd.tmpfiles.rules = [
-    "d /run/data                0700 root   root    - -"
-    "d /run/data/certs          0700 kanidm kanidm  - -"
-  ];
-  systemd.services.kanidm.serviceConfig = {
-    # AmbientCapabilities = [ "NET_BIND_SERVICE" ];
-    # CapabilityBoundingSet = [ "NET_BIND_SERVICE" ];
-    # /data/state (root-owned) -> /var/lib/kanidm-mount (bind as-is) 
-    # -> /var/lib/kanidm-mount/rw-data (+ rw dir rw-data) -> /var/lib/kanidm (symlink to rw-data)
-    StateDirectory = [
-      # NOTE; Use systemd's permission skip ability to create a rw-folder inside the root-owned
-      # virtiofs mount.
-      "kanidm-mount/rw-data:/var/lib/kanidm"
-    ];
-    BindPaths = [
-      "/data/state:/var/lib/kanidm-mount"
-    ];
-  };
-  systemd.services."kanidm-secrets-init" = {
-    description = "Copies over secrets for the kanidm service";
-    wantedBy = [ config.systemd.services.kanidm.name ];
-    before = [ config.systemd.services.kanidm.name ];
-
-    unitConfig.ConditionPathExists = "/data/certs/fullchain.pem";
-    serviceConfig.Type = "oneshot";
-    # /data/certs (root-owned) -> /run/kanidm/certs (file copy) -> chown kanidm
-    # RuntimeDirectory = [
-    #   "kanidm/certs" # Assign /run/kanidm/certs as certdir
-    # ];
-    # NOTE; Assign /run/data/certs as certdir
-    serviceConfig.ExecStart =
-      let
-        script = pkgs.writeShellApplication {
-          name = "copy-kanidm-certs";
-          runtimeInputs = [ ];
-          text = ''
-            source="/data/certs"
-            destination="/run/data/certs" 
-
-            (umask 077; cp "$source"/*.pem "$destination"/)
-            chown kanidm:kanidm "$destination"/*.pem
-          '';
-        };
-      in
-      lib.getExe script;
+  systemd.services.kanidm = {
+    serviceConfig = {
+      LoadCredential = [
+        # WARN; Certificate files must be loaded into the unit credential store because
+        # the original files require root access. This unit executes with user kanidm permissions.
+        "FULLCHAIN_PEM:/data/certs/fullchain.pem"
+        "KEY_PEM:/data/certs/key.pem"
+      ];
+    };
   };
 
-
+  # Ignore below
+  # Consistent defaults accross all machine configurations.
+  system.stateVersion = "24.05";
 }
