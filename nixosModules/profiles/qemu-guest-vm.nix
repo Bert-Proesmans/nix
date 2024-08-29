@@ -55,8 +55,24 @@
     ];
   };
 
-  # Allow remote management
-  services.openssh.enable = true;
+  # Allow remote management over VSOCK
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+      PermitEmptyPasswords = "no";
+      GSSAPIAuthentication = "no";
+      KerberosAuthentication = "no";
+    };
+    openFirewall = false;
+    listenAddresses = [{
+      addr = "127.0.0.1";
+      port = 22;
+    }];
+  };
+
   systemd.services."ssh-vsock-proxy" = {
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
