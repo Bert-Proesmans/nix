@@ -21,6 +21,22 @@ in
           default = null;
         };
 
+        management.ip-address = lib.mkOption {
+          description = ''
+            The IP address to use when attempting to SSH connect to this host.
+          '';
+          type = lib.types.nullOr lib.net.types.ip;
+          default = null;
+        };
+
+        management.domain-name = lib.mkOption {
+          description = ''
+            The DNS name to use when attempting to SSH connect to this host.
+          '';
+          type = lib.types.nullOr lib.dns.types.domain-name;
+          default = null;
+        };
+
         meta.vsock-id = lib.mkOption {
           description = ''
             The virtual socket identifier (VSOCK ID) that uniquely identifies this virtual machine host.
@@ -37,7 +53,7 @@ in
   # Setup some defaults that apply to all machines
   config.proesmans.facts = {
     host-name = lib.mkIf (config.networking.hostName != null) config.networking.hostName;
-    domain = lib.mkIf (config.networking.domain != null) config.networking.domain;
+    management.domain-name = lib.mkIf (config.networking.hostName != null && config.networking.domain != null) "${config.networking.hostName}.${config.networking.domain}";
 
     meta.vsock-id = lib.mkIf (lib.hasAttrByPath [ "microvm" "vsock" "cid" ] config) config.microvm.vsock.cid;
   };

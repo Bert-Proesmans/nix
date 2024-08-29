@@ -1,8 +1,20 @@
-{ lib, flake, home-configurations, config, ... }:
+{ lib, flake, facts, home-configurations, config, ... }:
 let
   cfg = config.proesmans.home-manager;
   cfg-users = config.users.users;
   types = lib.types;
+
+  # Meta module used similarly to nixosModules to inject host facts and custom modules.
+  wrapped-in-meta = _: original-module: { ... }: {
+    _file = ./home-manager.nix;
+
+    imports = [ original-module ];
+
+    config = {
+      _module.args.facts = facts;
+    };
+  };
+  wrapped-home-configurations = builtins.mapAttrs wrapped-in-meta home-configurations;
 in
 {
   imports = [ flake.inputs.home-manager.nixosModules.default ];
@@ -80,9 +92,9 @@ in
       # Follow the system nix configuration instead of building/using a parallel index
       home-manager.useGlobalPkgs = true;
       home-manager.users =
-        if cfg.whitelist == null then home-configurations
+        if cfg.whitelist == null then wrapped-home-configurations
         # Only keep the home configurations that intersect with the whitelist
-        else builtins.intersectAttrs (builtins.listToAttrs (builtins.map (name: { inherit name; value = null; }) cfg.whitelist)) home-configurations;
+        else builtins.intersectAttrs (builtins.listToAttrs (builtins.map (name: { inherit name; value = null; }) cfg.whitelist)) wrapped-home-configurations;
     })
   ];
 }

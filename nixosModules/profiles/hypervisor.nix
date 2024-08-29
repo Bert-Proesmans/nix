@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, config, ... }:
+{ lib, pkgs, flake, facts, config, ... }:
 {
   imports = [ flake.inputs.microvm.nixosModules.host ];
 
@@ -40,37 +40,14 @@
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
   programs.ssh.extraConfig =
     let
-      tunnel-script = pkgs.writeShellApplication {
-        name = "tunnel-vsock-ssh";
-        runtimeInputs = [ pkgs.socat ];
-        text = ''
-          if [ $# -ne 1 ]; then
-            echo "Usage: $0 'vsock/<VM CID>'"
-            exit 1
-          fi
-
-          # Extract the VM CID from the host argument
-          host=$1
-          vm_cid=$(echo "$host" | awk -F'/' '{print $2}')
-
-          # Validate CID
-          if [ -z "$vm_cid" ]; then
-              echo "Error: VM CID is not specified."
-              exit 1
-          fi
-
-          # Establish socat tunnel!
-          socat - VSOCK-CONNECT:"$vm_cid":22
-        '';
-      };
+      my-guests = lib.filterAttrs (_: v: "virtual-machine" == v.type && config.proesmans.facts.host-name == v.parent) facts;
+      vsock-match-block = name: v: ''
+        Host ${name}
+          ProxyCommand ${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString v.meta.vsock-id}:22
+      '';
     in
-    ''
-      # Usage 'ssh vsock/55', where 55 is the VM Context identifier (CID)
-      # VM CID, see option microvm.vsock.cid in the virtual machine configuration
-      Host vsock/*
-        HostName localhost
-        StrictHostKeyChecking no
-        UserKnownHostsFile=/dev/null
-        ProxyCommand ${lib.getExe tunnel-script} %n
-    '';
+    lib.pipe my-guests [
+      (lib.mapAttrsToList vsock-match-block)
+      (lib.concatStringsSep "\n")
+    ];
 }

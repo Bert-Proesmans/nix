@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ lib, pkgs, facts, osConfig, ... }:
 {
   # Values are preset for the next attribute names;
   # - home.username
@@ -59,11 +59,40 @@
   programs.ssh.enable = true;
   programs.ssh.hashKnownHosts = true;
   programs.ssh.forwardAgent = false;
-  programs.ssh.matchBlocks = {
-    "development".hostname = "fe80::1";
-    "buddy".hostname = "192.168.88.11";
-    "buddy".forwardAgent = true;
-  };
+  programs.ssh.matchBlocks =
+    let
+      resolve-endpoint = fact-node: lib.findFirst (x: null != x) fact-node [
+        facts."${fact-node}".management.domain-name
+        facts."${fact-node}".management.ip-address
+      ];
+
+      others-facts = lib.filterAttrs
+        (_: v: (
+          osConfig.proesmans.facts.host-name != v.host-name
+          && ((v?parent == false) || osConfig.proesmans.facts.host-name != v.parent)
+        ))
+        facts;
+      physical-hosts = lib.mapAttrs
+        (name: v: {
+          hostname = resolve-endpoint name;
+        })
+        (lib.filterAttrs (_: v: "host" == v.type) others-facts);
+      virtual-machines = lib.mapAttrs
+        (name: v: {
+          # ERROR; Using proxy/jumphost means your current host controls all network steering!
+          # AKA your current host must instruct to switch over to VSOCK because there is no autonomy on
+          # the jumphost, its ssh_config will not be used to connect to the next hop.
+          # -ERROR- proxyJump = resolve-endpoint v.parent;
+          #
+          # ERROR; SOCAT must be installed on the target host!
+          # Could also just call "socat" and have the package be added to environment through
+          # hypervisor profile, but I'm assuming there will always be system configuration to connect
+          # to the vm from the host (also in profile hypervisor).
+          proxyCommand = "ssh ${resolve-endpoint v.parent} \"${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString v.meta.vsock-id}:22\"";
+        })
+        (lib.filterAttrs (_: v: "virtual-machine" == v.type) others-facts);
+    in
+    physical-hosts // virtual-machines;
 
   programs.atuin.enable = true;
   programs.atuin.settings = {

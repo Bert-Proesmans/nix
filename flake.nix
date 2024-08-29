@@ -20,6 +20,8 @@ rec {
     microvm.url = "github:astro/microvm.nix";
     microvm.inputs.nixpkgs.follows = "nixpkgs";
     impermanence.url = "github:nix-community/impermanence";
+    dns.url = "github:nix-community/dns.nix";
+    dns.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@args:
@@ -51,7 +53,10 @@ rec {
       # eg; inputs.nixpkgs.lib.nixosSystem => exists
       # eg; pkgs.lib.nixosSystem => does _not_ exist
       # eg; nixpkgs.legacyPackages.<system>.lib.nixosSystem => does _not_ exist
-      lib = inputs.nixpkgs.lib.extend (_: _: self.outputs.lib);
+      lib = inputs.nixpkgs.lib.extend (inputs.nixpkgs.lib.composeManyExtensions [
+        (_: _: { dns = inputs.dns.lib; }) # lib from dns.nix
+        (_: _: self.outputs.lib) # Our own lib
+      ]);
 
       # Shortcut to create behaviour that abstracts over different package indexes
       eachSystem = f: lib.genAttrs systems (system: f inputs.nixpkgs.legacyPackages.${system});
@@ -72,7 +77,7 @@ rec {
         # Select and flatten all virtual machine configurations
         (lib.mapAttrsToList (host-name: guests:
           (lib.mapAttrsToList (guest-name: v: {
-            "${guest-name}-${host-name}" = v.config.config.proesmans.facts // { type = "virtual-machine"; };
+            "${guest-name}-${host-name}" = v.config.config.proesmans.facts // { type = "virtual-machine"; parent = host-name; };
           })) guests
         ))
         (lib.concatLists)
