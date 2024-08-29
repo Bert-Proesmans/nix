@@ -1,6 +1,8 @@
 { lib, pkgs, config, flake, profiles, ... }: {
   imports = [ profiles.dns-server ];
 
+  networking.domain = "alpha.proesmans.eu";
+
   services.openssh.hostKeys = [
     {
       path = "/seeds/ssh_host_ed25519_key";

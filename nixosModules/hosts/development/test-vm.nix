@@ -1,4 +1,4 @@
-{ flake, profiles, home-configurations, ... }: {
+{ lib, flake, profiles, home-configurations, meta-module, ... }: {
   sops.secrets."test-vm/ssh_host_ed25519_key" = {
     # For virtio ssh
     mode = "0400";
@@ -7,24 +7,17 @@
 
   microvm.vms.test = {
     autostart = true;
-    specialArgs = { inherit flake profiles; };
+    specialArgs = { inherit lib flake profiles; };
     config = { lib, profiles, ... }: {
       _file = ./test-vm.nix;
 
       imports = [
         profiles.qemu-guest-vm
+        (meta-module "test")
         ../test.nix # VM config
       ];
 
       config = {
-        _module.args.home-configurations = home-configurations;
-        # TODO
-        _module.args.facts = { }; #configuration-facts;
-
-        # The hostname of each configuration _must_ match their attribute name.
-        # This prevent the footgun of desynchronized identifiers.
-        networking.hostName = lib.mkForce "test";
-
         microvm.vsock.cid = 55;
         microvm.interfaces = [{
           type = "macvtap";

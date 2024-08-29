@@ -1,4 +1,6 @@
 { lib, pkgs, config, ... }: {
+  networking.domain = "alpha.proesmans.eu";
+
   environment.systemPackages = [
     pkgs.socat
     pkgs.tcpdump

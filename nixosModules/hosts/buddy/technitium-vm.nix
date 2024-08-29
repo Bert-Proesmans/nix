@@ -1,11 +1,11 @@
-{ lib, pkgs, config, flake, profiles, home-configurations, ... }: {
+{ lib, pkgs, config, flake, profiles, home-configurations, meta-module, ... }: {
   sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
     mode = "0400";
   };
 
   microvm.vms.technitium = {
     autostart = true;
-    specialArgs = { inherit flake profiles; };
+    specialArgs = { inherit lib flake profiles; };
 
     # The configuration for the MicroVM.
     # Multiple definitions will be merged as expected.
@@ -14,16 +14,11 @@
 
       imports = [
         profiles.qemu-guest-vm
+        (meta-module "DNS")
         ../DNS.nix # VM config
       ];
 
       config = {
-        _module.args.home-configurations = home-configurations;
-        # TODO
-        _module.args.facts = { }; #configuration-facts;
-
-        networking.hostName = lib.mkForce "DNS";
-
         # ERROR; Number must be unique for each VM!
         # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
         microvm.vsock.cid = 210;

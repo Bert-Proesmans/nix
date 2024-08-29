@@ -4,6 +4,8 @@
     ./provision.nix # Setup users/groups/applications
   ];
 
+  networking.domain = "alpha.proesmans.eu";
+
   services.openssh.hostKeys = [
     {
       path = "/seeds/ssh_host_ed25519_key";

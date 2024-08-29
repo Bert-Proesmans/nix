@@ -63,6 +63,22 @@ rec {
       eachSystemOverride = nixpkgs-config: f: lib.genAttrs systems
         (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
 
+      # TODO
+      host-facts = (builtins.mapAttrs (_: v: v.config.proesmans.facts // { type = "host"; }) self.outputs.nixosConfigurations)
+        // (lib.pipe self.outputs.nixosConfigurations [
+        # Keep hypervisor host configurations
+        (lib.filterAttrs (_: v: lib.hasAttrByPath [ "microvm" "vms" ] v.config))
+        (builtins.mapAttrs (_: v: v.config.microvm.vms))
+        # Select and flatten all virtual machine configurations
+        (lib.mapAttrsToList (host-name: guests:
+          (lib.mapAttrsToList (guest-name: v: {
+            "${guest-name}-${host-name}" = v.config.config.proesmans.facts // { type = "virtual-machine"; };
+          })) guests
+        ))
+        (lib.concatLists)
+        (lib.mergeAttrsList)
+      ]);
+
       # NixosModules that hold a fixed set of configuration that is re-usable accross different hosts.
       # eg; dns server program configuration, reused by all the dns server hosts (OSI layer 7 high-availability)
       # eg; virtual machine guest configuration, reused by all hosts that are running on top of a hypervisor
@@ -182,6 +198,9 @@ rec {
           };
         });
 
+      # TODO
+      inherit host-facts;
+
       # nixOS modules are just lambda's with an attribute set as the first argument (arity of all nix functions is
       # always one). NixOS modules on their own do nothing, but need to be incorporated into a nixosConfiguration.
       #
@@ -249,8 +268,9 @@ rec {
 
               _module.args.flake-overlays = self.outputs.overlays;
               _module.args.home-configurations = self.outputs.homeModules.users;
+              _module.args.meta-module = meta-module;
               # TODO
-              _module.args.facts = { }; #configuration-facts;
+              _module.args.facts = host-facts; #configuration-facts;
 
               # The hostname of each configuration _must_ match their attribute name.
               # This prevent the footgun of desynchronized identifiers.
