@@ -9,6 +9,7 @@
     pkgs.dust
     pkgs.fd
     pkgs.mdcat
+    pkgs.kanidm
   ];
 
   home.keyboard.options = [
@@ -152,6 +153,9 @@
       receive.fsckObjects = true;
     };
   };
+
+  # ERROR; kanidm cli tool expects path "~/.config/kanidm", note the lack of file extension!
+  xdg.configFile."kanidm".source = ./kanidm.conf;
 
   # Ignore below
   home.stateVersion = "23.11";
