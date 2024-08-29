@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, config, ... }: {
+{ lib, flake, ... }: {
   # Basic usage of sops-nix, showing the interaction between the encrypted file and nixos configuration.
   # REF; https://github.com/Mic92/sops-nix?tab=readme-ov-file#usage-example
   imports = [ flake.inputs.sops-nix.nixosModules.sops ];

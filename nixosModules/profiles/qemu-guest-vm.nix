@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, ... }: {
+{ lib, pkgs, ... }: {
   imports = [
     # flake.inputs.impermanence.nixosModules.impermanence
   ];

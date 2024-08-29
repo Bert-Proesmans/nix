@@ -1,4 +1,4 @@
-{ lib, pkgs, config, flake, profiles, ... }: {
+{ profiles, ... }: {
   imports = [ profiles.dns-server ];
 
   networking.domain = "alpha.proesmans.eu";

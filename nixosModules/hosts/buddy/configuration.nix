@@ -1,4 +1,4 @@
-{ modulesPath, lib, pkgs, config, profiles, ... }: {
+{ modulesPath, lib, config, profiles, ... }: {
 
   imports = [
     "${modulesPath}/hardware/video/radeon.nix" # AMD Vega GPU (Radeon = pre-amdgpu)

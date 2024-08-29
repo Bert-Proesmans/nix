@@ -1,4 +1,4 @@
-{ lib, pkgs, config, flake, profiles, home-configurations, meta-module, ... }: {
+{ lib, pkgs, config, flake, profiles, meta-module, ... }: {
   sops.secrets."kanidm-vm/ssh_host_ed25519_key" = {
     mode = "0400";
   };
@@ -70,7 +70,7 @@
 
     # The configuration for the MicroVM.
     # Multiple definitions will be merged as expected.
-    config = { lib, config, profiles, ... }: {
+    config = { config, profiles, ... }: {
       _file = ./kanidm-vm.nix;
 
       imports = [

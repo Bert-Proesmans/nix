@@ -1,7 +1,4 @@
 { lib, config, options, ... }:
-let
-  cfg = config.proesmans.facts;
-in
 {
   options.proesmans.facts = lib.mkOption {
     type = lib.types.submodule {

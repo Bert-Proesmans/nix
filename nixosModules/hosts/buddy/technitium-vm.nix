@@ -1,4 +1,4 @@
-{ lib, pkgs, config, flake, profiles, home-configurations, meta-module, ... }: {
+{ lib, config, flake, profiles, meta-module, ... }: {
   sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
     mode = "0400";
   };
@@ -9,7 +9,7 @@
 
     # The configuration for the MicroVM.
     # Multiple definitions will be merged as expected.
-    config = { lib, config, profiles, ... }: {
+    config = { config, profiles, ... }: {
       _file = ./technitium-vm.nix;
 
       imports = [

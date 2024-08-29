@@ -73,12 +73,12 @@
         ))
         facts;
       physical-hosts = lib.mapAttrs
-        (name: v: {
+        (name: _v: {
           hostname = resolve-endpoint name;
         })
         (lib.filterAttrs (_: v: "host" == v.type) others-facts);
       virtual-machines = lib.mapAttrs
-        (name: v: {
+        (_name: v: {
           # ERROR; Using proxy/jumphost means your current host controls all network steering!
           # AKA your current host must instruct to switch over to VSOCK because there is no autonomy on
           # the jumphost, its ssh_config will not be used to connect to the next hop.

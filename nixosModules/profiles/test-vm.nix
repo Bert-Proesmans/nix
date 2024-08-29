@@ -1,4 +1,4 @@
-{ lib, flake, ... }:
+{ lib, ... }:
 let
   mkVMDefault = lib.mkOverride 900;
 in

@@ -1,4 +1,4 @@
-{ lib, pkgs, profiles, config, ... }: {
+{ pkgs, config, ... }: {
 
   imports = [
     ./provision.nix # Setup users/groups/applications

@@ -1,4 +1,4 @@
-{ lib, config, pkgs, flake, profiles, ... }: {
+{ lib, config, pkgs, profiles, ... }: {
 
   imports = [
     profiles.hypervisor

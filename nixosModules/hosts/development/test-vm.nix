@@ -1,4 +1,4 @@
-{ lib, flake, profiles, home-configurations, meta-module, ... }: {
+{ lib, flake, profiles, meta-module, ... }: {
   sops.secrets."test-vm/ssh_host_ed25519_key" = {
     # For virtio ssh
     mode = "0400";
@@ -8,7 +8,7 @@
   microvm.vms.test = {
     autostart = true;
     specialArgs = { inherit lib flake profiles; };
-    config = { lib, profiles, ... }: {
+    config = { profiles, ... }: {
       _file = ./test-vm.nix;
 
       imports = [

@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }: {
+{ lib, ... }: {
 
   # this is both efi and bios compatible
   boot.loader.grub = {
