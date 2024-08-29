@@ -54,6 +54,7 @@
     pkgs.traceroute
     pkgs.socat
     pkgs.nmap # ncat
+    pkgs.kanidm
   ];
 
   # Note; default firewall package is IPTables

@@ -2,6 +2,7 @@
   sops.secrets."kanidm-vm/ssh_host_ed25519_key" = {
     mode = "0400";
   };
+  sops.secrets."kanidm-vm/idm_admin_password" = { };
 
   # Kanidm state is basically an SQLite database. This dataset is tuned for that use case.
   disko.devices.zpool.zstorage.datasets."vm/kanidm" = {
@@ -74,7 +75,7 @@
 
       imports = [
         profiles.qemu-guest-vm
-        ../SSO.nix # VM config
+        ../SSO/configuration.nix # VM config
       ];
 
       config = {
