@@ -55,6 +55,9 @@ in
       nix.settings.connect-timeout = lib.mkDefault 5;
       # Enable flakes
       nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
+      # No building by default!
+      # ERROR; You must override this setting on builder hosts!
+      nix.settings.max-jobs = lib.mkDefault 0;
       # The default at 10 is rarely enough.
       nix.settings.log-lines = lib.mkDefault 25;
       # Dirty git repo warnings become tiresome really quickly...
@@ -103,23 +106,51 @@ in
         ];
 
       # Trusted users can manage and ad-hoc use substituters, also maintain the nix/store without limits (import and cleanup)
-      nix.settings.trusted-users = [ "@wheel" ];
-
-      nix.settings.trusted-substituters = [
-        "https://nix-community.cachix.org"
-        "https://cache.garnix.io"
-        "https://numtide.cachix.org"
-        "https://microvm.cachix.org"
-      ];
-      nix.settings.trusted-public-keys = [
-        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-        "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
-        "numtide.cachix.org-1:2ps1kLBUWjxIneOy1Ik6cQjb41X0iXVXeHigGmycPPE="
-        "microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
+      nix.settings.trusted-users = [
+        # NONE !
+        # Not even @wheel by default, because adding users to this list is basically giving them root access.
+        # And @wheel is list of users that are allowed to use 'sudo', but 'sudo' usage could be restricted. AKA not even sudo
+        # should give full system control (except in naïve environments)!
       ];
 
       # Avoid copying unnecessary stuff over SSH
       nix.settings.builders-use-substitutes = lib.mkDefault true;
+
+      # This setting allows all users to utilize specific binary caches without specific permissions.
+      #
+      # NOTE; Unless objects are output-addressed, the objects also must be signed by a trusted public key!
+      # SEEALSO; nix.settings.trusted-public-keys
+      nix.settings.trusted-substituters = [
+        # The hydra build cache is listed as "substituter", but only these situations make use of those entries;
+        # - <substituter> is in list "trusted-substituters"
+        # - <user> is in the list "trusted-users"
+        #
+        # By appending the hydra build cache to this list it will always be used
+        "https://cache.nixos.org"
+      ];
+
+      # Substituters that are only used if user is part of "trusted-user", or substituter is part of "trusted-substituter"
+      nix.settings.substituters = [
+        # WARN; Added here because this flake can utilize them and `nixos-rebuild --use-substituters`
+        # requires preconfiguration on the destination host!
+        "https://nix-community.cachix.org"
+        "https://microvm.cachix.org"
+      ];
+
+      # A store object must be signed by any of these keys otherwise it's not added to /nix/store.
+      #
+      # WARN; Yes, this means it's possible to block users from downloading objects from online caches on a user/cache-url
+      # basis, but does not block importing blocks downloaded manually from those same caches ... 
+      # There is no other option than allowing these keys, because in that situation only "output-addressed" objects
+      # are allowed into /nix/store. Basically only derivations from "fetchers" (the pkgs functions that require a hash
+      # of their on-disk contents) are "output-addressed" and that implies we could only _build_ from verified source. At
+      # this point there are no _build result_ objects that are "output-addressed".
+      nix.settings.trusted-public-keys = [
+        # WARN; Added here because this flake can utilize them and `nixos-rebuild --use-substituters`
+        # requires preconfiguration on the destination host!
+        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+        "microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
+      ];
 
       # Assist nix-direnv, since project devshells aren't rooted in the computer profile, nor stored in /nix/store
       nix.settings.keep-outputs = lib.mkDefault true;

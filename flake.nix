@@ -26,6 +26,20 @@ rec {
     immich-review.url = "github:jvanbruegge/nixpkgs/immich";
   };
 
+  # Parts of this flake have existing artifacts in these binary caches. The items below are hints towards
+  # consumers of this flake.
+  #
+  # The nix cli will automatically ask you to trust/distrust these hints. You must be a user account that is
+  # added to the nix configuration "trusted-users" array to be able to make use of these substituters.
+  nixConfig.extra-substituters = [
+    "https://nix-community.cachix.org"
+    "https://microvm.cachix.org"
+  ];
+  nixConfig.extra-trusted-public-keys = [
+    "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+    "microvm.cachix.org-1:oXnBc6hRE3eX5rSYdRyMYXnfzcCxC7yKPTbZXALsqys="
+  ];
+
   outputs = { self, ... }@args:
     let
       # The original input metadata can be reused when building the nix registry configuration of
@@ -184,7 +198,10 @@ rec {
                 # For fun
                 nyancat figlet
                 # For development
-                git bat;
+                git bat
+                # For introspection
+                nix-output-monitor
+                ;
             };
 
             # Open files within the visual code window

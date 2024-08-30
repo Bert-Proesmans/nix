@@ -21,6 +21,10 @@
   proesmans.vscode.nix-dependencies.enable = true;
   proesmans.home-manager.enable = true;
 
+  # Customise nix to allow building on this host
+  nix.settings.max-jobs = "auto";
+  nix.settings.trusted-users = [ "@wheel" ];
+
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   sops.age.keyFile = "/etc/secrets/decrypter.age";
 
