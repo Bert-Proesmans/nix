@@ -9,9 +9,16 @@ let
 in
 {
   options.proesmans.nix = {
-    garbage-collect.enable = lib.mkEnableOption "cleanup of nix/store" // { description = "Make the target host automatically cleanup unused reference in the nix store"; };
-    garbage-collect.development-schedule.enable = lib.mkEnableOption "lower frequency runs" // { description = "Lower the frequency of gc and adjusted the amount of data to cleanup"; };
-
+    garbage-collect.enable = lib.mkEnableOption "cleanup of nix/store" // {
+      description = ''
+        Make the target host automatically cleanup unused reference in the nix store
+      '';
+    };
+    garbage-collect.development-schedule.enable = lib.mkEnableOption "lower frequency runs" // {
+      description = ''
+        Lower the frequency of gc and adjusted the amount of data to cleanup
+      '';
+    };
     registry.nixpkgs.fat = lib.mkEnableOption "adding inputs to closure" // {
       description = ''
         Copy all files from the nixpkgs inputs (stable + unstable) to the host, instead of a link to their online location.
@@ -116,23 +123,29 @@ in
           #
           # WARN; Assumes all inputs are defined with 'url' attribute instead of the full syntax
           # eg; {type = "github", "owner" = "NixOS", repo = "nixpkgs" ... }
-          nixpkgs.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url;
-          nixpkgs-unstable.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url;
-          nixpkgs-stable.to = builtins.parseFlakeRef flake-references.nixpkgs-stable.url;
+          nixpkgs.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url
+            // { ref = flake-sources.nixpkgs-unstable.rev; };
+          nixpkgs-unstable.to = builtins.parseFlakeRef flake-references.nixpkgs-unstable.url
+            // { ref = flake-sources.nixpkgs-unstable.rev; };
+          nixpkgs-stable.to = builtins.parseFlakeRef flake-references.nixpkgs-stable.url
+            // { ref = flake-sources.nixpkgs-stable.rev; };
         })
 
         (lib.mkIf (cfg.registry.nixpkgs.fat == true) {
           nixpkgs.to = {
             type = "path";
-            path = flake-sources.nixpkgs;
+            path = flake-sources.nixpkgs.outPath;
+            narHash = flake-sources.nixpkgs.narHash;
           };
           nixpkgs-unstable.to = {
             type = "path";
-            path = flake-references.nixpkgs-unstable;
+            path = flake-sources.nixpkgs-unstable.outPath;
+            narHash = flake-sources.nixpkgs-unstable.narHash;
           };
           nixpkgs-stable.to = {
             type = "path";
-            path = flake-references.nixpkgs-stable;
+            path = flake-sources.nixpkgs-stable.outPath;
+            narHash = flake-sources.nixpkgs-stable.narHash;
           };
         })
       ];

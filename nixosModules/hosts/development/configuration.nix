@@ -14,6 +14,7 @@
   proesmans.nix.garbage-collect.enable = true;
   # Garbage collect less often, so we don't drop build artifacts from other systems
   proesmans.nix.garbage-collect.development-schedule.enable = true;
+  proesmans.nix.registry.nixpkgs.fat = true;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
