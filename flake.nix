@@ -22,6 +22,8 @@ rec {
     impermanence.url = "github:nix-community/impermanence";
     dns.url = "github:nix-community/dns.nix";
     dns.inputs.nixpkgs.follows = "nixpkgs";
+    # Nixpkgs PR#324127
+    immich-review.url = "github:jvanbruegge/nixpkgs/immich";
   };
 
   outputs = { self, ... }@args:

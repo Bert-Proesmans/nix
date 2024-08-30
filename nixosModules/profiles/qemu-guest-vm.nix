@@ -8,7 +8,7 @@
   microvm.hypervisor = lib.mkForce "qemu";
 
   microvm.vcpu = lib.mkDefault 1;
-  microvm.mem = lib.mkDefault 512;
+  microvm.mem = lib.mkDefault 512; # MB
   # Allow the VM to use an additional 512 MB at boot, reclaimed by the host after settling
   microvm.balloonMem = lib.mkDefault 512;
   microvm.graphics.enable = false;

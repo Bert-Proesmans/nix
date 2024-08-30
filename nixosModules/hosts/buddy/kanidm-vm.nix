@@ -82,6 +82,7 @@
       ];
 
       config = {
+        nixpkgs.hostPlatform = lib.systems.examples.gnu64;
         # ERROR; Number must be unique for each VM!
         # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
         microvm.vsock.cid = 300;
