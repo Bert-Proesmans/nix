@@ -1,4 +1,4 @@
-{ lib, pkgs, ... }: {
+{ lib, pkgs, config, ... }: {
   imports = [
     # flake.inputs.impermanence.nixosModules.impermanence
   ];
@@ -57,36 +57,28 @@
   # Allow remote management over VSOCK
   services.openssh = {
     enable = true;
+    # NOTE; Starting sshd from activation + getting a new login session is slow as frick,
+    # expect dropping into a shell to take about 10 seconds on the default microvm resource config.
+    startWhenNeeded = true;
+    openFirewall = false;
+    listenAddresses = lib.mkForce [ ];
     settings = {
       PermitRootLogin = "no";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
       PermitEmptyPasswords = "no";
-      GSSAPIAuthentication = "no";
-      KerberosAuthentication = "no";
+      # Support not compiled in for the settings below
+      # (Results in stderr messages)
+      # GSSAPIAuthentication = "no";
+      # KerberosAuthentication = "no";
     };
-    openFirewall = false;
-    listenAddresses = [{
-      addr = "127.0.0.1";
-      port = 22;
-    }];
   };
 
-  systemd.services."ssh-vsock-proxy" = {
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "simple";
-      ExecStart =
-        let
-          script = pkgs.writeShellApplication {
-            name = "ssh-vsock-proxy";
-            runtimeInputs = [ pkgs.socat ];
-            text = ''
-              socat VSOCK-LISTEN:22,reuseaddr,fork TCP:localhost:22
-            '';
-          };
-        in
-        lib.getExe script;
+  systemd.sockets.sshd = {
+    socketConfig = {
+      ListenStream = [
+        "vsock:${toString config.microvm.vsock.cid}:22"
+      ];
     };
   };
 }
