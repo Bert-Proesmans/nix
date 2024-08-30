@@ -15,9 +15,11 @@
   };
 
   security.acme.certs."idm.proesmans.eu" = {
-    # TODO
     # NOTE; Currently no mechanism to reload services inside the vm directly.
-    reloadServices = [ "microvm-virtiofsd@kanidm.service" ];
+    #
+    # ERROR; Must reload/restart the virtual machine, because reloading the virtiofs daemon
+    # with a connected machine will fail reloading and do nothing (as far as I understand).
+    reloadServices = [ "microvm@kanidm.service" ];
   };
 
   systemd.targets."microvms" = {

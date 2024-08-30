@@ -111,7 +111,7 @@ blocklist-refresh = 86400 # 24 hours
     allow-failure = true # Keep running the show if downloading the blocklists fail
     format = "cidr"
     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/bogons/plain.black.ip4cidr.list"
-# ERROR; This list of IPs blocks the cache.nixos.org website! This blocks nixos-rebuild from installing updates!
+# ERROR; This list of IPs blocks the cache.nixos.org website! This blocks nixos-rebuild from using the main file caches!
 # LOG; level=debug msg="blocking response" client=127.0.0.1 id=blocklist-ip ip=151.101.194.217 list=cbuijs-malware-ips
 #      qname=cache.nixos.org. qtype=A rule=151.101.194.217/32
 # TODO; Build out my own nixpkg cache!

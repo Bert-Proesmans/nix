@@ -68,7 +68,11 @@ rec {
       eachSystemOverride = nixpkgs-config: f: lib.genAttrs systems
         (system: f (import (inputs.nixpkgs) (nixpkgs-config // { localSystem = { inherit system; }; })));
 
-      # TODO
+      # Collect facts about all the host configurations defined in this flake
+      #
+      # WARN; This iteration over all nixosConfigurations slows down evaluation time by A LOT. The approach
+      # must be removed/re-evaluated when eval times become embarassignly slow!
+      #
       host-facts = (builtins.mapAttrs (_: v: v.config.proesmans.facts // { type = "host"; }) self.outputs.nixosConfigurations)
         // (lib.pipe self.outputs.nixosConfigurations [
         # Keep hypervisor host configurations
@@ -203,7 +207,14 @@ rec {
           };
         });
 
-      # TODO
+      # Print and externally process host information with;
+      # nix eval --json .#host-facts
+      #
+      # eg; To get a list of objects containing each host-name and domain-name, use the following jq expression
+      # nix eval --json .#host-facts `
+      # | jq 'to_entries | map({ "host-name": .value["host-name"], "domain-name": .value.management["domain-name"] })'
+      #
+      # Expose the collected facts about all the host configurations defined by this flake
       inherit host-facts;
 
       # nixOS modules are just lambda's with an attribute set as the first argument (arity of all nix functions is
@@ -249,15 +260,6 @@ rec {
       #
       nixosConfigurations =
         let
-          # Read details from each host to share them with all other hosts.
-          #
-          # NOTE; The facts are collected through the use of a nixos module that shapes the data into "freeform schema".
-          # Freeform schema here means there is a limited schema pre-defined, and individual configurations can add 
-          # more schema nodes to their facts collection as required.
-          configuration-facts = builtins.mapAttrs (_: v: v.config.proesmans.facts) self.outputs.nixosConfigurations;
-          # Prevent the footgun of infinite recursion by preventing hosts from accessing their own facts table.
-          # facts-no-circular = hostname: lib.filterAttrs (name: _: name != hostname) configuration-facts;
-
           meta-module = hostname: { config, ... }: {
             # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
             _file = ./flake.nix;
@@ -274,8 +276,10 @@ rec {
               _module.args.flake-overlays = self.outputs.overlays;
               _module.args.home-configurations = self.outputs.homeModules.users;
               _module.args.meta-module = meta-module;
-              # TODO
-              _module.args.facts = host-facts; #configuration-facts;
+              # WARN; Possible footgun here; the facts of the current host configuration are also included.
+              # This could cause unexpected effects when self-referencing, causing a hairpin access pattern.
+              # (You'll understand when you experience it)
+              _module.args.facts = host-facts;
 
               # The hostname of each configuration _must_ match their attribute name.
               # This prevent the footgun of desynchronized identifiers.
@@ -343,7 +347,20 @@ rec {
       # standard nix flake output schema. Harmless message.
       homeConfigurations = { };
 
-      # TODO
+      # Build a bootstrap image using;
+      # nix build
+      #
+      # Collection of derivations that build into finished concrete file outputs, to be used as-is.
+      # This flake is exactly producing tangible outputs but;
+      #   - user module configuration, which must be wrapped into the home-manager platform
+      #   - host module configuration, which must be wrapped into the nixos platform
+      #   - host configuration, which must be installed through nixos-rebuild
+      #   - configuration metadata, which must be post-processed
+      #
+      # This attribute set outputs two files to bootstrap a new development host somewhere (anywhere).
+      # The default build output is an iso that can be injected into virtual machines or burned onto USB drives.
+      # The default iso is basically a minimal image.
+      # The development-iso attribute is basically the same as default plus a bigger payload size.
       packages = eachSystem (pkgs:
         let
           forced-system = pkgs.system;
@@ -422,7 +439,7 @@ rec {
       );
 
       # Verify flake configurations with;
-      # nix flake check --no-eval-cache
+      # nix flake check --no-eval-cache --keep-going
       #
       # `nix flake check` by default evaluates and builds derivations (if applicable) of common flake schema outputs.
       # It's not necessary to explicitly add packages, devshells, nixosconfigurations (build.toplevel attribute) to this attribute set.

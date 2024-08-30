@@ -11,7 +11,7 @@
   ];
   systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
 
-  # TODO
+  # Not much to define here, the DNS serve is very thoroughly profiled.
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

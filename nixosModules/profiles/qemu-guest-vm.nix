@@ -13,10 +13,9 @@
   microvm.balloonMem = lib.mkDefault 512;
   microvm.graphics.enable = false;
 
-  # Overwrite default root filesystem minimizing ram usage.
+  # Configure default root filesystem minimizing ram usage.
   # NOTE; All required files for boot and configuration are within the /nix mount!
   # What's left are temporary files, application logs and -artifacts, and to-persist application data.
-  # TODO; Do I need to configure /tmp ?
   fileSystems."/" = {
     device = "rootfs";
     fsType = "tmpfs";
