@@ -9,6 +9,26 @@ let
 in
 {
   options.proesmans.nix = {
+    overlays = lib.mkOption {
+      description = ''
+        List of overlay functions that should be added to both {option}`nixpkgs.overlays`, but also the stable variant of nixpkgs!
+        This option exists to prevent an infinite recursion through overlay re-use.
+
+        WARNING; Use this option instead of nixpkgs.overlays, as the overlays passed directly to nixpkgs.overlays will not be applied
+        to the stable package set!
+      '';
+      type = lib.types.listOf (lib.types.functionTo (lib.types.functionTo lib.types.attrs));
+      default = [ ];
+      example = lib.literalExpression ''
+        [
+          (final: prev: {
+            new-attribute = <pkgs-derivation>;
+            new-name-for-attribute = final.new-attribute;
+          })
+        ]
+      '';
+    };
+
     garbage-collect.enable = lib.mkEnableOption "cleanup of nix/store" // {
       description = ''
         Make the target host automatically cleanup unused reference in the nix store
@@ -40,33 +60,47 @@ in
       # Dirty git repo warnings become tiresome really quickly...
       nix.settings.warn-dirty = false;
 
+      # Setup default overlays, you can add more in your own configuration.
+      proesmans.nix.overlays = (builtins.attrValues flake-overlays);
+
       # NOTE; The pkgs and lib arguments for every nixos module will be overwritten with a package repository
       # defined from options nixpkgs.*
-      nixpkgs.overlays = (builtins.attrValues flake-overlays)
-        ++ [
-        (_self': _super: {
-          # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
-          # with an infinite recursion.
-          # Overriding lib _must_ be done at the call-site of lib.nixosSystem.
-          # REF; https://github.com/NixOS/nixpkgs/issues/156312
-          # lib = super.lib // self.outputs.lib;
+      nixpkgs.overlays =
+        let
+          # WARN; In case of overlay misuse prevent the footgun of infinite nixpkgs evaluations. That's why the import
+          # is pulled outside the overlay body.
+          stable-nixpkgs = (import flake-sources.nixpkgs-stable) {
+            # WARN; passing "overlays" here creates a high likelihood of _eval explosion_ AKA nix uses lots of RAM and
+            # cannot close on the result. Basically an undetected infinite recursion!
+            # WARN - inherit (config.nixpkgs) overlays
+            overlays = cfg.overlays; # Breaks overlay recursion cycle
 
-          # Inject stable packages, initialised with the same configuration as nixpkgs, as pkgs.stable.
-          # WARN; This code assumes nixpkgs follows nixpkgs-*un*stable, so the pkgs.stable package set is a way to 
-          # (temporarily) stabilise changes.
-          # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same 
-          # as loading from '<flake>/flake.nix'! flake.nix includes nixos library functions, the old default.nix doesn't.
-          #   - '(import nixpkgs).lib' will not have the nixos library function
-          #   - 'inputs.nixpkgs.lib' has the nixos library functions
-          #
-          # Attribute 'pkgs' will contain all unstable package versions.
-          # Attribute 'pkgs.stable' contains all stable package versions.
-          stable = (import flake-sources.nixpkgs-stable) {
-            inherit (config.nixpkgs) config overlays;
+            config = config.nixpkgs.config;
             localSystem = config.nixpkgs.hostPlatform;
           };
-        })
-      ];
+        in
+        cfg.overlays
+        ++ [
+          (_self': _super: {
+            # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
+            # with an infinite recursion.
+            # Overriding lib _must_ be done at the call-site of lib.nixosSystem.
+            # REF; https://github.com/NixOS/nixpkgs/issues/156312
+            # lib = super.lib // self.outputs.lib;
+
+            # Inject stable packages, initialised with the same configuration as nixpkgs, as pkgs.stable.
+            # WARN; This code assumes nixpkgs follows nixpkgs-*un*stable, so the pkgs.stable package set is a way to 
+            # (temporarily) stabilise changes.
+            # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same 
+            # as loading from '<flake>/flake.nix'! flake.nix includes nixos library functions, the old default.nix doesn't.
+            #   - '(import nixpkgs).lib' will not have the nixos library function
+            #   - 'inputs.nixpkgs.lib' has the nixos library functions
+            #
+            # Attribute 'pkgs' will contain all unstable package versions.
+            # Attribute 'pkgs.stable' contains all stable package versions.
+            stable = stable-nixpkgs;
+          })
+        ];
 
       # Trusted users can manage and ad-hoc use substituters, also maintain the nix/store without limits (import and cleanup)
       nix.settings.trusted-users = [ "@wheel" ];

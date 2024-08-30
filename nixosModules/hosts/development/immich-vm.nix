@@ -31,7 +31,7 @@
             mode = "private";
             link = "main";
           };
-          id = "vmac-test";
+          id = "vmac-immich";
           mac = "42:de:e5:ce:a8:d6"; # randomly generated
         }];
 
