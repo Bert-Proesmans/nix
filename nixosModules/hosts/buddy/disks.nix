@@ -310,10 +310,33 @@
     type = "zpool";
     mode = "raidz";
     mountpoint = null; # Don't (automatically) mount the pool filesystem
-    postCreateHook = ''
-      # Add SLOG device manually (not yet abstracted by DISKO)
-      zpool add zstorage log '/dev/disk/by-partlabel/disk-slog-for-zstorage'
-    '';
+    postCreateHook =
+      let
+        label-zpool = "zstorage";
+        device-node = "/dev/disk/by-partlabel/disk-slog-for-zstorage";
+      in
+      ''
+        # Add SLOG device manually (not yet abstracted by DISKO).
+        # Target device node is matched as zfs member, and matching zpool label.
+        #
+        # NOTE; lsblk outputs something like below when the slog is attached
+        # /dev/<moniker> zfs_member  zstorage
+        #
+        # ERROR; This lacks pool ID matching! But we're assuming the pools are always destroyed
+        # together with disk contents between script runs, nor do we expect the drives to move
+        # between systems (that happen to have the same pool labels) without a full wipe.
+        #
+        # ERROR; This also doesn't check the current pool state, where an SLOG could have been detached
+        # but that doesn't automatically destroy the partition data on-disk!
+        #
+        if lsblk -o FSTYPE,LABEL ${device-node} --noheadings | grep -q "^zfs_member\s\+${label-zpool}\$"; then
+          echo "Not attaching SLOG device to pool ${label-zpool} because it already belongs to a pool with the same name."
+        else
+          if ! zpool add ${label-zpool} log ${device-node}; then
+            echo "Failed to attach SLOG device '${device-node}' for ${label-zpool}." >&2
+          fi
+        fi
+      '';
     # Configure the pool
     options = {
       # Set to 8KiB in preparation of NVMe vdev members. There is (also) no downside to making maximum write chunksize larger

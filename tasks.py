@@ -215,6 +215,85 @@ def host_deploy(
 
 
 @task
+# USAGE; invoke filesystem-rebuild development
+def filesystem_rebuild(c: Any, hostname: str) -> None:
+    """
+    Builds the disko format script, pushes it to the destination host and executes the script.
+    This will attempt to realise the (presumably) changed configuration. This is only really useful when
+    new ZFS datasets were added, or empty disk space is now taken in with new partition(s).
+
+    This operation should happen **before** a nixos-rebuild applies the new system configuration!
+    Probably best to restart first before updating the system build!
+    """
+
+    # NOTE; The format script will leave existing disks and partitions that are not defined within
+    # the configuration intact.
+    # NOTE; The format script will attempt to reapply partition attributes if they do not match
+    # with the configuration.
+    format_attr_path = (
+        f"{FLAKE}#nixosConfigurations.{hostname}.config.system.build.formatScript"
+    )
+
+    print(f"Checking if format script builds for {hostname}..")
+    format_script = subprocess.run(
+        [
+            "nix",
+            "build",
+            format_attr_path,
+            "--no-link",
+            "--no-eval-cache",
+            "--print-out-paths",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    text_machines = subprocess.run(
+        [
+            "nix",
+            "eval",
+            "--json",
+            f"{FLAKE}#host-facts",
+            "--apply",
+            "builtins.mapAttrs (_: v: v.host-name)",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    machines = json.loads(text_machines)
+    ssh_connection_string = next(
+        (
+            moniker
+            for moniker, x_host_name in machines.items()
+            if hostname == x_host_name or hostname == moniker
+        ),
+        None,
+    )
+
+    assert ssh_connection_string, """
+        There is no ssh moniker found for the provided hostname.
+        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+    """
+
+    if not ask_user_input(
+        f"Update filesystems for {hostname} on {ssh_connection_string}?"
+    ):
+        return
+
+    subprocess.run(
+        ["nix", "copy", "--to", f"ssh://{ssh_connection_string}", format_script],
+        check=True,
+    )
+
+    subprocess.run(["ssh", ssh_connection_string, f"sudo {format_script}"], check=True)
+
+    return
+
+
+@task
 # USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"]
 def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> None:
     """
