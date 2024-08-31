@@ -4,7 +4,6 @@
     profiles.hypervisor
     ./hardware-configuration.nix
     ./test-vm.nix
-    ./immich-vm.nix
   ];
 
   networking.hostName = "development";

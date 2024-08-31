@@ -8,6 +8,7 @@
     ./disks.nix
     ./kanidm-vm.nix
     ./technitium-vm.nix
+    ./immich-vm.nix
   ];
 
   networking.hostName = "buddy";
