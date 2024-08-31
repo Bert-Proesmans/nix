@@ -294,13 +294,14 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
 
 @task
 # USAGE; invoke rebuild development
-def rebuild(flake_attr: str, yes: bool) -> None:
+def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     host_attr_path = f".#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
 
-    print(f"Checking if host {flake_attr} builds..")
-    subprocess.run(
-        ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
-    )
+    if not yes:
+        print(f"Checking if host {flake_attr} builds..")
+        subprocess.run(
+            ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+        )
 
     print(f"Evaluating machine facts to find {flake_attr}..")
     text_machines = subprocess.run(
@@ -342,11 +343,12 @@ def rebuild(flake_attr: str, yes: bool) -> None:
     subprocess.run(
         [
             "nixos-rebuild",
-            "switch",
             "--flake",
-            flake_attr,
+            f"{FLAKE}#{flake_attr}",
             "--target-host",
             ssh_connection_string,
+            "--use-remote-sudo",
+            "switch",
         ],
         check=True,
     )
