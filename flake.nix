@@ -24,6 +24,8 @@ rec {
     dns.inputs.nixpkgs.follows = "nixpkgs";
     # Nixpkgs PR#324127
     immich-review.url = "github:jvanbruegge/nixpkgs/immich";
+    nix-topology.url = "github:oddlama/nix-topology";
+    nix-topology.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # Parts of this flake have existing artifacts in these binary caches. The items below are hints towards
@@ -284,7 +286,11 @@ rec {
             _file = ./flake.nix;
 
             # Make all custom nixos options available to the host configurations.
-            imports = builtins.attrValues self.outputs.nixosModules;
+            imports = builtins.attrValues self.outputs.nixosModules
+              ++ [
+              # Options for vizualizing topology of configuration
+              inputs.nix-topology.nixosModules.default
+            ];
 
             config = {
               # Flake inputs are used for importing additional nixos modules.
@@ -478,5 +484,52 @@ rec {
       overlays = {
         atuin = import ./overlays/atuin;
       };
+
+      # Render your topology via the command below, the resulting directory will contain your finished svgs.
+      # nix build .#topology.x86_64-linux.config.output
+      #
+      # Constructs a visual topology of all the host configurations inside this flake. The code uses evalModules, which is the same
+      # "platform" used by nixosSystem to process module files.
+      topology = eachSystemOverride { overlays = [ inputs.nix-topology.overlays.default ]; } (
+        pkgs: import inputs.nix-topology {
+          inherit pkgs;
+          modules = [
+            # HELP; You own file to define global topology. Works in principle like a nixos module but uses different options.
+            # HELP - ./topology.nix
+
+            ({ config, ... }:
+              let
+                inherit (config.lib.topology) mkInternet mkRouter mkConnection;
+              in
+              {
+                _file = ./flake.nix;
+                config = {
+                  # WARN; Provide all nixosConfigurations definitions
+                  nixosConfigurations = self.nixosConfigurations;
+
+                  nodes.internet = mkInternet {
+                    connections = mkConnection "router" "ether1";
+                  };
+
+                  nodes.router = mkRouter "Mikrotik" {
+                    info = "RB750Gr3";
+                    image = ./assets/RB750Gr3-smol.png;
+                    interfaceGroups = [ [ "ether2" "ether3" "ether4" "ether5" ] [ "ether1" ] ];
+                    connections.ether2 = mkConnection "buddy" "30-lan-bridge";
+                    interfaces.ether2 = {
+                      addresses = [ "192.168.88.1" ];
+                      network = "home";
+                    };
+                  };
+
+                  networks.home = {
+                    name = "Home Network";
+                    cidrv4 = "192.168.88.0/24";
+                  };
+                };
+              })
+          ];
+        }
+      );
     };
 }

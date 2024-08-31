@@ -77,7 +77,7 @@
 
   systemd.network.links = {
     "10-upstream" = {
-      matchConfig.MACAddress = [ "b4:2e:99:15:33:a6" ];
+      matchConfig.MACAddress = "b4:2e:99:15:33:a6";
       linkConfig.Alias = "Internet uplink";
       linkConfig.AlternativeName = "main";
     };
@@ -85,7 +85,7 @@
 
   systemd.network.networks = {
     "30-lan-bridge" = {
-      matchConfig.MACAddress = [ "b4:2e:99:15:33:a6" ];
+      matchConfig.MACAddress = "b4:2e:99:15:33:a6";
       networkConfig = {
         DHCP = "ipv4";
         IPv6AcceptRA = false;
