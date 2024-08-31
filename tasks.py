@@ -294,6 +294,66 @@ def filesystem_rebuild(c: Any, hostname: str) -> None:
 
 
 @task
+# USAGE; invoke rebuild development
+def rebuild(flake_attr: str, yes: bool) -> None:
+    host_attr_path = f".#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
+
+    print(f"Checking if host {flake_attr} builds..")
+    subprocess.run(
+        ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+    )
+
+    print(f"Evaluating machine facts to find {flake_attr}..")
+    text_machines = subprocess.run(
+        [
+            "nix",
+            "eval",
+            "--json",
+            f"{FLAKE}#host-facts",
+            "--apply",
+            "builtins.mapAttrs (_: v: v.host-name)",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    machines = json.loads(text_machines)
+    ssh_connection_string = next(
+        (
+            moniker
+            for moniker, host_name in machines.items()
+            if flake_attr == host_name or flake_attr == moniker
+        ),
+        None,
+    )
+
+    assert ssh_connection_string, """
+        There is no ssh moniker found for the provided hostname.
+        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+    """
+
+    if not yes:
+        ask = input(
+            f"Update configuration {flake_attr} on {ssh_connection_string}? [y/N] "
+        )
+        if ask != "y":
+            return
+
+    subprocess.run(
+        [
+            "nixos-rebuild",
+            "switch",
+            "--flake",
+            flake_attr,
+            "--target-host",
+            ssh_connection_string,
+        ],
+        check=True,
+    )
+
+
+@task
 # USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"]
 def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> None:
     """
