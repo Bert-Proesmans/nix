@@ -40,7 +40,7 @@
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
   programs.ssh.extraConfig =
     let
-      my-guests = lib.filterAttrs (_: v: "virtual-machine" == v.type && config.proesmans.facts.host-name == v.parent) facts;
+      my-guests = lib.filterAttrs (_: v: builtins.elem "virtual-machine" v.tags && config.proesmans.facts.host-name == v.meta.parent) facts;
       vsock-match-block = name: v: ''
         Host ${name}
           ProxyCommand ${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString v.meta.vsock-id}:22
