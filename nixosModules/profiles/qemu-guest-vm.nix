@@ -19,7 +19,7 @@
   fileSystems."/" = {
     device = "rootfs";
     fsType = "tmpfs";
-    options = [ "size=10%,mode=0755" ];
+    options = [ "size=100M,mode=0755" ];
     neededForBoot = true;
   };
 
