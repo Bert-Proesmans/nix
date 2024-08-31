@@ -471,7 +471,7 @@ rec {
       # Add custom derivations, like nixos-tests or custom format outputs of nixosSystem, to this attribute set for
       # automated validation through a CLI-oneliner.
       #
-      checks = eachSystem (pkgs: { });
+      checks = eachSystem (_pkgs: { });
 
       # Overwrite (aka patch) functionality defined by the inputs, mostly nixpkgs.
       #

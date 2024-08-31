@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, config, ... }: {
+{ pkgs, flake, config, ... }: {
   imports = [
     # Look at updates to file nixos/modules/module-list.nix
     "${flake.inputs.immich-review}/nixos/modules/services/web-apps/immich.nix"
@@ -15,7 +15,7 @@
       };
     in
     [
-      (final: prev: {
+      (final: _prev: {
         immich-review = immich-pkgs;
         immich = final.immich-review.immich;
       })
