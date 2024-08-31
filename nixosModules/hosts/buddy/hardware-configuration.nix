@@ -84,7 +84,7 @@
   };
 
   systemd.network.networks = {
-    "30-lan-bridge" = {
+    "30-lan" = {
       matchConfig.MACAddress = "b4:2e:99:15:33:a6";
       networkConfig = {
         DHCP = "ipv4";

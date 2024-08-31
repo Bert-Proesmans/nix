@@ -515,7 +515,7 @@ rec {
                     info = "RB750Gr3";
                     image = ./assets/RB750Gr3-smol.png;
                     interfaceGroups = [ [ "ether2" "ether3" "ether4" "ether5" ] [ "ether1" ] ];
-                    connections.ether2 = mkConnection "buddy" "30-lan-bridge";
+                    connections.ether2 = mkConnection "buddy" "30-lan";
                     interfaces.ether2 = {
                       addresses = [ "192.168.88.1" ];
                       network = "home";
