@@ -29,7 +29,9 @@
   users.users.bert-proesmans = {
     isNormalUser = true;
     description = "Bert Proesmans";
-    extraGroups = [ ];
+    extraGroups = [
+      "systemd-journal" # Read the systemd service journal without sudo
+    ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
     ];

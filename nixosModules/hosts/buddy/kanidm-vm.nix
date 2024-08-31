@@ -1,17 +1,52 @@
 { lib, pkgs, config, flake, profiles, meta-module, ... }: {
-  sops.secrets."kanidm-vm/ssh_host_ed25519_key" = {
-    mode = "0400";
+  sops.secrets = {
+    "kanidm-vm/ssh_host_ed25519_key" = {
+      mode = "0400"; # Required by sshd
+      restartUnits = [
+        # New secrets are a new directory (new generation) and bind mount must be updated
+        "shared-kanidm-seeds.mount"
+        # New ssh key requires restart of guest
+        "microvm@kanidm.service"
+      ];
+    };
+    "kanidm-vm/idm_admin_password" = {
+      restartUnits = [
+        # New secrets are a new directory (new generation) and bind mount must be updated
+        "shared-kanidm-seeds.mount"
+        # New ssh key requires restart of guest
+        "microvm@kanidm.service"
+      ];
+    };
   };
-  sops.secrets."kanidm-vm/idm_admin_password" = { };
 
   # Kanidm state is basically an SQLite database. This dataset is tuned for that use case.
-  disko.devices.zpool.zstorage.datasets."vm/kanidm" = {
+  disko.devices.zpool.storage.datasets."sqlite/state/kanidm" = {
     type = "zfs_fs";
     options = {
-      mountpoint = "/vm/kanidm"; # Default, but good to be explicit
-      logbias = "latency";
-      recordsize = "64K";
+      mountpoint = "/storage/sqlite/state/kanidm";
+      acltype = "posixacl"; # Required by virtiofsd
+      xattr = "sa"; # Required by virtiofsd
     };
+  };
+
+  # Mounted at /shared/immich/<mount-name>
+  proesmans.mount-central = {
+    defaults.after-units = [ "zfs-mount.service" ];
+    directories."kanidm".mounts = {
+      "seeds".source = "/run/secrets/kanidm-vm";
+      "certs" = {
+        source = "/run/certs-kanidm";
+        read-only = true;
+      };
+      "state".source = "/storage/sqlite/state/kanidm";
+    };
+  };
+
+  systemd.services."microvm-virtiofsd@kanidm".unitConfig = {
+    # Run the microvms after certificates are acquired!
+    requires = [ "acme-finished-idm.proesmans.eu.target" ];
+    after = [ "acme-finished-idm.proesmans.eu.target" ];
+    RequiresMountsFor = config.proesmans.mount-central.directories."kanidm".bind-paths;
   };
 
   security.acme.certs."idm.proesmans.eu" = {
@@ -20,53 +55,39 @@
     # ERROR; Must reload/restart the virtual machine, because reloading the virtiofs daemon
     # with a connected machine will fail reloading and do nothing (as far as I understand).
     reloadServices = [ "microvm@kanidm.service" ];
+    postRun = ''
+      destination="/run/certs-kanidm"
+      FIND="${pkgs.findutils}/bin/find"
+      CP="${pkgs.coreutils}/bin/cp"
+      RM="${pkgs.coreutils}/bin/rm"
+
+      # First cleanup the destination directory
+      $FIND "$destination"/ -maxdepth 1 -type f -exec $RM --force {} \;
+
+      # The certificate directory gets removed during renewal.
+      # We're bind mounting the certificates into a virtiofs share.
+      # We need the files in a stable folder, because removing the source directory of a bind mount
+      # gives issues.
+      $FIND "." -maxdepth 1 -type f -exec $CP {} "$destination"/ \;
+    '';
   };
 
-  systemd.targets."microvms" = {
-    # Run the microvms after certificates are acquired!
-    wants = [ "acme-finished-idm.proesmans.eu.target" ];
-    after = [ "acme-finished-idm.proesmans.eu.target" ];
+  systemd.tmpfiles.settings = {
+    "10-certs-copy" = {
+      # NOTE; /run is a RAMFS, it needs to be re-provisioned at every boot!
+      # This rule copies all contents from cert directory to the /run directory
+      "/run/certs-kanidm".C.argument = config.security.acme.certs."idm.proesmans.eu".directory;
+
+      # Adjust permissions on /run directory and all contents
+      "/run/certs-kanidm".Z = {
+        user = "root";
+        group = "root";
+        mode = "0700";
+      };
+    };
   };
 
-  # Squash permissions of the acme certificates to root by _simply copying the files_
-  # It's possible to do this with bind mounting and 1:1 ID-mapping before going 
-  # through virtiofs, but unwieldly.
-  # REF; https://gitlab.com/virtio-fs/virtiofsd/-/issues/152#note_2005451839
-  #
-  #
-  # OR Not required anymore when virtiofsd gets updated with internal UID/GID mapping (host-side)!
-  # REF; https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/237
-  # OR Not required anymore when virtiofsd gets updated for mount UID/GID mapping (vm-side)!
-  # REF; https://gitlab.com/virtio-fs/virtiofsd/-/merge_requests/245
-  #
-  # WARN; Assumes the service runs as root!
-  assertions = [
-    {
-      assertion = config.systemd.services."microvm-virtiofsd@".serviceConfig?User -> config.systemd.services."microvm-virtiofsd@".serviceConfig.User == "root";
-      message = ''
-        The virtiofs service must run as root user, or change the approach to certificate pemission squashing!
-      '';
-    }
-  ];
-  systemd.services."microvm-virtiofsd@kanidm" = {
-    serviceConfig.RuntimeDirectory = [ "kanidm" "kanidm/certs" ];
-    serviceConfig.ExecStartPre =
-      let
-        script = pkgs.writeShellApplication {
-          name = "copy-certs-kanidm";
-          runtimeInputs = [ pkgs.util-linux ];
-          text = ''
-            certdir="/var/lib/acme/idm.proesmans.eu"
-            destination="/run/kanidm/certs"
-
-            find "$certdir" -maxdepth 1 -type f -exec cp {} "$destination"/ \;
-          '';
-        };
-      in
-      lib.getExe script;
-  };
-
-  microvm.vms.kanidm =
+  microvm.vms."kanidm" =
     let
       parent-hostname = config.networking.hostName;
     in
@@ -108,21 +129,9 @@
 
           microvm.shares = [
             {
-              source = "/run/secrets/kanidm-vm";
-              mountPoint = "/seeds";
-              tag = "secrets-kanidm";
-              proto = "virtiofs";
-            }
-            {
-              source = "/vm/kanidm";
-              mountPoint = "/data/state";
+              source = "/shared/kanidm";
+              mountPoint = "/data";
               tag = "state-kanidm";
-              proto = "virtiofs";
-            }
-            {
-              source = "/run/kanidm/certs";
-              mountPoint = "/data/certs";
-              tag = "certs-kanidm";
               proto = "virtiofs";
             }
           ];

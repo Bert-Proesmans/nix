@@ -173,14 +173,16 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
             file_handle.write(age_key)
 
         deploy_flags = [
-            "--debug"
-            # "--no-reboot"
+            "--debug",
+            "--no-substitute-on-destination",
+            # "--stop-after-disko", # DEBUG
+            # "--no-reboot",
             # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
             # operations on that flake execution only.
             # These options are encoded inside the 'nixConfig' output attribute of the flake-schema.
             # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
             #
-            # "--option accept-flake-config true"
+            # "--option accept-flake-config true",
         ]
 
         # NOTE; The (nixos-anywhere) default is to let the target pull packages from the caches first, and if they not exist there
@@ -196,10 +198,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
         # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
         subprocess.run(
             [
-                "nix",
-                "run",
-                "nixpkgs#nixos-anywhere",
-                "--",
+                "nixos-anywhere",
                 "--extra-files",
                 deploy_directory,
                 "--flake",

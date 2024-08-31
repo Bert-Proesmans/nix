@@ -1,9 +1,27 @@
 { lib, config, flake, profiles, meta-module, ... }: {
-  sops.secrets."technitium-vm/ssh_host_ed25519_key" = {
-    mode = "0400";
+  sops.secrets."routedns-vm/ssh_host_ed25519_key" = {
+    mode = "0400"; # Required by sshd
+    restartUnits = [
+      # New secrets are a new directory (new generation) and bind mount must be updated
+      "shared-routedns-seeds.mount"
+      # New ssh key requires restart of guest
+      "microvm@routedns.service"
+    ];
   };
 
-  microvm.vms.technitium =
+  # Mounted at /shared/routedns/<mount-name>
+  proesmans.mount-central = {
+    defaults.after-units = [ "zfs-mount.service" ];
+    directories."routedns".mounts = {
+      "seeds".source = "/run/secrets/routedns-vm";
+    };
+  };
+
+  systemd.services."microvm-virtiofsd@routedns".unitConfig = {
+    RequiresMountsFor = config.proesmans.mount-central.directories."routedns".bind-paths;
+  };
+
+  microvm.vms."routedns" =
     let
       parent-hostname = config.networking.hostName;
     in
@@ -14,7 +32,7 @@
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
       config = { config, profiles, ... }: {
-        _file = ./technitium-vm.nix;
+        _file = ./routedns-vm.nix;
 
         imports = [
           profiles.qemu-guest-vm
@@ -39,11 +57,18 @@
               mode = "private";
               link = "main";
             };
-            id = "vmac-technitium";
+            id = "vmac-routedns";
             mac = "26:fa:77:05:26:bc"; # randomly generated
           }];
 
-          microvm.shares = [ ];
+          microvm.shares = [
+            {
+              source = "/shared/routedns";
+              mountPoint = "/data";
+              tag = "state-routedns";
+              proto = "virtiofs";
+            }
+          ];
         };
       };
     };

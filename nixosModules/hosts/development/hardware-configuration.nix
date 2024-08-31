@@ -12,6 +12,8 @@
   # NOTE; Force importing is possible, ofcourse.
   networking.hostId = "9c522fc1";
 
+  boot.supportedFilesystems = [ "zfs" ]; # enables zfs
+
   # Load Hyper-V kernel modules
   virtualisation.hypervGuest.enable = true;
 

@@ -5,13 +5,14 @@
 
   services.openssh.hostKeys = [
     {
-      path = "/seeds/ssh_host_ed25519_key";
+      path = "/data/seeds/ssh_host_ed25519_key";
       type = "ed25519";
     }
   ];
-  systemd.services.sshd.unitConfig.ConditionPathExists = "/seeds/ssh_host_ed25519_key";
+  systemd.services.sshd.unitConfig.ConditionPathExists = "/data/seeds/ssh_host_ed25519_key";
 
-  # Not much to define here, the DNS serve is very thoroughly profiled.
+  # Not much to define here, the DNS configuration is very easily profiled.
+  # SEEALSO; profiles.dns-server
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

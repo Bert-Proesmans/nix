@@ -1,43 +1,63 @@
 { lib, flake, profiles, meta-module, config, ... }:
-let
-  # ERROR; Postgres major versions require manual upgrades! To not shoot myself into the foot
-  # I prepare multiple datasets on the host to not accidentally clobber data, plus the second
-  # dataset location makes upgrading the database files easier by not requiring to do the process
-  # inplace!
-  #
-  # NOTE; Yes, that's double config, because the first is a microvm option and the second
-  # is the module evaluation!
-  version-pg = config.microvm.vms.immich.config.config.services.postgresql.package.psqlSchema;
-in
 {
-  sops.secrets."immich-vm/ssh_host_ed25519_key" = {
-    # For virtio ssh
-    mode = "0400";
-    restartUnits = [ "microvm@immich.service" ]; # Systemd interpolated service
+  sops.secrets = {
+    "immich-vm/ssh_host_ed25519_key" = {
+      mode = "0400"; # Required by sshd
+      restartUnits = [
+        # New secrets are a new directory (new generation) and bind mount must be updated
+        "shared-immich-seeds.mount"
+        # New ssh key requires restart of guest
+        "microvm@immich.service"
+      ];
+    };
   };
+
+  # What's up with storage, really?
+  #
+  # TLDR; Mounting is literally passthrough, but there are two sides of the mount
+  # story. To keep the host secured, and leaks through to the guest minimized, there
+  # preparation on both sides of the mount is required.
+  #
+  # Deep dive; TODO
 
   # Immich database is Postgres
-  disko.devices.zpool.zstorage.datasets = {
-    # NOTE; Edit postgresql config, set 'full_page_writes = off'
-    "vm/immich/db/state" = {
+  # NOTE; Edit postgresql config, set 'full_page_writes = off'
+  disko.devices.zpool.storage.datasets = {
+    "postgres/state/immich" = {
       type = "zfs_fs";
       options = {
-        mountpoint = "/vm/immich/db/${version-pg}/state"; # Default, but good to be explicit
-        logbias = "latency";
-        recordsize = "64K";
+        mountpoint = "/storage/postgres/state/immich";
+        acltype = "posixacl"; # Required by virtiofsd
+        xattr = "sa"; # Required by virtiofsd
       };
     };
-    "vm/immich/db/wal" = {
+    "postgres/wal/immich" = {
       type = "zfs_fs";
       options = {
-        mountpoint = "/vm/immich/db/${version-pg}/wal"; # Default, but good to be explicit
-        logbias = "latency";
-        recordsize = "64K";
+        mountpoint = "/storage/postgres/wal/immich";
+        acltype = "posixacl"; # Required by virtiofsd
+        xattr = "sa"; # Required by virtiofsd
       };
+    };
+
+    # HERE; Add more datasets for the guests
+  };
+
+  # Mounted at /shared/immich/<mount-name>
+  proesmans.mount-central = {
+    defaults.after-units = [ "zfs-mount.service" ];
+    directories."immich".mounts = {
+      "seeds".source = "/run/secrets/immich-vm";
+      "state-postgresql".source = "/storage/postgres/state/immich";
+      "wal-postgresql".source = "/storage/postgres/wal/immich";
     };
   };
 
-  microvm.vms.immich =
+  systemd.services."microvm-virtiofsd@immich".unitConfig = {
+    RequiresMountsFor = config.proesmans.mount-central.directories."immich".bind-paths;
+  };
+
+  microvm.vms."immich" =
     let
       parent-hostname = config.networking.hostName;
     in
@@ -76,15 +96,9 @@ in
 
           microvm.shares = [
             {
-              source = "/run/secrets/immich-vm"; # RAMFS coming from sops
-              mountPoint = "/seeds";
-              tag = "secret-seeds";
-              proto = "virtiofs";
-            }
-            {
-              source = "/vm/immich/db/${version-pg}";
-              mountPoint = "/data/db";
-              tag = "state-db-immich";
+              source = "/shared/immich";
+              mountPoint = "/data";
+              tag = "state-immich";
               proto = "virtiofs";
             }
           ];

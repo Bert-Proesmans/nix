@@ -6,9 +6,10 @@
     profiles.hypervisor
     ./hardware-configuration.nix
     ./disks.nix
-    ./kanidm-vm.nix
-    ./technitium-vm.nix
+    ./routedns-vm.nix
     ./immich-vm.nix
+    ./kanidm-vm.nix
+    # ./test-vm.nix # DEBUG
   ];
 
   networking.hostName = "buddy";
@@ -47,6 +48,17 @@
       type = "ed25519";
     }
   ];
+
+  systemd.tmpfiles.settings."1-base-datasets" = {
+    # Assumes ZFS datasets will be mounted on paths /storage/**/X
+    # The parent folder permissions are explicitly set to prevent accidental
+    # world access.
+    "/storage".d = {
+      user = "root";
+      group = "root";
+      mode = "0700";
+    };
+  };
 
   sops.secrets."cloudflare-proesmans-key" = { };
   sops.secrets."cloudflare-zones-key" = { };

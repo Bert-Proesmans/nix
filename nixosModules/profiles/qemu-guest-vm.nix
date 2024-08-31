@@ -41,13 +41,31 @@
     # securityModel = "mapped";
   }];
 
+  # systemd.tmpfiles.settings = lib.mkMerge [
+  #   (lib.optionalAttrs (builtins.any ({ mountPoint, ... }: mountPoint == "/data") config.microvm.shares)
+  #     {
+  #       "1-mount-landing" = {
+  #         # NOTE; The base (AKA root) directory of a mount gets the following default permissions assigned;
+  #         # u=rwx,g=rx,o=rx root:root -> AKA path is world-readable!
+  #         #
+  #         # WARN; Guest config should work with the contents of this folder. It's supposed to be pre-populated
+  #         # with data-specific filesystems. 
+  #         "/data".d = {
+  #           user = "root";
+  #           group = "root";
+  #           mode = "0755";
+  #         };
+  #       };
+  #     })
+  # ];
+
   networking.useNetworkd = true;
 
   users.users.bert-proesmans = {
     isNormalUser = true;
     description = "Bert Proesmans";
     extraGroups = [
-      "systemd-journal" # Read the systemd service journal
+      "systemd-journal" # Read the systemd service journal without sudo
     ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"

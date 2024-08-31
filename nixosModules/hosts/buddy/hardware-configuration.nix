@@ -15,14 +15,14 @@
   boot.supportedFilesystems = [ "zfs" ];
   boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
-  disko.devices.zpool.zlocal.datasets = {
+  disko.devices.zpool.local.datasets = {
     "root" = {
       # Root filesystem, a catch-all
       type = "zfs_fs";
       mountpoint = "/";
       postCreateHook = ''
         # Generate empty snapshot in preparation for impermanence
-        zfs list -t snapshot -H -o name | grep -E '^zlocal/root@empty$' || zfs snapshot 'zlocal/root@empty'
+        zfs list -t snapshot -H -o name | grep -E '^local/root@empty$' || zfs snapshot 'local/root@empty'
       '';
       options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
     };

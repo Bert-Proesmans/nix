@@ -26,9 +26,19 @@
     ];
   };
 
-  # Leave ZFS pool alone!
+  # Do not force anything when pools have not been properly exported!
   boot.zfs.forceImportRoot = false;
   boot.zfs.forceImportAll = false;
+  # WARN; We have a zpool defined for pure data.
+  # A pure data zpool is when all ..zpool.<name>.datasets.<name> are not needed for boot
+  #   => Imported pool is a requirement for the dataset mount
+  #     => But no dataset of the pool requires mounting, so the pool doesn't import
+  #   => disko does not add additional pools to the option boot.zfs.extraPools
+  #
+  # NOTE; The pool is imported in stage-2 (after initrd finished switching root). The unit ordering
+  # is before sysinit.target. Search the system logs for "Starting Import ZFS pool" to imperatively
+  # answer ordering questions.
+  boot.zfs.extraPools = [ "storage" ];
 
   # Tune ZFS
   #
@@ -58,9 +68,12 @@
     # Set this value equal to or less than the largest recordsize written on this system/pool. (bytes?)
     options zfs zfs_immediate_write_sz=1048576
 
-    # Enable prefetcher. Zfs proactively reads data from spinning disks, expecting inflight or future requests, into
-    # the ARC.
-    options zfs zfs_prefetch_disable=0
+    # Disable prefetcher. Zfs could proactively read data expecting inflight or future requests, into the ARC.
+    # We have a system with pools on (low IOPS) hard drives, including high random access load of databases.
+    # It's best to not introduce additional I/O latency when the potential for random access is high!
+    #
+    # NOTE; No-brainer on full ssd array though.. one day
+    options zfs zfs_prefetch_disable=1
   '';
 
   services.fstrim.enable = true;
@@ -71,11 +84,11 @@
   # ZFS setup
   #
   # Rundown;
-  #   - pool ZLOCAL, mounted at null
+  #   - pool LOCAL, mounted at null
   #     - /
   #     - /nix
   #     - /tmp -> trades lower memory usage for storage
-  #   - pool ZSTORAGE, mounted at null
+  #   - pool STORAGE, mounted at null
   #     - 
   #
   # Creates a RAIDZ1 pool from 3 disks + 1 SLOG device.
@@ -146,7 +159,7 @@
             size = "200G";
             content = {
               type = "zfs";
-              pool = "zlocal";
+              pool = "local";
             };
           };
         };
@@ -180,7 +193,7 @@
             size = "3722G";
             content = {
               type = "zfs";
-              pool = "zstorage";
+              pool = "storage";
             };
           };
           #
@@ -220,7 +233,7 @@
             size = "3722G";
             content = {
               type = "zfs";
-              pool = "zstorage";
+              pool = "storage";
             };
           };
           #
@@ -260,7 +273,7 @@
             size = "3722G";
             content = {
               type = "zfs";
-              pool = "zstorage";
+              pool = "storage";
             };
           };
           #
@@ -278,12 +291,11 @@
 
   # ZFS pool, mostly default, for modern COW filesystem for local data.
   # Main use case is storing the nix store.
-  disko.devices.zpool.zlocal = {
+  disko.devices.zpool.local = {
     type = "zpool";
     # ERROR; Intentionally left empty to not create a VDEV. No vdev explicitly creates
     # a non-redundant pool (aka RAID0)!
     mode = "";
-    mountpoint = null;
     options = {
       # Set to 8KiB because of NVMe vdev members.
       ashift = "13";
@@ -306,13 +318,12 @@
   };
 
   # ZFS pool optimised for my spinning rust setup
-  disko.devices.zpool.zstorage = {
+  disko.devices.zpool.storage = {
     type = "zpool";
     mode = "raidz";
-    mountpoint = null; # Don't (automatically) mount the pool filesystem
     postCreateHook =
       let
-        label-zpool = "zstorage";
+        label-zpool = "storage";
         device-node = "/dev/disk/by-partlabel/disk-slog-for-zstorage";
       in
       ''
@@ -320,7 +331,7 @@
         # Target device node is matched as zfs member, and matching zpool label.
         #
         # NOTE; lsblk outputs something like below when the slog is attached
-        # /dev/<moniker> zfs_member  zstorage
+        # /dev/<moniker> zfs_member  storage
         #
         # ERROR; This lacks pool ID matching! But we're assuming the pools are always destroyed
         # together with disk contents between script runs, nor do we expect the drives to move
@@ -349,9 +360,8 @@
     rootFsOptions = {
       # NOTE; No mounting/auto-mounting
       canmount = "off";
-      # NOTE; Datasets do not inherit a parent mountpoint.
-      # Default; Name of pool, 'zstorage' in this case
-      mountpoint = "none"; # WARN; All ZFS options must be set to "none", but outer (disko) settings must be null
+      # NOTE; Datasets inherit a parent's mountpoint.
+      mountpoint = "/storage";
       # NOTE; Fletcher is by far the fastest
       # Only change checksumming algorithm if dedup is a requirement, blake3 is a cryptographic
       # hasher for higher security on clash resistance
@@ -450,6 +460,10 @@
       "org.open-zfs:large_blocks" = "enabled";
       # NOTE; Opt out of built-in snapshotting, sanoid is used
       "com.sun:auto-snapshot" = "false";
+      #
+      # Guest sharing security, restrict privilege elevation in both directions of host<->guest.
+      devices = "off";
+      setuid = "off";
     };
     # NOTE; You can create nested datasets without defining any parent. The parent datasets will exist ephemerally
     # and be automatically configured from the parent-parent dataset or pool-filesystem options.
@@ -479,13 +493,12 @@
     # of dataset hierarchy.
     #
     datasets = {
-      "vm" = {
+      "volumes" = {
         # Default storage location for vm state data without requirements.
         # HELP; Create sub datasets to specialize storage behaviour to the application.
         type = "zfs_fs";
-        mountpoint = null; # ERROR; Triggers race-condition and pauses boot
         options = {
-          canmount = "off";
+          mountpoint = "/storage/volumes";
           # Qemu does its own application level caching
           # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
           # NOTE; My virtual machines will run from a tmpfs by default!
@@ -494,25 +507,16 @@
           logbias = "throughput";
           # Haven't done benchmarking to change away from the default
           recordsize = "128K";
-          # ACL required for virtiofs
-          acltype = "posixacl";
-          xattr = "sa";
-          # 
-          devices = "off";
-          setuid = "off";
+          # Don't store access times
+          atime = "off";
         };
       };
-      "vm/vault" = {
-        # Basically file storage
+      "media" = {
         type = "zfs_fs";
-        mountpoint = null; # ERROR; Triggers race-condition and pauses boot
-      };
-      "vm/vault/media" = {
-        # Basically file storage
-        type = "zfs_fs";
-        mountpoint = "/vm/vault/media";
         options = {
-          atime = "off";
+          canmount = "off";
+          # ACL required for virtiofs
+          acltype = "posixacl";
           # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
           # Back of enveloppe calculation; HDD seek time is ~10 ms, reading 16MB is ~130ms.
           # The record is split accross 2 disks (data + 1 parity) so each disk is held for
@@ -529,13 +533,86 @@
           # NOTE; ~45ms aka 20-25 IOPS seems like an OK(?) situation, also considering 
           # ARC prefetching is enabled and database caches should be in RAM.
           # HELP; HEAVILY VIRTUALIZE INTO RAM BOIISS
-          recordsize = "8M";
+          recordsize = "1M";
           compression = "zstd-3";
-          # TODO NFS mounting
-          # TODO Sub layout
         };
       };
-      # "vm/vault/torrent" = {};
+      "media/pictures" = {
+        type = "zfs_fs";
+        options = {
+          mountpoint = "/storage/media/pictures";
+        };
+      };
+      "media/video" = {
+        type = "zfs_fs";
+        options = {
+          mountpoint = "/storage/media/video";
+          # SEEALSO; recordsize comment on dataset media
+          recordsize = "8M";
+        };
+      };
+      "postgres" = {
+        type = "zfs_fs";
+        options = {
+          canmount = "off";
+          # ACL required for virtiofs
+          acltype = "posixacl";
+          atime = "off";
+
+          # Performance notes;
+          #   - Disable database checksumming
+          #     - Checksumming is a necessity in HA clusters with timelines though (eg Patroni)
+
+          # Postgres page size is fixed 8K. A bigger recordsize is more performant on reads, but not writes.
+          recordsize = "32K";
+          # Assumes all postgres state fits in RAM, so no double caching of data files
+          primarycache = "metadata";
+          # No fragmented writes from ZIL to data pool
+          logbias = "latency";
+        };
+      };
+      "postgres/state" = {
+        # NOTE; Inherit from this dataset!
+        type = "zfs_fs";
+        options = {
+          canmount = "off";
+          mountpoint = "/storage/postgres/state";
+        };
+      };
+      "postgres/wal" = {
+        # NOTE; Inherit from this dataset!
+        type = "zfs_fs";
+        options = {
+          canmount = "off";
+          mountpoint = "/storage/postgres/wal";
+        };
+      };
+      "sqlite" = {
+        type = "zfs_fs";
+        options = {
+          canmount = "off";
+          # ACL required for virtiofs
+          acltype = "posixacl";
+          atime = "off";
+          # SEEALSO; dataset options for postgres
+          recordsize = "64K";
+          primarycache = "metadata";
+          logbias = "latency";
+        };
+      };
+      "sqlite/state" = {
+        # NOTE; Inherit from this dataset!
+        # WARN; SQLite page size can and should be set to 64K
+        type = "zfs_fs";
+        options = {
+          canmount = "off";
+          mountpoint = "/storage/sqlite/state";
+        };
+      };
+
+      # Datasets are defined where they're used!
+      # SEEALSO; XX-vm.nix
+      # datasets = {};
     };
   };
 }

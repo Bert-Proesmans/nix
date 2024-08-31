@@ -5,12 +5,16 @@
     restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
   };
 
+  proesmans.mount-central.directories."test-machine".mounts = {
+    "state-postgresql".source = "/storage/postgres/state/immich";
+  };
+
   microvm.vms.test =
     let
       parent-hostname = config.networking.hostName;
     in
     {
-      autostart = true;
+      autostart = false;
       specialArgs = { inherit lib flake profiles; };
       config = { profiles, ... }: {
         _file = ./test-vm.nix;
@@ -38,12 +42,21 @@
             mac = "6a:33:06:88:6c:5b"; # randomly generated
           }];
 
-          microvm.shares = [{
-            source = "/run/secrets/test-vm"; # RAMFS coming from sops
-            mountPoint = "/seeds";
-            tag = "secret-seeds";
-            proto = "virtiofs";
-          }];
+
+          microvm.shares = [
+            ({
+              source = "/run/secrets/test-vm"; # RAMFS coming from sops
+              mountPoint = "/seeds";
+              tag = "secret-seeds";
+              proto = "virtiofs";
+            })
+            ({
+              source = "/shared/test";
+              mountPoint = "/data";
+              tag = "state-test";
+              proto = "virtiofs";
+            })
+          ];
         };
       };
     };
