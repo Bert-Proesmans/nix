@@ -66,60 +66,67 @@
       lib.getExe script;
   };
 
-  microvm.vms.kanidm = {
-    autostart = true;
-    specialArgs = { inherit lib flake profiles; };
+  microvm.vms.kanidm =
+    let
+      parent-hostname = config.networking.hostName;
+    in
+    {
+      autostart = true;
+      specialArgs = { inherit lib flake profiles; };
 
-    # The configuration for the MicroVM.
-    # Multiple definitions will be merged as expected.
-    config = { config, profiles, ... }: {
-      _file = ./kanidm-vm.nix;
+      # The configuration for the MicroVM.
+      # Multiple definitions will be merged as expected.
+      config = { config, profiles, ... }: {
+        _file = ./kanidm-vm.nix;
 
-      imports = [
-        profiles.qemu-guest-vm
-        (meta-module "SSO")
-        ../SSO/configuration.nix # VM config
-      ];
-
-      config = {
-        nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-        # ERROR; Number must be unique for each VM!
-        # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-        microvm.vsock.cid = 300;
-
-        microvm.interfaces = [{
-          type = "macvtap";
-          macvtap = {
-            # Private allows the VMs to only talk to the network, no host interaction.
-            # That's OK because we use VSOCK to communicate between host<->guest!
-            mode = "private";
-            link = "main";
-          };
-          id = "vmac-kanidm";
-          mac = "9e:30:e8:e8:b1:d0"; # randomly generated
-        }];
-
-        microvm.shares = [
-          {
-            source = "/run/secrets/kanidm-vm";
-            mountPoint = "/seeds";
-            tag = "secrets-kanidm";
-            proto = "virtiofs";
-          }
-          {
-            source = "/vm/kanidm";
-            mountPoint = "/data/state";
-            tag = "state-kanidm";
-            proto = "virtiofs";
-          }
-          {
-            source = "/run/kanidm/certs";
-            mountPoint = "/data/certs";
-            tag = "certs-kanidm";
-            proto = "virtiofs";
-          }
+        imports = [
+          profiles.qemu-guest-vm
+          (meta-module "SSO")
+          ../SSO/configuration.nix # VM config
         ];
+
+        config = {
+          nixpkgs.hostPlatform = lib.systems.examples.gnu64;
+          # ERROR; Number must be unique for each VM!
+          # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
+          microvm.vsock.cid = 300;
+
+          proesmans.facts.tags = [ "virtual-machine" ];
+          proesmans.facts.meta.parent = parent-hostname;
+
+          microvm.interfaces = [{
+            type = "macvtap";
+            macvtap = {
+              # Private allows the VMs to only talk to the network, no host interaction.
+              # That's OK because we use VSOCK to communicate between host<->guest!
+              mode = "private";
+              link = "main";
+            };
+            id = "vmac-kanidm";
+            mac = "9e:30:e8:e8:b1:d0"; # randomly generated
+          }];
+
+          microvm.shares = [
+            {
+              source = "/run/secrets/kanidm-vm";
+              mountPoint = "/seeds";
+              tag = "secrets-kanidm";
+              proto = "virtiofs";
+            }
+            {
+              source = "/vm/kanidm";
+              mountPoint = "/data/state";
+              tag = "state-kanidm";
+              proto = "virtiofs";
+            }
+            {
+              source = "/run/kanidm/certs";
+              mountPoint = "/data/certs";
+              tag = "certs-kanidm";
+              proto = "virtiofs";
+            }
+          ];
+        };
       };
     };
-  };
 }

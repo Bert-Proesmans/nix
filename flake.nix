@@ -89,7 +89,7 @@ rec {
       # WARN; This iteration over all nixosConfigurations slows down evaluation time by A LOT. The approach
       # must be removed/re-evaluated when eval times become embarassignly slow!
       #
-      host-facts = (builtins.mapAttrs (_: v: v.config.proesmans.facts // { type = "host"; }) self.outputs.nixosConfigurations)
+      host-facts = (builtins.mapAttrs (_: v: v.config.proesmans.facts) self.outputs.nixosConfigurations)
         // (lib.pipe self.outputs.nixosConfigurations [
         # Keep hypervisor host configurations
         (lib.filterAttrs (_: v: lib.hasAttrByPath [ "microvm" "vms" ] v.config))
@@ -97,7 +97,7 @@ rec {
         # Select and flatten all virtual machine configurations
         (lib.mapAttrsToList (host-name: guests:
           (lib.mapAttrsToList (guest-name: v: {
-            "${guest-name}-${host-name}" = v.config.config.proesmans.facts // { type = "virtual-machine"; parent = host-name; };
+            "${guest-name}-${host-name}" = v.config.config.proesmans.facts;
           })) guests
         ))
         (lib.concatLists)

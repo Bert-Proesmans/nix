@@ -12,6 +12,7 @@
 
   networking.hostName = "buddy";
   networking.domain = "alpha.proesmans.eu";
+  proesmans.facts.tags = [ "bare-metal" "hypervisor" ];
 
   proesmans.nix.garbage-collect.enable = true;
   proesmans.internationalisation.be-azerty.enable = true;

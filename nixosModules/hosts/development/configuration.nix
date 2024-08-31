@@ -9,6 +9,7 @@
 
   networking.hostName = "development";
   networking.domain = "alpha.proesmans.eu";
+  proesmans.facts.tags = [ "virtual-machine" "hypervisor" ];
 
   proesmans.filesystem.simple-disk.enable = true;
   proesmans.filesystem.simple-disk.systemd-boot.enable = true;

@@ -7,6 +7,19 @@
       options = {
         # All options defined here will form a partial schema, their values will also be properly type-checked on query.
 
+        tags = lib.mkOption {
+          description = ''
+            Collection of data to help filtering down records.
+          '';
+          type = lib.types.listOf (lib.types.enum [
+            "bare-metal"
+            "hypervisor"
+            "virtual-machine"
+          ]);
+          apply = lib.lists.unique;
+          default = [ ];
+        };
+
         management.mac-address = lib.mkOption {
           description = ''
             The MAC address of the network interface that should be used for SSH host management.
@@ -31,6 +44,14 @@
             The DNS name to use when attempting to SSH connect to this host.
           '';
           type = lib.types.nullOr lib.dns.types.domain-name;
+          default = null;
+        };
+
+        meta.parent = lib.mkOption {
+          description = ''
+            Hostname of the parent controlling the start/stop state of (and access to) this host.
+          '';
+          type = lib.types.nullOr lib.types.str;
           default = null;
         };
 
