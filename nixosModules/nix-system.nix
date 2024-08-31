@@ -111,6 +111,9 @@ in
         # Not even @wheel by default, because adding users to this list is basically giving them root access.
         # And @wheel is list of users that are allowed to use 'sudo', but 'sudo' usage could be restricted. AKA not even sudo
         # should give full system control (except in naïve environments)!
+
+        # TODO; Currently required for remote nixos-rebuild
+        "@wheel"
       ];
 
       # Avoid copying unnecessary stuff over SSH
