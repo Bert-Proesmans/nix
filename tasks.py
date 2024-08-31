@@ -103,10 +103,8 @@ def sops_files_update(c: Any) -> None:
 
 
 @task
-# USAGE; invoke host-deploy development root@10.1.7.100 [-k "development_decrypter"]
-def host_deploy(
-    c: Any, hostname: str, ssh_connection_string: str, key: str = None
-) -> None:
+# USAGE; invoke deploy development root@10.1.7.100 [-k "development_decrypter"]
+def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -> None:
     """
     Decrypts the secret used for sops-nix, deploys the machine, upload the secret to the host filesystem.
     """
@@ -216,7 +214,7 @@ def host_deploy(
 
 @task
 # USAGE; invoke filesystem-rebuild development
-def filesystem_rebuild(c: Any, hostname: str) -> None:
+def filesystem_rebuild(c: Any, flake_attr: str) -> None:
     """
     Builds the disko format script, pushes it to the destination host and executes the script.
     This will attempt to realise the (presumably) changed configuration. This is only really useful when
@@ -231,10 +229,10 @@ def filesystem_rebuild(c: Any, hostname: str) -> None:
     # NOTE; The format script will attempt to reapply partition attributes if they do not match
     # with the configuration.
     format_attr_path = (
-        f"{FLAKE}#nixosConfigurations.{hostname}.config.system.build.formatScript"
+        f"{FLAKE}#nixosConfigurations.{flake_attr}.config.system.build.formatScript"
     )
 
-    print(f"Checking if format script builds for {hostname}..")
+    print(f"Checking if format script builds for {flake_attr}..")
     format_script = subprocess.run(
         [
             "nix",
@@ -249,6 +247,7 @@ def filesystem_rebuild(c: Any, hostname: str) -> None:
         capture_output=True,
     ).stdout.strip()
 
+    print(f"Evaluating machine facts to find {flake_attr}..")
     text_machines = subprocess.run(
         [
             "nix",
@@ -267,19 +266,19 @@ def filesystem_rebuild(c: Any, hostname: str) -> None:
     ssh_connection_string = next(
         (
             moniker
-            for moniker, x_host_name in machines.items()
-            if hostname == x_host_name or hostname == moniker
+            for moniker, host_name in machines.items()
+            if flake_attr == host_name or flake_attr == moniker
         ),
         None,
     )
 
     assert ssh_connection_string, """
-        There is no ssh moniker found for the provided hostname.
+        There is no ssh moniker found for the provided host attribute.
         Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
     """
 
     if not ask_user_input(
-        f"Update filesystems for {hostname} on {ssh_connection_string}?"
+        f"Update filesystems for {flake_attr} on {ssh_connection_string}?"
     ):
         return
 
