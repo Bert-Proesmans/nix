@@ -17,6 +17,10 @@ in
     ];
   };
 
+  # ERROR; Secrets disappear when rebuilding the host.
+  # Tell SOPS-NIX to not cleanup old generations of mounted secrets.
+  sops.keepGenerations = 0;
+
   # WARN; Superseded by systemd-ssh-generators!
   # Comes with systemd v256+ and the systemd-ssh-generators feature activated!
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
