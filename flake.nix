@@ -201,6 +201,7 @@ rec {
                 nyancat figlet
                 # For development
                 git bat
+                outils# sha{1,256,5120}/md5
                 # For introspection
                 nix-output-monitor
                 ;

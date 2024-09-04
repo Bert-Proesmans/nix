@@ -50,10 +50,24 @@ in
 
     # TEMPORARY
     redis.host = "/run/redis-immich/redis.sock";
+
+    environment = {
+      IMMICH_LOG_LEVEL = "log";
+      # The timezone used for interpreting date/timestamps without time zone indicator
+      TZ = "Europe/Brussels";
+      IMMICH_CONFIG_FILE = "/run/credentials/immich-server.service/CONFIG";
+    };
   };
 
-  # TEMPORARY
-  systemd.services.immich-server.after = [ "redis-immich.service" "postgresql.service" ];
+  systemd.services.immich-server = {
+    # TEMPORARY
+    after = [ "redis-immich.service" "postgresql.service" ];
+    serviceConfig.LoadCredential = [
+      # WARN; Config file must be loaded into the unit credential store because
+      # the original files require root access. This unit executes with user immich permissions.
+      "CONFIG:/data/config/immich-config.json"
+    ];
+  };
   systemd.services.immich-machine-learning.after = [ "redis-immich.service" "postgresql.service" ];
 
   systemd.tmpfiles.settings."10-postgres-ownership" = {
@@ -61,25 +75,35 @@ in
     # for the service users. This approach is an alternative to the unit config attribute StateDirectory.
     #
     # NOTE; Unix user for the postgres service is fixed to "postgres"
-    "${state-postgres-dir}".d = {
-      user = "postgres";
-      group = "postgres";
-      mode = "0700";
+
+    "${state-postgres-dir}" = {
+      # Create directory - necessary, do not remove!
+      d = {
+        user = "postgres";
+        group = "postgres";
+        mode = "0700";
+      };
+      # Fix permissions, in case a rebuild shifts uid/guids!
+      Z = {
+        user = "postgres";
+        group = "postgres";
+        mode = "0700";
+      };
+
     };
-    "${state-postgres-dir}/*".Z = {
-      user = "postgres";
-      group = "postgres";
-      mode = "0700";
-    };
-    "${wal-postgres-dir}".d = {
-      user = "postgres";
-      group = "postgres";
-      mode = "0700";
-    };
-    "${wal-postgres-dir}/*".Z = {
-      user = "postgres";
-      group = "postgres";
-      mode = "0700";
+    "${wal-postgres-dir}" = {
+      # Create directory - necessary, do not remove!
+      d = {
+        user = "postgres";
+        group = "postgres";
+        mode = "0700";
+      };
+      # Fix permissions, in case a rebuild shifts uid/guids!
+      Z = {
+        user = "postgres";
+        group = "postgres";
+        mode = "0700";
+      };
     };
   };
 
@@ -92,7 +116,6 @@ in
       # WAL is written to another filesystem to limit denial-of-service (DOS) when clients open
       # transactions for a long time.
       "--waldir=${wal-postgres-dir}"
-      # Encode in UTF-8
       "--encoding=UTF8"
       # Sort in C, aka use straightforward byte-ordering
       "--no-locale" # PERFORMANCE

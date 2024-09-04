@@ -308,6 +308,16 @@
       canmount = "off";
       # NOTE; Datasets do not inherit a parent mountpoint.
       mountpoint = "none"; # WARN; Dataset option for mountpoint must be set to `null`
+      # NOTE; Disable extended access control lists and use owner/group/other!
+      # HELP; Set this parameter to `posixacl` when required, check documentation of your software!
+      acltype = "off";
+      # NOTE; Store file metadata as extensions in inode structure (for performance)
+      xattr = "sa";
+      # NOTE; Increase inode size, if ad-hoc necessary, from the default 512-byte
+      dnodesize = "auto";
+      # NOTE; Enable optimized access time writes
+      # HELP; Disable access time selectively per dataset
+      relatime = "on";
       # NOTE; Opt out of built-in snapshotting, sanoid is used
       "com.sun:auto-snapshot" = "false";
     };
@@ -498,7 +508,7 @@
         # HELP; Create sub datasets to specialize storage behaviour to the application.
         type = "zfs_fs";
         options = {
-          mountpoint = "/storage/volumes";
+          mountpoint = "/microvm/volumes";
           # Qemu does its own application level caching
           # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
           # NOTE; My virtual machines will run from a tmpfs by default!

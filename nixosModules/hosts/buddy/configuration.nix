@@ -58,6 +58,12 @@
       group = "root";
       mode = "0700";
     };
+    # Microvm user needs R/W access to the mounted volumes
+    "/microvm".Z = {
+      user = "microvm";
+      group = "kvm"; # WARN; hardcoded group is NOT microvm!
+      mode = "0750";
+    };
   };
 
   sops.secrets."cloudflare-proesmans-key" = { };

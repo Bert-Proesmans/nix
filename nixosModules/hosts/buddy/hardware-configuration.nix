@@ -63,9 +63,10 @@
       };
     };
     "temporary" = {
-      # Put /tmp on storage to save on RAM
+      # Put /var/tmp on a separate dataset to curb its usage (if needed)
       type = "zfs_fs";
-      mountpoint = "/tmp";
+      # NOTE; /var/tmp (and /tmp) are subject to automated cleanup
+      mountpoint = "/var/tmp";
       options = {
         compression = "lz4"; # High throughput lowest latency
         #sync = "disabled"; # No sync writes

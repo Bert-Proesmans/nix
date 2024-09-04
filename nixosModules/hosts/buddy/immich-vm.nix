@@ -10,6 +10,12 @@
         "microvm@immich.service"
       ];
     };
+    "idm/openid-secret-immich" = { };
+  };
+  sops.templates."immich-config.json" = {
+    file = ../photos/immich-config.json;
+    # NOTE; We can override the output path!
+    path = "/run/secrets-rendered/immich/immich-config.json";
   };
 
   # What's up with storage, really?
@@ -48,8 +54,13 @@
     defaults.after-units = [ "zfs-mount.service" ];
     directories."immich".mounts = {
       "seeds".source = "/run/secrets/immich-vm";
+      "config" = {
+        source = "/run/secrets-rendered/immich";
+        read-only = true;
+      };
       "state-postgresql".source = "/storage/postgres/state/immich";
       "wal-postgresql".source = "/storage/postgres/wal/immich";
+      #"media".source = "/<TODO>";
     };
   };
 
@@ -70,7 +81,7 @@
         imports = [
           profiles.qemu-guest-vm
           (meta-module "immich")
-          ../photos.nix # VM config
+          ../photos/configuration.nix # VM config
         ];
 
         config = {
@@ -81,6 +92,28 @@
 
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;
+
+          microvm.volumes = [
+            {
+              # Persist tmp directory because of big downloads and video processing
+              autoCreate = true;
+              image = "/microvm/volumes/tmp-immich-disk.img";
+              label = "tmp-immich";
+              mountPoint = "/var/tmp";
+              size = 5 * 1024; # Megabytes
+              fsType = "ext4";
+            }
+            {
+              # Persist cache directory because machine learning
+              autoCreate = true;
+              image = "/microvm/volumes/cache-immich-disk.img";
+              label = "cache-immich";
+              mountPoint = "/var/cache";
+              # TODO; Need to measure model sizes. Out of the box face and search models require ~1G
+              size = 2 * 1024; # Megabytes
+              fsType = "ext4";
+            }
+          ];
 
           microvm.interfaces = [{
             type = "macvtap";
