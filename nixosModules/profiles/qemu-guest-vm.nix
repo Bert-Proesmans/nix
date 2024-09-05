@@ -1,6 +1,7 @@
 { lib, config, ... }: {
   imports = [
-    # flake.inputs.impermanence.nixosModules.impermanence
+    ./microvm-guest/central-microvm.nix # WIP
+    ./microvm-guest/suitcase-microvm.nix # WIP
   ];
 
   # Generate a nixos module with for each defined vm containing all hypervisor

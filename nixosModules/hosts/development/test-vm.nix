@@ -5,10 +5,6 @@
     restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
   };
 
-  proesmans.mount-central.directories."test-machine".mounts = {
-    "state-postgresql".source = "/storage/postgres/state/immich";
-  };
-
   microvm.vms.test =
     let
       parent-hostname = config.networking.hostName;
@@ -42,18 +38,23 @@
             mac = "6a:33:06:88:6c:5b"; # randomly generated
           }];
 
+          microvm.central.shares = [
+            ({
+              source = "/var/dir-share";
+              mountPoint = "/var/dir-share";
+              tag = "dir-share";
+            })
+          ];
+
+          microvm.suitcase.secrets = {
+            "test".source = "/var/dir-share/hable.txt";
+          };
 
           microvm.shares = [
             ({
               source = "/run/secrets/test-vm"; # RAMFS coming from sops
               mountPoint = "/seeds";
               tag = "secret-seeds";
-              proto = "virtiofs";
-            })
-            ({
-              source = "/shared/test";
-              mountPoint = "/data";
-              tag = "state-test";
               proto = "virtiofs";
             })
           ];

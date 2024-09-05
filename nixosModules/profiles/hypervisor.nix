@@ -4,7 +4,11 @@ let
   ssh-my-guests = builtins.mapAttrs (_: v: { vsock-id = v.microvm.vsock.cid; }) my-guests;
 in
 {
-  imports = [ flake.inputs.microvm.nixosModules.host ];
+  imports = [
+    flake.inputs.microvm.nixosModules.host
+    ./microvm-host/central-microvm.nix # WIP
+    ./microvm-host/suitcase-microvm.nix # WIP
+  ];
 
   # The hypervisor infrastructure is ran by the systemd framework
   networking.useNetworkd = true;

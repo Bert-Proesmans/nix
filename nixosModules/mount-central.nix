@@ -6,6 +6,15 @@ in
 {
   options = {
     proesmans.mount-central = {
+      permissions = lib.mkOption {
+        description = ''
+          Set permissions on '${path-mount-central}'
+        '';
+        type = lib.types.str;
+        default = "0700";
+        example = "0755";
+      };
+
       defaults.after-units = lib.mkOption {
         description = ''
           Names of units that should be ordered before all mounts.
@@ -13,6 +22,33 @@ in
         type = lib.types.listOf lib.types.str;
         default = [ ];
         example = [ "zfs-mount.service" ];
+      };
+
+      defaults.permissions = lib.mkOption {
+        description = ''
+          Permissions of all bindmount directories.
+        '';
+        type = lib.types.str;
+        default = "0700";
+        example = "0755";
+      };
+
+      defaults.user = lib.mkOption {
+        description = ''
+          Owner of all bindmount directories.
+        '';
+        type = lib.types.str;
+        default = config.users.users.root.name;
+        example = "root";
+      };
+
+      defaults.group = lib.mkOption {
+        description = ''
+          Group assigned to all bindmount directories.
+        '';
+        type = lib.types.str;
+        default = config.users.groups.root.name;
+        example = "root";
       };
 
       directories = lib.mkOption {
@@ -59,6 +95,33 @@ in
                       Path relative to the parent mount group container that is bind-mounted to {option}`source`.
                     '';
                     type = lib.types.str;
+                  };
+
+                  permissions = lib.mkOption {
+                    description = ''
+                      Permissions of on this directory.
+                    '';
+                    type = lib.types.str;
+                    default = cfg.defaults.permissions;
+                    example = "0755";
+                  };
+
+                  user = lib.mkOption {
+                    description = ''
+                      Owner of this directory.
+                    '';
+                    type = lib.types.str;
+                    default = cfg.defaults.user;
+                    example = "root";
+                  };
+
+                  group = lib.mkOption {
+                    description = ''
+                      Group assigned to this directory.
+                    '';
+                    type = lib.types.str;
+                    default = cfg.defaults.group;
+                    example = "root";
                   };
 
                   read-only = lib.mkOption {
@@ -128,7 +191,7 @@ in
             "size=1M"
             # This folder is the shield between host and guests, so limited permissions
             # to prevent contaminating the other.
-            "mode=0700"
+            "mode=${cfg.permissions}"
             "uid=0"
             "gid=0"
             # More mounting options for security/robustness
@@ -148,11 +211,11 @@ in
       ]
       # Append bind mount units for each enabled mount
       ++ (lib.pipe enabled-mounts [
-        (lib.mapAttrsToList (host-name: list-mounts: (
+        (lib.mapAttrsToList (directory-name: list-mounts: (
           builtins.map
             (v: {
               what = v.source;
-              where = "${path-mount-central}/${host-name}/${v.path}";
+              where = "${path-mount-central}/${directory-name}/${v.path}";
               type = "none";
               options = lib.concatStringsSep "," (
                 [ "bind" ]
@@ -189,28 +252,34 @@ in
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = "yes";
-          UMask = "0022";
+          # UMask = "0022";
           ExecStart =
             let
-              bash-path-mounts = lib.pipe enabled-mounts [
-                (lib.mapAttrsToList (host-name: list-mounts: builtins.map (v: "${host-name}/${v.path}") list-mounts))
+              ensure-directory-scripts = lib.pipe enabled-mounts [
+                (lib.mapAttrsToList (directory-name: list-mounts: (
+                  builtins.map
+                    (v: ''
+                      (
+                        DIRECTORY="/shared/${lib.escapeShellArg "${directory-name}/${v.path}"}"
+                        PERMISSIONS="${v.permissions}"
+                        USER="${lib.escapeShellArg v.user}"
+                        GROUP="${lib.escapeShellArg v.group}"
+                        # NOTE; The directory test does not care if bind mount on top exists or not
+                        if [ ! -d "$DIRECTORY" ]; then
+                          mkdir --parents "$DIRECTORY"
+                        fi
+                        chmod "$PERMISSIONS" "$DIRECTORY"
+                        chown "$USER":"$GROUP" "$DIRECTORY"
+                      )
+                    '')
+                    list-mounts
+                )))
                 (lib.flatten)
-                (builtins.map (v: lib.escapeShellArg v))
               ];
               script = pkgs.writeShellApplication {
                 name = "base-dirs-shared-mount";
-                runtimeInputs = [ pkgs.coreutils pkgs.findutils ];
-                # WARN; ''\ escapes the following character. Used to escape the dollar sign
-                text = ''
-                  # Exit early if directory is not empty
-                  # WARN; This service is running a second time if the directory is not empty!
-                  [ -z "$(find /shared -mindepth 1 -print -quit)" ] || exit 0
-
-                  machine_names=(${lib.concatStringsSep " " bash-path-mounts})
-                  for name in "''\${machine_names[@]}"; do
-                    mkdir --parents /shared/"$name"
-                  done
-                '';
+                runtimeInputs = [ pkgs.coreutils ];
+                text = lib.concatStringsSep "\n" ensure-directory-scripts;
               };
             in
             lib.getExe script;
