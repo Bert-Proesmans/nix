@@ -46,6 +46,24 @@
       };
     };
 
+    "media/pictures/immich" = {
+      type = "zfs_fs";
+      options = {
+        mountpoint = "/storage/media/pictures/immich";
+        acltype = "posixacl"; # Required by virtiofsd
+        xattr = "sa"; # Required by virtiofsd
+      };
+    };
+
+    "media/transcodes/immich" = {
+      type = "zfs_fs";
+      options = {
+        mountpoint = "/storage/media/transcodes/immich";
+        acltype = "posixacl"; # Required by virtiofsd
+        xattr = "sa"; # Required by virtiofsd
+      };
+    };
+
     # HERE; Add more datasets for the guests
   };
 
@@ -60,7 +78,15 @@
       };
       "state-postgresql".source = "/storage/postgres/state/immich";
       "wal-postgresql".source = "/storage/postgres/wal/immich";
-      #"media".source = "/<TODO>";
+
+      # Construct library layout for immich media
+      #
+      # WARN; Assumes enabled storage template
+      #
+      # NOTE; It's not possible to split media between pictures and video! Maybe
+      # when storage template allows MEDIA_TYPE as first element, before USER_TAG.
+      "library".source = "/storage/media/pictures/immich";
+      "transcodes".source = "/storage/storage/media/transcodes/immich";
     };
   };
 
@@ -95,10 +121,11 @@
 
           microvm.volumes = [
             {
-              # Persist tmp directory because of big downloads and video processing
+              # Persist tmp directory because of big downloads, video processing, and chunked uploads
               autoCreate = true;
               image = "/microvm/volumes/tmp-immich-disk.img";
               label = "tmp-immich";
+              # NOTE; Sticky bit is automatically set
               mountPoint = "/var/tmp";
               size = 5 * 1024; # Megabytes
               fsType = "ext4";

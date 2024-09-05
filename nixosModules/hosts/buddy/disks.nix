@@ -561,6 +561,12 @@
           recordsize = "8M";
         };
       };
+      "media/transcodes" = {
+        type = "zfs_fs";
+        options = {
+          mountpoint = "/storage/media/transcodes";
+        };
+      };
       "postgres" = {
         type = "zfs_fs";
         options = {
