@@ -62,13 +62,21 @@ in
   systemd.services.immich-server = {
     # TEMPORARY
     after = [ "redis-immich.service" "postgresql.service" ];
+
     serviceConfig.LoadCredential = [
       # WARN; Config file must be loaded into the unit credential store because
       # the original files require root access. This unit executes with user immich permissions.
       "CONFIG:/data/config/immich-config.json"
     ];
   };
-  systemd.services.immich-machine-learning.after = [ "redis-immich.service" "postgresql.service" ];
+  systemd.services.immich-machine-learning = {
+    # TEMPORARY
+    after = [ "redis-immich.service" "postgresql.service" ];
+
+    # Attempt to redirect temporary files to disk-backed temporary folder.
+    # /var/temp is backed by a persisted volume.
+    environment.TMPDIR = "/var/tmp";
+  };
 
   systemd.tmpfiles.settings."10-postgres-ownership" = {
     # ERROR; Parent directories are still owned by root so something must create the required directories
