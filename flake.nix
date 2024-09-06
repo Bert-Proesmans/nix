@@ -376,6 +376,9 @@ rec {
       # Build a bootstrap image using;
       # nix build
       #
+      # Build vsock-proxy, or any other program by attribute name using;
+      # nix build .#vsock-proxy
+      #
       # Collection of derivations that build into finished concrete file outputs, to be used as-is.
       # This flake is exactly producing tangible outputs but;
       #   - user module configuration, which must be wrapped into the home-manager platform
@@ -390,6 +393,9 @@ rec {
       packages = eachSystem (pkgs:
         let
           forced-system = pkgs.system;
+
+          # NOTE; This builds the software with dependencies from the upstream nixpkgs channel, without any overrides.
+          repo-packages = builtins.mapAttrs (_: recipe: pkgs.callPackage recipe { }) (lib.rakeLeaves ./packages);
 
           # NOTE; Minimal installer based host to get new hosts up and running
           bootstrap = lib.nixosSystem {
@@ -431,6 +437,7 @@ rec {
             ];
           };
         in
+        repo-packages //
         {
           # NOTE; You can find the generated iso file at ./result/iso/*.iso
           default = bootstrap.config.system.build.isoImage;
