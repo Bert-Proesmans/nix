@@ -56,8 +56,8 @@
         LoadCredential = [
           # WARN; Certificate files must be loaded into the unit credential store because
           # the original files require root access. This unit executes with user kanidm permissions.
-          "FULLCHAIN_PEM:/run/in-secrets-microvm/certificates/fullchain.pem"
-          "KEY_PEM:/run/in-secrets-microvm/certificates/key.pem"
+          "FULLCHAIN_PEM:${config.microvm.suitcase.secrets."certificates".path}/fullchain.pem"
+          "KEY_PEM:${config.microvm.suitcase.secrets."certificates".path}/key.pem"
           "IDM_PASS:/seeds/idm_admin_password"
         ];
       };

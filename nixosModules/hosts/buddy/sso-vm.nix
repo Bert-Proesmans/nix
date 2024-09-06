@@ -1,10 +1,8 @@
 { lib, pkgs, config, flake, profiles, meta-module, ... }: {
   sops.secrets = {
     "sso-vm/ssh_host_ed25519_key" = {
-      restartUnits = [
-        # New ssh key requires restart of guest
-        "microvm@sso.service"
-      ];
+      # New ssh key requires restart of guest
+      restartUnits = [ config.systemd.services."microvm@sso".name ];
     };
     "idm/idm_admin_password" = { };
     "idm/openid-secret-immich" = { };
@@ -18,6 +16,14 @@
       acltype = "posixacl"; # Required by virtiofsd
       xattr = "sa"; # Required by virtiofsd
     };
+  };
+
+  security.acme.certs."idm.proesmans.eu" = {
+    reloadServices = [ config.systemd.services."microvm@sso".name ];
+  };
+  systemd.services."microvm@sso" = {
+    # Wait until the certificates exist before starting the guest
+    unitConfig.ConditionPathExists = "${config.security.acme.certs."idm.proesmans.eu".directory}/fullchain.pem";
   };
 
   microvm.vms."sso" =
