@@ -26,6 +26,10 @@ in
   # Tell SOPS-NIX to not cleanup old generations of secrets.
   sops.keepGenerations = 0;
 
+  # Provisions space for microvm volume creation
+  # AKA store your newly created volumes at /var/cache/microvm/<name>/<volume>
+  systemd.services."microvm@".serviceConfig.CacheDirectory = "microvm/%i";
+
   # WARN; Superseded by systemd-ssh-generators!
   # Comes with systemd v256+ and the systemd-ssh-generators feature activated!
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html

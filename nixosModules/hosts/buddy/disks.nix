@@ -519,7 +519,7 @@
         # HELP; Create sub datasets to specialize storage behaviour to the application.
         type = "zfs_fs";
         options = {
-          mountpoint = "/microvm/volumes";
+          mountpoint = "/var/cache/microvm";
           # Qemu does its own application level caching
           # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
           # NOTE; My virtual machines will run from a tmpfs by default!

@@ -8,7 +8,7 @@
     ./disks.nix
     ./dns-vm.nix
     ./sso-vm.nix
-    #./immich-vm.nix
+    ./photos-vm.nix
     # ./test-vm.nix # DEBUG
   ];
 
