@@ -1,7 +1,7 @@
 { lib, config, ... }: {
   imports = [
-    ./microvm-guest/central-microvm.nix # WIP
-    ./microvm-guest/suitcase-microvm.nix # WIP
+    ./microvm-guest/central-microvm.nix
+    ./microvm-guest/suitcase-microvm.nix
   ];
 
   # Generate a nixos module with for each defined vm containing all hypervisor
@@ -41,24 +41,6 @@
     # ERROR; The parameter below is only used for p9 sharing. This is _not_ the same as virtiofs' accessmode!
     # securityModel = "mapped";
   }];
-
-  # systemd.tmpfiles.settings = lib.mkMerge [
-  #   (lib.optionalAttrs (builtins.any ({ mountPoint, ... }: mountPoint == "/data") config.microvm.shares)
-  #     {
-  #       "1-mount-landing" = {
-  #         # NOTE; The base (AKA root) directory of a mount gets the following default permissions assigned;
-  #         # u=rwx,g=rx,o=rx root:root -> AKA path is world-readable!
-  #         #
-  #         # WARN; Guest config should work with the contents of this folder. It's supposed to be pre-populated
-  #         # with data-specific filesystems. 
-  #         "/data".d = {
-  #           user = "root";
-  #           group = "root";
-  #           mode = "0755";
-  #         };
-  #       };
-  #     })
-  # ];
 
   networking.useNetworkd = true;
 

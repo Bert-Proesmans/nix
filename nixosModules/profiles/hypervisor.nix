@@ -6,8 +6,8 @@ in
 {
   imports = [
     flake.inputs.microvm.nixosModules.host
-    ./microvm-host/central-microvm.nix # WIP
-    ./microvm-host/suitcase-microvm.nix # WIP
+    ./microvm-host/central-microvm.nix
+    ./microvm-host/suitcase-microvm.nix
   ];
 
   # The hypervisor infrastructure is ran by the systemd framework
@@ -21,8 +21,9 @@ in
     ];
   };
 
-  # ERROR; Secrets disappear when rebuilding the host.
-  # Tell SOPS-NIX to not cleanup old generations of mounted secrets.
+  # ERROR; Secrets disappear when rebuilding the host, mounted folders outside the
+  # secrets directory become empty.
+  # Tell SOPS-NIX to not cleanup old generations of secrets.
   sops.keepGenerations = 0;
 
   # WARN; Superseded by systemd-ssh-generators!
@@ -39,15 +40,6 @@ in
       (lib.mapAttrsToList vsock-match-block)
       (lib.concatStringsSep "\n")
     ];
-
-  boot.kernel.sysctl = {
-    # Don't setup the hypervisor to route, but attach MACVTAP interfaces
-    # to the physical uplink directly!
-    #
-    # "net.ipv4.ip_forward" = "1";
-    # "net.ipv6.conf.all.forwarding" = "1";
-    # "net.ipv6.conf.default.forwarding" = "1";
-  };
 
   # mount /hugetlbfs for virtio/qemu
   # systemd.mounts = [{
