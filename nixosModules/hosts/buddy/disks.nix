@@ -26,6 +26,17 @@
     ];
   };
 
+  systemd.tmpfiles.settings."1-base-datasets" = {
+    # Assumes ZFS datasets will be mounted on paths /storage/**/X
+    # The parent folder permissions are explicitly set to prevent accidental
+    # world access.
+    "/storage".d = {
+      user = "root";
+      group = "root";
+      mode = "0700";
+    };
+  };
+
   # Do not force anything when pools have not been properly exported!
   boot.zfs.forceImportRoot = false;
   boot.zfs.forceImportAll = false;

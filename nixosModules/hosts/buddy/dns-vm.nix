@@ -1,29 +1,15 @@
 { lib, config, flake, profiles, meta-module, ... }: {
-  sops.secrets."routedns-vm/ssh_host_ed25519_key" = {
-    mode = "0400"; # Required by sshd
+  sops.secrets."dns-vm/ssh_host_ed25519_key" = {
     restartUnits = [
-      # New secrets are a new directory (new generation) and bind mount must be updated
-      "shared-routedns-seeds.mount"
       # New ssh key requires restart of guest
-      "microvm@routedns.service"
+      "microvm@dns.service"
     ];
   };
 
-  # Mounted at /shared/routedns/<mount-name>
-  proesmans.mount-central = {
-    defaults.after-units = [ "zfs-mount.service" ];
-    directories."routedns".mounts = {
-      "seeds".source = "/run/secrets/routedns-vm";
-    };
-  };
-
-  systemd.services."microvm-virtiofsd@routedns".unitConfig = {
-    RequiresMountsFor = config.proesmans.mount-central.directories."routedns".bind-paths;
-  };
-
-  microvm.vms."routedns" =
+  microvm.vms."dns" =
     let
       parent-hostname = config.networking.hostName;
+      guest-ssh-key = config.sops.secrets."dns-vm/ssh_host_ed25519_key".path;
     in
     {
       autostart = true;
@@ -32,12 +18,12 @@
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
       config = { config, profiles, ... }: {
-        _file = ./routedns-vm.nix;
+        _file = ./dns-vm.nix;
 
         imports = [
           profiles.qemu-guest-vm
-          (meta-module "DNS")
-          ../DNS.nix # VM config
+          (meta-module "dns")
+          ../dns.nix # VM config
         ];
 
         config = {
@@ -61,14 +47,18 @@
             mac = "26:fa:77:05:26:bc"; # randomly generated
           }];
 
-          microvm.shares = [
+          microvm.suitcase.secrets = {
+            "ssh_host_ed25519_key".source = guest-ssh-key;
+          };
+
+          services.openssh.hostKeys = [
             {
-              source = "/shared/routedns";
-              mountPoint = "/data";
-              tag = "state-routedns";
-              proto = "virtiofs";
+              path = config.microvm.suitcase.secrets."ssh_host_ed25519_key".path;
+              type = "ed25519";
             }
           ];
+          systemd.services.sshd.unitConfig.ConditionPathExists = config.microvm.suitcase.secrets."ssh_host_ed25519_key".path;
+          systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
         };
       };
     };

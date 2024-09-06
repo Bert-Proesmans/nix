@@ -6,9 +6,9 @@
     profiles.hypervisor
     ./hardware-configuration.nix
     ./disks.nix
-    ./routedns-vm.nix
-    ./immich-vm.nix
-    ./kanidm-vm.nix
+    ./dns-vm.nix
+    #./immich-vm.nix
+    #./kanidm-vm.nix
     # ./test-vm.nix # DEBUG
   ];
 
@@ -38,33 +38,16 @@
     path = "/etc/ssh/ssh_host_ed25519_key";
     owner = config.users.users.root.name;
     group = config.users.users.root.group;
-    mode = "0400";
+    mode = "0400"; # Required by sshd
     restartUnits = [ config.systemd.services.sshd.name ];
   };
 
   services.openssh.hostKeys = [
     {
-      path = "/etc/ssh/ssh_host_ed25519_key";
+      path = config.sops.secrets.ssh_host_ed25519_key.path;
       type = "ed25519";
     }
   ];
-
-  systemd.tmpfiles.settings."1-base-datasets" = {
-    # Assumes ZFS datasets will be mounted on paths /storage/**/X
-    # The parent folder permissions are explicitly set to prevent accidental
-    # world access.
-    "/storage".d = {
-      user = "root";
-      group = "root";
-      mode = "0700";
-    };
-    # Microvm user needs R/W access to the mounted volumes
-    "/microvm".Z = {
-      user = "microvm";
-      group = "kvm"; # WARN; hardcoded group is NOT microvm!
-      mode = "0750";
-    };
-  };
 
   sops.secrets."cloudflare-proesmans-key" = { };
   sops.secrets."cloudflare-zones-key" = { };
