@@ -1,18 +1,17 @@
 { lib, flake, profiles, meta-module, config, ... }: {
   sops.secrets."test-vm/ssh_host_ed25519_key" = {
-    # For virtio ssh
-    mode = "0400";
     restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
   };
 
   microvm.vms.test =
     let
       parent-hostname = config.networking.hostName;
+      guest-ssh-key = config.sops.secrets."test-vm/ssh_host_ed25519_key".path;
     in
     {
       autostart = false;
       specialArgs = { inherit lib flake profiles; };
-      config = { profiles, ... }: {
+      config = { profiles, config, ... }: {
         _file = ./test-vm.nix;
 
         imports = [
@@ -47,17 +46,17 @@
           ];
 
           microvm.suitcase.secrets = {
-            "test".source = "/var/dir-share/hable.txt";
+            "ssh_host_ed25519_key".source = guest-ssh-key;
           };
 
-          microvm.shares = [
-            ({
-              source = "/run/secrets/test-vm"; # RAMFS coming from sops
-              mountPoint = "/seeds";
-              tag = "secret-seeds";
-              proto = "virtiofs";
-            })
+          services.openssh.hostKeys = [
+            {
+              path = config.microvm.suitcase.secrets."ssh_host_ed25519_key".path;
+              type = "ed25519";
+            }
           ];
+          systemd.services.sshd.unitConfig.ConditionPathExists = config.microvm.suitcase.secrets."ssh_host_ed25519_key".path;
+          systemd.services.sshd.serviceConfig.StandardOutput = "journal+console";
         };
       };
     };

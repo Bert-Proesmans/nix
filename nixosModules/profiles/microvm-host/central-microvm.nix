@@ -34,8 +34,8 @@
           "microvm-pci-devices@${name}.service"
           "microvm-virtiofsd@${name}.service"
         ];
+        requiredBy = [ "microvm@${name}.service" ];
         partOf = [ "microvm@${name}.service" ];
-        wantedBy = [ "microvms.target" ];
       }]
       ++ (lib.flip builtins.map microvm-config.config.config.microvm.central.shares (
         share: {
@@ -56,8 +56,8 @@
             "microvm-pci-devices@${name}.service"
             "microvm-virtiofsd@${name}.service"
           ];
+          requiredBy = [ "microvm@${name}.service" ];
           partOf = [ "microvm@${name}.service" ];
-          wantedBy = [ "microvms.target" ];
         }
       ))
     ));
