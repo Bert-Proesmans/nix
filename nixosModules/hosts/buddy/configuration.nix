@@ -7,8 +7,8 @@
     ./hardware-configuration.nix
     ./disks.nix
     ./dns-vm.nix
+    ./sso-vm.nix
     #./immich-vm.nix
-    #./kanidm-vm.nix
     # ./test-vm.nix # DEBUG
   ];
 

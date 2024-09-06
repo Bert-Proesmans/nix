@@ -7,14 +7,6 @@
   config = {
     networking.domain = "alpha.proesmans.eu";
 
-    services.openssh.hostKeys = [
-      {
-        path = "/data/seeds/ssh_host_ed25519_key";
-        type = "ed25519";
-      }
-    ];
-    systemd.services.sshd.unitConfig.ConditionPathExists = "/data/seeds/ssh_host_ed25519_key";
-
     # DEBUG
     security.sudo.enable = true;
     security.sudo.wheelNeedsPassword = false;
@@ -28,23 +20,6 @@
       # Add CLI tools to PATH
       pkgs.kanidm
     ];
-
-    # ERROR; Kanidm database path option is readonly and cannot be changed!
-    #
-    # Alternative, set /var/lib/kanidm to a symlink. This requires to mimic service config
-    # StateDirectory manually; create directory out of tree, update permissions + symlink into /var/lib
-    #
-    # WARN; Disable StateDirectory from the systemd service unit.
-    systemd.tmpfiles.settings."20-kanidm" = {
-      # Adjust permissions of files within the state directory
-      "/data/state".Z = {
-        user = "kanidm";
-        group = "kanidm";
-        mode = "0700";
-      };
-
-      "/var/lib/kanidm".L.argument = "/data/state";
-    };
 
     services.kanidm = {
       enableServer = true;
@@ -78,19 +53,12 @@
 
     systemd.services.kanidm = {
       serviceConfig = {
-        # /var/lib/kanidm is a symlink so don't create the state directory
-        StateDirectory = lib.mkForce "";
-        BindPaths = [
-          # Allow the service to see the symlink, but also the state directory it points to
-          "/var/lib/kanidm"
-          "/data/state"
-        ];
         LoadCredential = [
           # WARN; Certificate files must be loaded into the unit credential store because
           # the original files require root access. This unit executes with user kanidm permissions.
-          "FULLCHAIN_PEM:/data/certs/fullchain.pem"
-          "KEY_PEM:/data/certs/key.pem"
-          "IDM_PASS:/data/seeds/idm_admin_password"
+          "FULLCHAIN_PEM:/run/in-secrets-microvm/certificates/fullchain.pem"
+          "KEY_PEM:/run/in-secrets-microvm/certificates/key.pem"
+          "IDM_PASS:/seeds/idm_admin_password"
         ];
       };
     };
