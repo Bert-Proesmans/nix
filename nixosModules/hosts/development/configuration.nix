@@ -5,6 +5,7 @@
     ./hardware-configuration.nix
     ./wip.nix
     ./test-vm.nix
+    #./proxy-vm.nix
   ];
 
   networking.hostName = "development";
