@@ -9,6 +9,11 @@
 , netcat-openbsd
 , gnugrep
 , coreutils
+, makeWrapper
+  # Self-reference to wrap other packages
+  # ERROR; Package _must_ be made available in the global package set for function wrapPackage
+  # to work!
+, unsock
 }:
 
 stdenv.mkDerivation (finalAttrs: {
@@ -31,6 +36,25 @@ stdenv.mkDerivation (finalAttrs: {
     mkdir $out/bin
     ln --symbolic $out/lib/libunsock.so $out/bin/libunsock.so
   '';
+
+  # NOTE; Wrapping packages is only half the work! Set environment variables like UNSOCK_DIR (UNSOCK_ADDR) to complete activation
+  # of the desired behaviour!
+  passthru.wrap = other:
+    assert lib.assertMsg (lib.isDerivation other)
+      "Unsock: Attempt to wrap a ${lib.typeOf other}, but it should be a derivation";
+    assert lib.assertMsg (other.meta?mainProgram && other.meta.mainProgram != null)
+      "Unsock: The provided package ${lib.getName other} has an empty mainProgram meta attribute, a value for meta.mainProgram should be set";
+    # WARN; NixOS modules will use <pkgs>.override (..) to adjust attributes in the argument that generates the package.
+    # Specifically overrideAttrs is used to override attributes passed into mkDerivation to keep compatibility
+    # with other running override!
+    other.overrideAttrs (prevAttrs: {
+      nativeBuildInputs = (prevAttrs.nativeBuildInputs or [ ]) ++ [ makeWrapper ];
+
+      postInstall = (prevAttrs.postInstall or "") + ''
+        wrapProgram $out/bin/${other.meta.mainProgram} \
+           --prefix LD_PRELOAD : ${lib.getLib unsock}/lib/libunsock.so
+      '';
+    });
 
   meta = {
     description = "Shim library to automatically change AF_INET sockets to AF_UNIX, etc.";
@@ -59,7 +83,6 @@ stdenv.mkDerivation (finalAttrs: {
       IPv4-communication only. As a bonus feature, *unsock* simplifies communication with
       [Firecracker-style](https://github.com/firecracker-microvm/firecracker/blob/main/docs/vsock.md)
       multiplexing sockets.
-
     '';
     homepage = "https://github.com/kohlschutter/unsock";
     changelog = "https://github.com/kohlschutter/unsock/releases/tag/unsock-${finalAttrs.version}";

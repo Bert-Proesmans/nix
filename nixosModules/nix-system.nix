@@ -84,7 +84,7 @@ in
         in
         cfg.overlays
         ++ [
-          (_final: prev: {
+          (final: prev: {
             # Injecting our own lib only has effect on argument pkgs.lib. This is by design otherwise we end up
             # with an infinite recursion.
             # Overriding lib _must_ be done at the call-site of lib.nixosSystem.
@@ -107,6 +107,9 @@ in
             #   - Dependencies are taken from system package set
             #   - Only one system is evaluated instead of all systems for cross-compilation (if any)
             proesmans = builtins.mapAttrs (_: recipe: prev.callPackage recipe { }) (lib.rakeLeaves ../packages);
+            # ERROR; special function unsock.wrap throws error about unresolved import "unsock"
+            # Need to special case unsock and pull it into the toplevel scope of pkgs.
+            unsock = final.proesmans.unsock;
           })
         ];
 

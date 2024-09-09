@@ -33,26 +33,26 @@
     };
   };
 
-  proesmans.unsock = {
+  systemd.services.nginx.unsock = {
     enable = true;
-    wrappers.nginx.enable = true;
-
+    ip-scope = "127.175.0.0/32";
     proxies = [
       {
-        match.port = 8040;
-        to.vsock.cid = 55;
-        to.vsock.port = 8000;
+        match.port = 8000;
+        to.vsock.cid = 3000;
+        to.vsock.port = 8080;
       }
       {
-        match.port = 8041;
-        to.vsock.cid = 55;
-        to.vsock.port = 8000;
+        match.port = 8010;
+        to.vsock.cid = 3001;
+        to.vsock.port = 8080;
       }
     ];
   };
 
   services.nginx = {
     enable = true;
+    package = pkgs.unsock.wrap pkgs.nginxMainline;
 
     virtualHosts = {
       "photos.alpha.proesmans.eu" = {
