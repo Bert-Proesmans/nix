@@ -78,7 +78,8 @@ in
 
           to.vsock.port = lib.mkOption {
             description = "VSOCK Port to redirect to";
-            type = lib.types.port;
+            type = lib.type.nullOr lib.types.port;
+            default = null;
           };
         };
       }));
