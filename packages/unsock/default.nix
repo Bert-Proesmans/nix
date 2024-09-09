@@ -1,11 +1,6 @@
-{ callPackage
-, lib
+{ lib
 , stdenv
 , fetchFromGitHub
-, fetchurl
-, nixos
-, testers
-, versionCheckHook
 , netcat-openbsd
 , gnugrep
 , coreutils

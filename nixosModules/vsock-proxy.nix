@@ -47,7 +47,7 @@ in
     proxies = lib.mkOption {
       description = "Connect bidirectionally between VSOCK and TCP";
       default = [ ];
-      type = lib.types.listOf (lib.types.submodule ({ name, config, ... }: {
+      type = lib.types.listOf (lib.types.submodule ({ ... }: {
         options = {
           enable = lib.mkEnableOption "vsock<->tcp proxy" // { default = true; };
 

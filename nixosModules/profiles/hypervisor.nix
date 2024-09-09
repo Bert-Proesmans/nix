@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, facts, config, ... }:
+{ lib, pkgs, flake, config, ... }:
 let
   my-guests = builtins.mapAttrs (_: v: v.config.config) config.microvm.vms;
   ssh-my-guests = builtins.mapAttrs (_: v: { vsock-id = v.microvm.vsock.cid; }) my-guests;

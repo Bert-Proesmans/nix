@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, profiles, meta-module, config, ... }: {
+{ lib, flake, profiles, meta-module, config, ... }: {
   disko.devices.zpool.storage.datasets = {
     "postgres/state/test" = {
       type = "zfs_fs";

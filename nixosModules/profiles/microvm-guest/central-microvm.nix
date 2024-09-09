@@ -32,7 +32,7 @@ in
     shares = lib.mkOption {
       description = "Shared directory trees passed through a single guest mount";
       default = [ ];
-      type = lib.types.listOf (lib.types.submodule ({ config, ... }: {
+      type = lib.types.listOf (lib.types.submodule ({ ... }: {
         options = {
           tag = lib.mkOption {
             type = lib.types.str;

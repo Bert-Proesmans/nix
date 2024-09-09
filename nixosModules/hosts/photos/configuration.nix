@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, config, ... }: {
+{ lib, pkgs, config, ... }: {
   imports = [ ./WIP.nix ];
 
   networking.domain = "alpha.proesmans.eu";

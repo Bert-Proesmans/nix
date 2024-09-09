@@ -1,4 +1,4 @@
-{ lib, pkgs, config, flake, profiles, meta-module, ... }: {
+{ lib, config, flake, profiles, meta-module, ... }: {
   sops.secrets = {
     "proxy-vm/ssh_host_ed25519_key" = {
       # New ssh key requires restart of guest

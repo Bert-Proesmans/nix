@@ -1,8 +1,4 @@
 { pkgs, config, ... }:
-let
-  state-postgres-dir = "/data/state-postgresql/${config.services.postgresql.package.psqlSchema}";
-  wal-postgres-dir = "/data/wal-postgresql/${config.services.postgresql.package.psqlSchema}";
-in
 {
   networking.domain = "alpha.proesmans.eu";
 

@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }: {
+{ pkgs, ... }: {
 
   proesmans.vsock-proxy.proxies = [
     {
