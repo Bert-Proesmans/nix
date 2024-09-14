@@ -1,37 +1,30 @@
-{ lib, config, flake, profiles, meta-module, ... }: {
-  sops.secrets = {
-    "proxy-vm/ssh_host_ed25519_key" = {
-      # New ssh key requires restart of guest
-      restartUnits = [ config.systemd.services."microvm@proxy".name ];
-    };
+{ lib, flake, special, meta-module, config, ... }: {
+  sops.secrets."test-vm/ssh_host_ed25519_key" = {
+    restartUnits = [ config.systemd.services."microvm@2-test".name ]; # Systemd interpolated service
   };
 
-  microvm.vms."proxy" =
+  microvm.vms."2-test" =
     let
       parent-hostname = config.networking.hostName;
-      guest-ssh-key = config.sops.secrets."proxy-vm/ssh_host_ed25519_key".path;
+      guest-ssh-key = config.sops.secrets."test-vm/ssh_host_ed25519_key".path;
     in
     {
-      autostart = true;
-      specialArgs = { inherit lib flake profiles; };
+      autostart = false;
+      specialArgs = { inherit lib flake special; };
+      config = { special, config, ... }: {
+        _file = ./2-test-vm.nix;
 
-      config = { config, profiles, ... }: {
-        _file = ./proxy-vm.nix;
         imports = [
-          profiles.qemu-guest-vm
-          (meta-module "proxy")
-          ../proxy.nix # VM config
+          special.profiles.qemu-guest-vm
+          (meta-module "2-test")
+          ../test.nix # VM config
         ];
 
         config = {
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-          # ERROR; Number must be unique for each VM!
-          # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-          microvm.vsock.cid = 289;
-
+          microvm.vsock.cid = 90000;
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;
-
           microvm.interfaces = [{
             type = "macvtap";
             macvtap = {
@@ -40,9 +33,17 @@
               mode = "private";
               link = "main";
             };
-            id = "vmac-proxy";
-            mac = "52:0d:da:28:b9:5b"; # randomly generated
+            id = "vmac-2-test";
+            mac = "9e:5f:ca:0b:83:8d"; # randomly generated
           }];
+
+          microvm.central.shares = [
+            ({
+              source = "/var/dir-share";
+              mountPoint = "/var/dir-share";
+              tag = "dir-share";
+            })
+          ];
 
           microvm.suitcase.secrets = {
             "ssh_host_ed25519_key".source = guest-ssh-key;

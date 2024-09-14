@@ -32,13 +32,17 @@ let
 
       to.vsock.cid = lib.mkOption {
         description = ''
-          VSOCK host ID. Note that hosts could have multiple aliased IDs.
-          CONSTANTS;
-            - VMADDR_CID_HYPERVISOR = 0 (AKA deprecated)
+          VSOCK host ID. Set to -1 when binding a listener!
+          CONSTANTS for connecting to a VSOCK listener;
+            - VMADDR_CID_HYPERVISOR = 0 (AKA deprecated) **do not use**
             - VMADDR_CID_LOCAL = 1 (AKA loopback)
             - VMADDR_CID_HOST = 2 (AKA hypervisor)
+
+          ERROR; Binding/connecting to VMADDR_CID_LOCAL requires loaded kernel module "vhost_loopback"
+          so the loopback transport is available. If the module is not loaded, connections will never
+          complete AKA a silent "failure".
         '';
-        type = lib.types.nullOr lib.types.ints.u32;
+        type = lib.types.nullOr (lib.types.addCheck lib.types.int (x: x == -1 || x > 0));
         default = null;
       };
 
@@ -102,14 +106,14 @@ in
             name = "generate-vsock-config";
             runtimeInputs = [ cfg.package ];
             text = ''
-              Take variables from environment or overwrite them from command line
+              # Take variables from environment or overwrite them from command line
               export UNSOCK_FILE="''${1:-UNSOCK_FILE}"
               export UNSOCK_VSOCK_CID="''${2:-UNSOCK_VSOCK_CID}"
               export UNSOCK_VSOCK_PORT="''${3:-UNSOCK_VSOCK_PORT}"
 
               [ -e "$UNSOCK_FILE" ] && rm --force "$UNSOCK_FILE"
 
-              Execute the library, creating a config file at UNSOCK_FILE with provided details
+              # Execute the library, creating a config file at UNSOCK_FILE with provided details
               libunsock.so
 
               chmod 0600 "$UNSOCK_FILE"
@@ -123,7 +127,31 @@ in
               by-vsock-proxies = builtins.attrValues (builtins.groupBy ({ to, ... }: "${toString to.vsock.cid}-${toString to.vsock.port}") cfg.proxies);
             in
             lib.optionals (cfg.enable) (
-              (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
+              [
+                ({
+                  assertion = (
+                    config?serviceConfig
+                    && config.serviceConfig?RestrictAddressFamilies
+                    && builtins.isList config.serviceConfig.RestrictAddressFamilies
+                  ) -> builtins.elem "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
+                  message = ''
+                    Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
+                    To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = ["AF_VSOCK"];
+                  '';
+                })
+                ({
+                  assertion = (
+                    config?serviceConfig
+                    && config.serviceConfig?RestrictAddressFamilies
+                    && builtins.isString config.serviceConfig.RestrictAddressFamilies
+                  ) -> lib.hasInfix "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
+                  message = ''
+                    Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
+                    To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = "AF_VSOCK";
+                  '';
+                })
+              ]
+              ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
                 "Unsock: service ${name}: You have multiple proxies pointing to the same socket path. This could be intentional, otherwise verify your proxy configuration."
                 [ ])
               ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-vsock-proxies)

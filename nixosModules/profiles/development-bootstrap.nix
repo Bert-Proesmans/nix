@@ -17,8 +17,8 @@
       # the interactive string reference is returned that points to the same derivation.
       devShells = shell-attribute: (
         builtins.seq
-          flake.inputs.self.outputs.devShells."${system}"."${shell-attribute}"
-          "${flake.inputs.self}#${shell-attribute}"
+          flake.outputs.devShells."${system}"."${shell-attribute}"
+          "${flake}#${shell-attribute}"
       );
 
       deployment-script = pkgs.writeShellApplication {
@@ -35,7 +35,7 @@
 
           nix develop "${devShells "deployment-shell"}" \
             --command bash \
-            -c "invoke --search-root ${flake.inputs.self} host-deploy development root@localhost"
+            -c "invoke --search-root ${flake} host-deploy development root@localhost"
         '';
       };
 

@@ -1,9 +1,11 @@
-{ lib, flake, facts, home-configurations, config, ... }:
+{ lib, special, flake, config, ... }:
 let
   cfg = config.proesmans.home-manager;
   cfg-users = config.users.users;
-  types = lib.types;
+  facts = flake.outputs.host-facts;
 
+  # WARN; Unpack the home modules until an attribute set of <user> = <config> remains!
+  home-modules = flake.outputs.homeModules.users;
   # Meta module used similarly to nixosModules to inject host facts and custom modules.
   wrapped-in-meta = _: original-module: { ... }: {
     _file = ./home-manager.nix;
@@ -14,17 +16,17 @@ let
       _module.args.facts = facts;
     };
   };
-  wrapped-home-configurations = builtins.mapAttrs wrapped-in-meta home-configurations;
+  wrapped-home-modules = builtins.mapAttrs wrapped-in-meta home-modules;
 in
 {
-  imports = [ flake.inputs.home-manager.nixosModules.default ];
+  imports = [ special.inputs.home-manager.nixosModules.default ];
 
   options.proesmans.home-manager = {
     enable = lib.mkEnableOption (lib.mdDoc "Enable user profile configuration for the users on the system");
     whitelist = lib.mkOption {
       # null is used to break infinite recursion.
       # The alternative would be to pre-populate the list with all users on the system.
-      type = types.nullOr (types.listOf types.str);
+      type = lib.types.nullOr (lib.types.listOf lib.types.str);
       description = lib.mdDoc ''
         List of home-manager configuration attributes to install.
         The values in this array must overlap with the key-list of attribute-set `homeModules.users`.
@@ -41,10 +43,10 @@ in
         ++ (if cfg.whitelist != null then
         lib.flatten
           (lib.flip builtins.map cfg.whitelist (ref: [{
-            assertion = builtins.hasAttr ref home-configurations;
+            assertion = builtins.hasAttr ref home-modules;
             message = ''
-              The whitelisted user reference ${ref} does not have a matching home-configuration.
-              You can create a new home-configuration by defining flake output:
+              The whitelisted user reference ${ref} does not have a matching home-module.
+              You can create a new home-module by defining flake output:
               homeModules.users.${ref} = {};
             '';
           }]))
@@ -67,7 +69,7 @@ in
         }])) else [ ])
         ++ (if cfg.whitelist == null then
         lib.flatten
-          (lib.flip lib.mapAttrsToList home-configurations (ref: _home-config: [{
+          (lib.flip lib.mapAttrsToList home-modules (ref: _: [{
             # WARN; Home-manager will create an empty users.users.<name> option without further details for
             # each user added through home-manager.users!
             # The assertion 'builtins.hasAttr ref cfg-users' will always be true like this.
@@ -79,7 +81,7 @@ in
               in
               xor isEffectivelySystemUser user.isNormalUser;
             message = ''
-              The home-configuration `homeModules.users.${ref}` is defined and included, but there is (probably) no matching system user defined in the configuration.
+              The home-module `homeModules.users.${ref}` is defined and included, but there is (probably) no matching system user defined in the configuration.
               You can create a new user by defining the nixos options:
               users.users.${ref}.isNormaluser = true;
             '';
@@ -92,9 +94,9 @@ in
       # Follow the system nix configuration instead of building/using a parallel index
       home-manager.useGlobalPkgs = true;
       home-manager.users =
-        if cfg.whitelist == null then wrapped-home-configurations
+        if cfg.whitelist == null then wrapped-home-modules
         # Only keep the home configurations that intersect with the whitelist
-        else builtins.intersectAttrs (builtins.listToAttrs (builtins.map (name: { inherit name; value = null; }) cfg.whitelist)) wrapped-home-configurations;
+        else builtins.intersectAttrs (builtins.listToAttrs (builtins.map (name: { inherit name; value = null; }) cfg.whitelist)) wrapped-home-modules;
     })
   ];
 }

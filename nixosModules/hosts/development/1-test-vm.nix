@@ -1,28 +1,28 @@
-{ lib, flake, profiles, meta-module, config, ... }: {
+{ lib, flake, special, meta-module, config, ... }: {
   sops.secrets."test-vm/ssh_host_ed25519_key" = {
-    restartUnits = [ "microvm@test.service" ]; # Systemd interpolated service
+    restartUnits = [ config.systemd.services."microvm@1-test".name ]; # Systemd interpolated service
   };
 
-  microvm.vms.test =
+  microvm.vms."1-test" =
     let
       parent-hostname = config.networking.hostName;
       guest-ssh-key = config.sops.secrets."test-vm/ssh_host_ed25519_key".path;
     in
     {
       autostart = false;
-      specialArgs = { inherit lib flake profiles; };
-      config = { profiles, config, ... }: {
-        _file = ./test-vm.nix;
+      specialArgs = { inherit lib flake special; };
+      config = { special, config, ... }: {
+        _file = ./1-test-vm.nix;
 
         imports = [
-          profiles.qemu-guest-vm
-          (meta-module "test")
+          special.profiles.qemu-guest-vm
+          (meta-module "1-test")
           ../test.nix # VM config
         ];
 
         config = {
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-          microvm.vsock.cid = 55;
+          microvm.vsock.cid = 10000;
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;
           microvm.interfaces = [{
@@ -33,7 +33,7 @@
               mode = "private";
               link = "main";
             };
-            id = "vmac-test";
+            id = "vmac-1-test";
             mac = "6a:33:06:88:6c:5b"; # randomly generated
           }];
 

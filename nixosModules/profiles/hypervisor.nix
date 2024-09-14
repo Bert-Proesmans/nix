@@ -1,11 +1,11 @@
-{ lib, pkgs, flake, config, ... }:
+{ lib, pkgs, special, config, ... }:
 let
   my-guests = builtins.mapAttrs (_: v: v.config.config) config.microvm.vms;
   ssh-my-guests = builtins.mapAttrs (_: v: { vsock-id = v.microvm.vsock.cid; }) my-guests;
 in
 {
   imports = [
-    flake.inputs.microvm.nixosModules.host
+    special.inputs.microvm.nixosModules.host
     ./microvm-host/central-microvm.nix
     ./microvm-host/suitcase-microvm.nix
   ];

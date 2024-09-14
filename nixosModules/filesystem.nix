@@ -1,9 +1,9 @@
-{ lib, flake, config, options, ... }:
+{ lib, special, config, options, ... }:
 let
   cfg = config.proesmans.filesystem;
 in
 {
-  imports = [ flake.inputs.disko.nixosModules.disko ];
+  imports = [ special.inputs.disko.nixosModules.disko ];
 
   options.proesmans.filesystem = {
     simple-disk.enable = lib.mkEnableOption (lib.mdDoc "Enable a simple disk layout");

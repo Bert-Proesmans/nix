@@ -1,4 +1,4 @@
-{ lib, flake, profiles, meta-module, config, ... }: {
+{ lib, flake, special, meta-module, config, ... }: {
   sops.secrets = {
     "photos-vm/ssh_host_ed25519_key" = {
       restartUnits = [
@@ -69,12 +69,12 @@
     in
     {
       autostart = true;
-      specialArgs = { inherit lib flake profiles; };
-      config = { config, profiles, ... }: {
+      specialArgs = { inherit lib flake special; };
+      config = { config, special, ... }: {
         _file = ./photos-vm.nix;
 
         imports = [
-          profiles.qemu-guest-vm
+          special.profiles.qemu-guest-vm
           (meta-module "photos")
           ../photos/configuration.nix # VM config
         ];

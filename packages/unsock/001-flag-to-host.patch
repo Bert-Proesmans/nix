@@ -1,0 +1,56 @@
+diff --git a/src/main.c b/src/main.c
+index fadbdf1..b41f1a9 100755
+--- a/src/main.c
++++ b/src/main.c
+@@ -11,6 +11,7 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
++#include <stdbool.h>
+ #include <stddef.h>
+ #include <string.h>
+ #include <errno.h>
+@@ -82,10 +83,11 @@ static int createProxyFile(char *sockFile, char *targetFile, int vsockPort) {
+     return writeFile(sockFile, &si);
+ }
+ 
+-static int createVsockFile(char *sockFile, int vsockPort, int vsockCid) {
++static int createVsockFile(char *sockFile, int vsockPort, int vsockCid, bool vsockConnectSibling) {
+     fprintf(stderr, "UNSOCK_FILE: %s\n", sockFile);
+     fprintf(stderr, "UNSOCK_VSOCK_PORT: %i\n", vsockPort);
+     fprintf(stderr, "UNSOCK_VSOCK_CID: %i\n", vsockCid);
++    fprintf(stderr, "UNSOCK_VSOCK_CONNECT_SIBLING: %i\n", vsockConnectSibling);
+ 
+     struct unsock_socket_info si = {0};
+     si.magicHeader = UNSOCK_SOCKET_INFO_MAGIC;
+@@ -97,6 +99,9 @@ static int createVsockFile(char *sockFile, int vsockPort, int vsockCid) {
+     si.dest.vsock.svm_cid = vsockCid;
+     si.dest.vsock.svm_port = vsockPort;
+ 
++    if(vsockConnectSibling)
++        si.dest.vsock.svm_flags |= VMADDR_FLAG_TO_HOST;
++
+     return writeFile(sockFile, &si);
+ }
+ 
+@@ -130,6 +135,7 @@ int unsock_main() {
+         char *targetFile = getenv_unsock("UNSOCK_FC_SOCK");
+         char *vsockPortStr = getenv_unsock("UNSOCK_VSOCK_PORT");
+         char *vsockCidStr = getenv_unsock("UNSOCK_VSOCK_CID");
++        char *vsockConnectSiblingStr = getenv_unsock("UNSOCK_VSOCK_CONNECT_SIBLING");
+ 
+         char *tipcAddrTypeStr = getenv_unsock("UNSOCK_TIPC_ADDRTYPE");
+         char *tipcScopeStr = getenv_unsock("UNSOCK_TIPC_SCOPE");
+@@ -139,10 +145,11 @@ int unsock_main() {
+ 
+         int vsockPort = vsockPortStr ? strtol(vsockPortStr, NULL, 10) : 0;
+         int vsockCid = vsockCidStr ? strtol(vsockCidStr, NULL, 10) : VMADDR_CID_ANY;
++        bool vsockConnectSibling = vsockConnectSiblingStr && vsockConnectSiblingStr[0] == '1' && vsockConnectSiblingStr[1] == 0;
+         if(targetFile && vsockPort) {
+             exit(-createProxyFile(sockFile, targetFile, vsockPort));
+         } else if(vsockPort) {
+-            exit(-createVsockFile(sockFile, vsockPort, vsockCid));
++            exit(-createVsockFile(sockFile, vsockPort, vsockCid, vsockConnectSibling));
+         } else if(tipcAddrTypeStr && tipcScopeStr && tipcTypeStr && tipcLowerStr && tipcUpperStr) {
+             char addrtype = (char)strtol(tipcAddrTypeStr, NULL, 10);
+             char scope = (char)(strtol(tipcScopeStr, NULL, 10));

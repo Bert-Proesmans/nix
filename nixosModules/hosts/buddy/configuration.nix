@@ -1,15 +1,15 @@
-{ modulesPath, lib, config, profiles, ... }: {
+{ modulesPath, lib, config, special, ... }: {
 
   imports = [
     "${modulesPath}/hardware/video/radeon.nix" # AMD Vega GPU (Radeon = pre-amdgpu)
-    profiles.server
-    profiles.hypervisor
+    special.profiles.server
+    special.profiles.hypervisor
     ./hardware-configuration.nix
     ./disks.nix
     ./dns-vm.nix
     ./sso-vm.nix
     ./photos-vm.nix
-    # ./test-vm.nix # DEBUG
+    ./proxy-vm.nix
   ];
 
   networking.hostName = "buddy";
@@ -68,6 +68,11 @@
     certs."idm.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = "*.idm.proesmans.eu";
+    };
+
+    certs."alpha.proesmans.eu" = {
+      # This block requests a wildcard certificate.
+      domain = "*.alpha.proesmans.eu";
     };
   };
 

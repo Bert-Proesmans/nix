@@ -1,5 +1,5 @@
-{ profiles, ... }: {
-  imports = [ profiles.dns-server ];
+{ special, ... }: {
+  imports = [ special.profiles.dns-server ];
 
   networking.domain = "alpha.proesmans.eu";
 

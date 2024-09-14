@@ -1,9 +1,9 @@
-{ lib, pkgs, flake, config, ... }:
+{ lib, pkgs, special, config, ... }:
 let
   cfg = config.proesmans.vscode;
 in
 {
-  imports = [ flake.inputs.vscode-server.nixosModules.default ];
+  imports = [ special.inputs.vscode-server.nixosModules.default ];
 
   options.proesmans.vscode = {
     enable = lib.mkEnableOption (lib.mdDoc "Enable vscode server compatibility");

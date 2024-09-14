@@ -1,4 +1,4 @@
-{ lib, config, flake, profiles, meta-module, ... }: {
+{ lib, config, flake, special, meta-module, ... }: {
   sops.secrets."dns-vm/ssh_host_ed25519_key" = {
     restartUnits = [
       # New ssh key requires restart of guest
@@ -13,15 +13,15 @@
     in
     {
       autostart = true;
-      specialArgs = { inherit lib flake profiles; };
+      specialArgs = { inherit lib flake special; };
 
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
-      config = { config, profiles, ... }: {
+      config = { config, special, ... }: {
         _file = ./dns-vm.nix;
 
         imports = [
-          profiles.qemu-guest-vm
+          special.profiles.qemu-guest-vm
           (meta-module "dns")
           ../dns.nix # VM config
         ];

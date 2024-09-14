@@ -1,11 +1,11 @@
-{ lib, config, pkgs, profiles, ... }: {
+{ lib, config, pkgs, special, ... }: {
 
   imports = [
-    profiles.hypervisor
+    special.profiles.hypervisor
     ./hardware-configuration.nix
     ./wip.nix
-    ./test-vm.nix
-    #./proxy-vm.nix
+    ./1-test-vm.nix
+    ./2-test-vm.nix
   ];
 
   networking.hostName = "development";

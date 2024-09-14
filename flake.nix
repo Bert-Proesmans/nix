@@ -44,20 +44,24 @@ rec {
 
   outputs = { self, ... }@args:
     let
-      # The original input metadata can be reused when building the nix registry configuration of
-      # the hosts. Using this information bounds the hosts to the lockfile of this flake explicitly!
-      #
-      # SEEALSO; nixos option nix.registry
-      # SEEALSO; ./nixosModules/nix-system.nix
-      flake-meta.inputs = inputs;
+      flake = self // {
+        # NOTE; The resolved input sources, which match the traditional 'inputs' in documentation and guides,
+        # are automatically inserted into the flake attribute "inputs".
+        # SUPERFLUOUS; inputs = args;
+
+        # The original input metadata can be reused when building the nix registry configuration of
+        # the hosts. This information is used to bind created hosts to the lockfile of this flake explicitly!
+        #
+        # ERROR; Requires 'rec' tagging the outermost attribute set to reference 'inputs' here
+        # ERROR; Requires no other variable being introduced into this scope that shadows 'inputs'
+        # SEEALSO; nixos {option}`nix.registry`
+        # SEEALSO; ./nixosModules/nix-system.nix
+        meta.inputs = inputs;
+      };
     in
     let
-      # Rebinding of args to the name 'inputs'.
-      #
-      # ERROR; Needs a double let .. in binding as to not clobber the variable `inputs`.
-      # `inputs` is canonically the variable used to reference all _resolved_ inputs, but
-      # we're also interested in the unresolved inputs!
-      inputs = args;
+      inherit (flake) inputs;
+      flake-meta = flake.meta;
 
       # Each target we want to (cross-)compile for
       # NOTE; Cross-compiling requires additional configuration on the build host
@@ -114,6 +118,8 @@ rec {
       profiles-nixos = lib.rakeLeaves ./nixosModules/profiles;
     in
     {
+      test = flake;
+
       # Builds an attribute set of all our library code.
       # Each library file is applied with the lib from nixpkgs.
       #
@@ -253,7 +259,7 @@ rec {
       # NOTE; Paths are a value type in nix, and nix will resolve these paths to their fixed store path
       # (eg /nix/store/aaabbbcccdddd/nixosModules/filesystem.nix) during/after evaluation (before derivations are created).
       # The prefix is the resulting path (/aaabbbcccddd) comes from the outPath attribute of this flake.
-      nixosModules = lib.filterAttrs (name: _: name != "hosts" && name != "profiles" && name != "debug") (lib.rakeLeaves ./nixosModules);
+      nixosModules = (lib.rakeLeaves ./nixosModules);
 
       # nixosConfigurations hold the full interconnected configuration data to build a host, either pieces of it or
       # in its entirety.
@@ -282,30 +288,38 @@ rec {
       #
       nixosConfigurations =
         let
+          special-arguments = {
+            # Define arguments here that must be be resolvable at module import stage, for all else use the _module.args option.
+            # SEEALSO; meta-module, below
+            special = {
+              inputs = inputs;
+              profiles = profiles-nixos;
+            };
+          };
+
+          # Only the modules that are safe to include always (aka option definitions and gated configuration)
+          nixos-modules = builtins.attrValues (
+            lib.filterAttrs (name: _: name != "hosts" && name != "profiles" && name != "debug") self.outputs.nixosModules
+          );
+
           meta-module = hostname: { config, ... }: {
             # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
             _file = ./flake.nix;
 
-            # Make all custom nixos options available to the host configurations.
-            imports = builtins.attrValues self.outputs.nixosModules
+            # Preload nixos modules from this repository
+            imports = nixos-modules
               ++ [
               # Options for vizualizing topology of configuration
               inputs.nix-topology.nixosModules.default
             ];
 
             config = {
-              # Flake inputs are used for importing additional nixos modules.
-              # ERROR; Attributes that must be resolved during import evaluation _must_ be passed into the nixos
-              # configuration through specialArgs!
-              # _module.args.flake.inputs = args;
-
-              _module.args.flake-overlays = self.outputs.overlays;
-              _module.args.home-configurations = self.outputs.homeModules.users;
+              # Make the outputs of this flake available to the configurations
+              #
+              # WARN; Possible footgun with flake.outputs.host-facts; the facts of the current host configuration are also included.
+              # This causes a hairpin access pattern, producing unexpected effects. (You'll understand when you experience it)
+              _module.args.flake = flake;
               _module.args.meta-module = meta-module;
-              # WARN; Possible footgun here; the facts of the current host configuration are also included.
-              # This could cause unexpected effects when self-referencing, causing a hairpin access pattern.
-              # (You'll understand when you experience it)
-              _module.args.facts = host-facts;
 
               # The hostname of each configuration _must_ match their attribute name.
               # This prevent the footgun of desynchronized identifiers.
@@ -317,14 +331,7 @@ rec {
           development = lib.nixosSystem {
             inherit lib;
             system = null; # Deprecated, use nixpkgs.hostPlatform option
-            specialArgs = {
-              # Set here arguments that must be be resolvable at module import stage,
-              # for all else use _module.args option.
-              # See also; meta-module, above
-              flake.inputs = inputs;
-              flake.meta.inputs = flake-meta.inputs;
-              profiles = profiles-nixos;
-            };
+            specialArgs = special-arguments;
             modules = [
               (meta-module "development")
               ./nixosModules/hosts/development/configuration.nix
@@ -334,20 +341,12 @@ rec {
           buddy = lib.nixosSystem {
             inherit lib;
             system = null; # Deprecated, use nixpkgs.hostPlatform option
-            specialArgs = {
-              # Set here arguments that must be be resolvable at module import stage,
-              # for all else use _module.args option.
-              # See also; meta-module, above
-              flake.inputs = inputs;
-              flake.meta.inputs = flake-meta.inputs;
-              profiles = profiles-nixos;
-            };
+            specialArgs = special-arguments;
             modules = [
               (meta-module "buddy")
               ./nixosModules/hosts/buddy/configuration.nix
             ];
           };
-
         };
 
       # Home manager modules are just lambda's with an attribute set as argument (arity of all nix functions is
@@ -391,84 +390,19 @@ rec {
       # The default iso is basically a minimal image.
       # The development-iso attribute is basically the same as default plus a bigger payload size.
       packages = eachSystem (pkgs:
-        let
-          forced-system = pkgs.system;
+        lib.makeScope pkgs.newScope (
+          self: {
+            inherit flake;
+            nixosLib = lib;
 
-          # NOTE; This builds the software with dependencies from the upstream nixpkgs channel, without any overrides.
-          repo-packages = builtins.mapAttrs (_: recipe: pkgs.callPackage recipe { }) (lib.rakeLeaves ./packages);
-
-          # NOTE; Minimal installer based host to get new hosts up and running
-          bootstrap = lib.nixosSystem {
-            system = null;
-            lib = lib;
-            specialArgs = {
-              flake.inputs = inputs;
-              flake.meta.inputs = flake-meta.inputs;
-              profiles = profiles-nixos;
-            };
-            modules = [
-              ({ lib, profiles, modulesPath, config, ... }: {
-                # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
-                _file = ./flake.nix;
-
-                imports = [
-                  "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
-                  profiles.remote-iso
-                  # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
-                ];
-
-                config = {
-                  networking.hostName = lib.mkForce "installer";
-                  networking.domain = lib.mkForce "alpha.proesmans.eu";
-
-                  users.users.bert-proesmans = {
-                    isNormalUser = true;
-                    description = "Bert Proesmans";
-                    extraGroups = [ "wheel" ];
-                    openssh.authorizedKeys.keys = [
-                      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"
-                    ];
-                  };
-
-                  nixpkgs.hostPlatform = lib.mkForce forced-system;
-                  system.stateVersion = lib.mkForce config.system.nixos.version;
-                };
-              })
-            ];
-          };
-        in
-        repo-packages //
-        {
-          # NOTE; You can find the generated iso file at ./result/iso/*.iso
-          default = bootstrap.config.system.build.isoImage;
-
-          # Using the handy extendModules function to append more contents to the basic bootstrap image.
-          # The entire point of this ISO is to work the size <-> RAM usage balance, see option isoImage.storeContents.
-          development-iso = (bootstrap.extendModules {
-            modules = [
-              ({ profiles, ... }: {
-                # This is an anonymous module and requires a marker for error messages and nixOS module accounting.
-                _file = ./flake.nix;
-                key = "${./flake.nix}?development-iso";
-
-                imports = [
-                  profiles.development-bootstrap
-                  # NOTE; Explicitly not importing the nixosModules to keep configuration minimal!
-                ];
-
-                config = {
-                  isoImage.storeContents = [
-                    # NOTE; The development machine toplevel derivation is included as a balancing act;
-                    # Bigger ISO image size <-> 
-                    #     + Less downloading 
-                    #     + Less RAM usage (nix/store is kept in RAM on live boots!)
-                    self.outputs.nixosConfigurations.development.config.system.build.toplevel
-                  ];
-                };
-              })
-            ];
-          }).config.system.build.isoImage;
-        }
+            # NOTE; You can find the generated iso file at ./result/iso/*.iso
+            default = self.bootstrap;
+            development = self.bootstrap.override { withDevelopmentConfig = true; };
+          } // lib.packagesFromDirectoryRecursive {
+            callPackage = self.callPackage;
+            directory = ./packages;
+          }
+        )
       );
 
       # Verify flake configurations with;

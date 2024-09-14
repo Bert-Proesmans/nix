@@ -1,4 +1,4 @@
-{ lib, flake, profiles, meta-module, config, ... }: {
+{ lib, flake, special, meta-module, config, ... }: {
   disko.devices.zpool.storage.datasets = {
     "postgres/state/test" = {
       type = "zfs_fs";
@@ -28,12 +28,12 @@
     in
     {
       autostart = true;
-      specialArgs = { inherit lib flake profiles; };
+      specialArgs = { inherit lib flake special; };
       config = { lib, ... }: {
         _file = ./test-vm.nix;
 
         imports = [
-          profiles.qemu-guest-vm
+          special.profiles.qemu-guest-vm
           (meta-module "test")
         ];
 

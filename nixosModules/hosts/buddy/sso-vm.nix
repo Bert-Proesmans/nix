@@ -1,11 +1,11 @@
-{ lib, config, flake, profiles, meta-module, ... }: {
+{ lib, config, flake, special, meta-module, ... }: {
   sops.secrets = {
     "sso-vm/ssh_host_ed25519_key" = {
       # New ssh key requires restart of guest
       restartUnits = [ config.systemd.services."microvm@sso".name ];
     };
-    "idm/idm_admin_password" = { };
-    "idm/openid-secret-immich" = { };
+    "idm/idm_admin_password".restartUnits = [ config.systemd.services."microvm@sso".name ];
+    "idm/openid-secret-immich".restartUnits = [ config.systemd.services."microvm@sso".name ];
   };
 
   # Kanidm state is basically an SQLite database. This dataset is tuned for that use case.
@@ -23,7 +23,7 @@
   };
   systemd.services."microvm@sso" = {
     # Wait until the certificates exist before starting the guest
-    unitConfig.ConditionPathExists = "${config.security.acme.certs."idm.proesmans.eu".directory}/fullchain.pem";
+    unitConfig.ConditionPathExists = "${config.security.acme.certs."alpha.proesmans.eu".directory}/fullchain.pem";
   };
 
   microvm.vms."sso" =
@@ -31,18 +31,19 @@
       parent-hostname = config.networking.hostName;
       guest-ssh-key = config.sops.secrets."sso-vm/ssh_host_ed25519_key".path;
       idm-certificate-path = config.security.acme.certs."idm.proesmans.eu".directory;
+      idm-secrets-path = "/run/secrets/idm";
     in
     {
       autostart = true;
-      specialArgs = { inherit lib flake profiles; };
+      specialArgs = { inherit lib flake special; };
 
       # The configuration for the MicroVM.
       # Multiple definitions will be merged as expected.
-      config = { config, profiles, ... }: {
+      config = { config, special, ... }: {
         _file = ./sso-vm.nix;
 
         imports = [
-          profiles.qemu-guest-vm
+          special.profiles.qemu-guest-vm
           (meta-module "sso")
           ../sso/configuration.nix # VM config
         ];
@@ -85,6 +86,7 @@
             "ssh_host_ed25519_key".source = guest-ssh-key;
             # Available at "/run/in-secrets-microvm/certificates"
             "certificates".source = idm-certificate-path;
+            "secrets".source = idm-secrets-path;
           };
 
           services.openssh.hostKeys = [

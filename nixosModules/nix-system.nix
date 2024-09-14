@@ -1,4 +1,4 @@
-{ config, lib, flake, flake-overlays, ... }:
+{ config, lib, flake, ... }:
 let
   cfg = config.proesmans.nix;
 
@@ -6,6 +6,8 @@ let
   flake-references = flake.meta.inputs;
   # Information on the flake source files in the /nix/store
   flake-sources = flake.inputs;
+  # Overlays from this repository
+  flake-overlays = flake.outputs.overlays;
 in
 {
   options.proesmans.nix = {
@@ -106,7 +108,10 @@ in
             # NOTE; Packages are applied here in current pkgs context. This is better because;
             #   - Dependencies are taken from system package set
             #   - Only one system is evaluated instead of all systems for cross-compilation (if any)
-            proesmans = builtins.mapAttrs (_: recipe: prev.callPackage recipe { }) (lib.rakeLeaves ../packages);
+            proesmans = lib.packagesFromDirectoryRecursive {
+              inherit (prev) callPackage;
+              directory = ../packages;
+            };
             # ERROR; special function unsock.wrap throws error about unresolved import "unsock"
             # Need to special case unsock and pull it into the toplevel scope of pkgs.
             unsock = final.proesmans.unsock;

@@ -13,6 +13,9 @@
           requiredBy = [ "microvm@${name}.service" ];
           partOf = [ "microvm@${name}.service" ];
 
+          # Skip unit if the desired paths don't (yet) exist ?
+          # unitConfig.ConditionPathExists = builtins.map (v: v.source) secrets;
+
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;

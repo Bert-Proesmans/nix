@@ -9,9 +9,11 @@
   users.users.bert-proesmans.extraGroups = [ "wheel" ];
   # DEBUG
 
+  environment.systemPackages = [ pkgs.proesmans.vsock-test ];
+
   services.immich = {
     enable = true;
-    host = "0.0.0.0";
+    host = "127.175.0.0";
     openFirewall = true;
     mediaLocation = "/var/lib/immich";
 
@@ -88,6 +90,14 @@
   systemd.services.postgresql.serviceConfig = {
     StateDirectory = [ "wal-postgresql wal-postgresql/${config.services.postgresql.package.psqlSchema}" ];
   };
+
+  proesmans.vsock-proxy.proxies = [{
+    description = "Connect VSOCK to AF_INET for immich service";
+    listen.vsock.cid = -1; # Binds to localhost
+    listen.port = 8080;
+    transmit.tcp.ip = config.services.immich.host;
+    transmit.port = config.services.immich.port;
+  }];
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

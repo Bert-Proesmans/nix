@@ -21,14 +21,34 @@
       pkgs.kanidm
     ];
 
+    nixpkgs.overlays = [
+      (_: prev: {
+        # Lightweight build of kanidm (only daemon) so it doesn't break my groove for hours ... ~10 minutes
+        # NOTE; kanidm is marked for "big-parallel" builders
+        #
+        # NOTE; Have to rebuild anyway because we need secret provisioning, this variant is not built/cached
+        # by hydra.
+        kanidm-daemon-slim = (prev.kanidm.withSecretProvisioning).overrideAttrs (prevAttrs: {
+          # Only build daemon
+          buildAndTestSubdir = "server/daemon";
+          # Skip testing, assuming upstream has built and tested the complete package
+          doCheck = false;
+          # Clear preFixup because it does stuff for other programs
+          preFixup = "";
+          # Mark the main program, so unsock.wrap works
+          meta.mainProgram = "kanidmd";
+        });
+      })
+    ];
+
     services.kanidm = {
       enableServer = true;
       # NOTE; Custom patches required to pre-provision secret values like;
       #   - admin account passwords
       #   - oauth2 basic secrets
-      package = pkgs.kanidm.withSecretProvisioning;
+      package = pkgs.kanidm-daemon-slim;
       serverSettings = {
-        bindaddress = "0.0.0.0:443"; # Requires CAP_NET_BIND_SERVICE
+        bindaddress = "127.175.0.0:8443";
         domain = "idm.proesmans.eu";
         origin = "https://idm.proesmans.eu";
         # ERROR; Cannot change database path
@@ -48,7 +68,10 @@
         tls_key = "/run/credentials/kanidm.service/KEY_PEM";
       };
 
+      provision.instanceUrl = "https://127.175.0.0:8443";
+      provision.acceptInvalidCerts = true; # Certificate won't validate IP address
       provision.idmAdminPasswordFile = "/run/credentials/kanidm.service/IDM_PASS";
+      provision.systems.oauth2."photos".basicSecretFile = "/run/credentials/kanidm.service/IMMICH_OAUTH2";
     };
 
     systemd.services.kanidm = {
@@ -58,10 +81,21 @@
           # the original files require root access. This unit executes with user kanidm permissions.
           "FULLCHAIN_PEM:${config.microvm.suitcase.secrets."certificates".path}/fullchain.pem"
           "KEY_PEM:${config.microvm.suitcase.secrets."certificates".path}/key.pem"
-          "IDM_PASS:/seeds/idm_admin_password"
+          "IDM_PASS:${config.microvm.suitcase.secrets."secrets".path}/idm_admin_password"
+          "IMMICH_OAUTH2:${config.microvm.suitcase.secrets."secrets".path}/openid-secret-immich"
         ];
       };
     };
+
+    # NOTE; kanidm-provision uses hardcoded curl that we cannot individually wrap into unsock.
+    # So the second best approach is a dedicated VSOCK proxy service.
+    proesmans.vsock-proxy.proxies = [{
+      description = "Connect VSOCK to AF_INET for kanidm service";
+      listen.vsock.cid = -1; # Binds to guest localhost
+      listen.port = 8443;
+      transmit.tcp.ip = "127.175.0.0";
+      transmit.port = 8443;
+    }];
 
     # Ignore below
     # Consistent defaults accross all machine configurations.

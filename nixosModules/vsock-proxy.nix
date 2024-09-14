@@ -6,19 +6,23 @@ let
     options = {
       tcp.ip = lib.mkOption {
         description = "IP address";
-        type = lib.types.nullOr lib.net.types.ip;
+        type = lib.types.nullOr lib.net.types.ipv4;
         default = null;
       };
 
       vsock.cid = lib.mkOption {
         description = ''
-          VSOCK host ID. Note that hosts could have multiple aliased IDs.
-          CONSTANTS;
-            - VMADDR_CID_HYPERVISOR = 0 (AKA deprecated)
+          VSOCK host ID. This value is ignored when listening on a VSOCK.
+          CONSTANTS for connecting to a VSOCK listener;
+            - VMADDR_CID_HYPERVISOR = 0 (AKA deprecated) **do not use**
             - VMADDR_CID_LOCAL = 1 (AKA loopback)
             - VMADDR_CID_HOST = 2 (AKA hypervisor)
+
+          ERROR; Binding/connecting to VMADDR_CID_LOCAL requires loaded kernel module "vhost_loopback"
+          so the loopback transport is available. If the module is not loaded, connections will never
+          complete AKA a silent "failure".
         '';
-        type = lib.types.nullOr lib.types.ints.u32;
+        type = lib.types.nullOr (lib.types.addCheck lib.types.int (x: x == -1 || x > 0));
         default = null;
       };
 
@@ -42,7 +46,7 @@ let
 in
 {
   options.proesmans.vsock-proxy = {
-    package = lib.mkPackageOption pkgs [ "proesmans" "vsock-proxy" ] { };
+    package = lib.mkPackageOption pkgs "socat" { };
 
     proxies = lib.mkOption {
       description = "Connect bidirectionally between VSOCK and TCP";
@@ -88,6 +92,7 @@ in
           {
             enable = v.enable;
             description = lib.mkIf (v.description != null) v.description;
+            before = [ "multi-user.target" ];
             wantedBy = [ "multi-user.target" ];
 
             serviceConfig = {
@@ -99,19 +104,20 @@ in
               DynamicUser = true;
               ExecStart =
                 let
+                  # NOTE; Port is added below, since it always exists
                   source-argument =
                     if v.listen.tcp.ip != null
-                    then "--tcp-source ${v.listen.tcp.ip}"
-                    else "--vsock-source ${toString v.listen.vsock.cid}";
+                    then "TCP4-LISTEN:${toString v.listen.port},bind=${v.listen.tcp.ip},reuseaddr,fork"
+                    else "VSOCK-LISTEN:${toString v.listen.port},reuseaddr,fork";
                   destination-argument =
                     if v.transmit.tcp.ip != null
-                    then "--tcp-dest ${v.transmit.tcp.ip}"
-                    else "--vsock-dest ${toString v.transmit.vsock.cid}";
+                    then "TCP4-CONNECT:${v.transmit.tcp.ip}:${toString v.transmit.port}"
+                    else "VSOCK-CONNECT:${toString v.transmit.vsock.cid}:${toString v.transmit.port}";
                 in
                 builtins.concatStringsSep " " [
-                  "${lib.getExe cfg.package}"
-                  "${source-argument}:${toString v.listen.port}"
-                  "${destination-argument}:${toString v.transmit.port}"
+                  (lib.getExe cfg.package)
+                  source-argument
+                  destination-argument
                 ];
             };
           };
