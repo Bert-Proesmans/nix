@@ -15,7 +15,8 @@
         _file = ./1-test-vm.nix;
 
         imports = [
-          special.profiles.qemu-guest-vm
+          #special.profiles.qemu-guest-vm
+          special.profiles.crosvm-guest
           (meta-module "1-test")
           ../test.nix # VM config
         ];
@@ -37,13 +38,13 @@
             mac = "6a:33:06:88:6c:5b"; # randomly generated
           }];
 
-          microvm.central.shares = [
-            ({
-              source = "/var/dir-share";
-              mountPoint = "/var/dir-share";
-              tag = "dir-share";
-            })
-          ];
+          # microvm.central.shares = [
+          #   ({
+          #     source = "/var/dir-share";
+          #     mountPoint = "/var/dir-share";
+          #     tag = "dir-share";
+          #   })
+          # ];
 
           microvm.suitcase.secrets = {
             "ssh_host_ed25519_key".source = guest-ssh-key;
