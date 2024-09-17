@@ -15,8 +15,8 @@
         _file = ./1-test-vm.nix;
 
         imports = [
-          #special.profiles.qemu-guest-vm
-          special.profiles.crosvm-guest
+          special.profiles.qemu-guest-vm
+          #special.profiles.crosvm-guest
           (meta-module "1-test")
           ../test.nix # VM config
         ];
