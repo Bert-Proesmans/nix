@@ -2,6 +2,7 @@
   imports = [
     ./microvm-guest/central-microvm.nix
     ./microvm-guest/suitcase-microvm.nix
+    ./microvm-guest/vsock-forwarding-microvm.nix
   ];
 
   # Generate a nixos module with for each defined vm containing all hypervisor

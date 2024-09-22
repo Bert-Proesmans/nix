@@ -1,13 +1,19 @@
 { lib, pkgs, special, config, ... }:
 let
   my-guests = builtins.mapAttrs (_: v: v.config.config) config.microvm.vms;
-  ssh-my-guests = builtins.mapAttrs (_: v: { vsock-id = v.microvm.vsock.cid; }) my-guests;
+  ssh-my-guests = builtins.mapAttrs
+    (_: v: {
+      inherit (v.proesmans.facts.meta) vsock-id;
+      forwarding = v.microvm.vsock.forwarding.enable;
+    })
+    my-guests;
 in
 {
   imports = [
     special.inputs.microvm.nixosModules.host
-    ./microvm-host/central-microvm.nix
-    ./microvm-host/suitcase-microvm.nix
+    ../microvm-host/central-microvm.nix
+    ../microvm-host/suitcase-microvm.nix
+    ../microvm-host/vsock-forwarding-microvm.nix
   ];
 
   # The hypervisor infrastructure is ran by the systemd framework
@@ -35,10 +41,19 @@ in
   # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-ssh-proxy.html
   programs.ssh.extraConfig =
     let
-      vsock-match-block = name: v: ''
-        Host ${name}
-          ProxyCommand ${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString v.vsock-id}:22
-      '';
+      vsock-match-block = name: v:
+        let
+          # ERROR; Must include the interpreter executable because the script directly cannot be "exec'ed".
+          proxy-script = pkgs.writers.writePython3 "firecracker-vsock-proxy" { } (builtins.readFile ./firecracker-proxy.py);
+        in
+        if v.forwarding then ''
+          Host ${name}
+            ProxyCommand "${pkgs.python3}/bin/python" ${proxy-script} "/run/microvm/vsock/${name}.vsock" 22
+        ''
+        else ''
+          Host ${name}
+            ProxyCommand ${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString v.vsock-id}:22
+        '';
     in
     lib.pipe ssh-my-guests [
       (lib.mapAttrsToList vsock-match-block)

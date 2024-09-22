@@ -1,5 +1,4 @@
-{ lib
-, stdenv
+{ stdenv
 , gcc
 }:
 stdenv.mkDerivation {

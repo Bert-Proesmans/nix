@@ -37,6 +37,7 @@
     extraGroups = [
       "wheel"
       "systemd-journal" # Read the systemd service journal without sudo
+      "kvm" # Interact with forwarded VSOCK files
     ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDUcKAUBNwlSZYiFc3xmCSSmdb6613MRQN+xq+CjZR7H bert@B-PC"

@@ -73,6 +73,13 @@
     host-name = lib.mkIf (config.networking.hostName != null) config.networking.hostName;
     management.domain-name = lib.mkIf (config.networking.hostName != null && config.networking.domain != null) "${config.networking.hostName}.${config.networking.domain}";
 
-    meta.vsock-id = lib.mkIf (lib.hasAttrByPath [ "microvm" "vsock" "cid" ] config) config.microvm.vsock.cid;
+    meta.vsock-id =
+      let
+        valid-options = builtins.filter (x: x != null) [
+          (config.microvm.vsock.cid or null)
+          (config.microvm.vsock.forwarding.cid or null)
+        ];
+      in
+      lib.mkIf (valid-options != [ ]) (builtins.head valid-options);
   };
 }

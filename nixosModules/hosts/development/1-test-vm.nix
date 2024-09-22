@@ -23,7 +23,12 @@
 
         config = {
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-          microvm.vsock.cid = 10000;
+          microvm.vsock = {
+            # cid = 10000;
+            forwarding.enable = true;
+            forwarding.cid = 10000;
+            forwarding.allowTo = [ 90000 ];
+          };
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;
           microvm.interfaces = [{

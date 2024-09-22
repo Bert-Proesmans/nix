@@ -1,9 +1,8 @@
 { lib
 , fetchFromGitHub
-, installShellFiles
 , rustPlatform
-, protobuf
 , stdenv
+, with-vsock-backend ? false
 }:
 
 rustPlatform.buildRustPackage rec {
@@ -21,17 +20,12 @@ rustPlatform.buildRustPackage rec {
 
   buildAndTestSubdir = "vhost-device-vsock";
 
+  # NOTE; The features are turned around, by default the crate builds with vsock-backend
+  # which must be disabled.
+  cargoBuildFlags = [ "--no-default-features" ]
+    ++ lib.optionals with-vsock-backend [ "--features=backend_vsock" ]
+  ;
   nativeBuildInputs = [ ];
-
-  # uses currently unstable tokio features
-  # RUSTFLAGS = "--cfg tokio_unstable";
-
-  # checkFlags = [
-  #   # tests depend upon git repository at test execution time
-  #   "--skip bootstrap"
-  #   "--skip config::tests::args_example_changed"
-  #   "--skip config::tests::toml_example_changed"
-  # ];
 
   meta = with lib; {
     description = "A vhost-device-vsock device daemon that enables communication between an application running in the guest i.e inside a VM and an application running on the host i.e outside the VM.";
