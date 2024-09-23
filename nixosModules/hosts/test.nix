@@ -1,4 +1,4 @@
-{ pkgs, config, ... }:
+{ pkgs, ... }:
 {
   networking.domain = "alpha.proesmans.eu";
 

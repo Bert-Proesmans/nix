@@ -28,7 +28,7 @@
         #
         # NOTE; Have to rebuild anyway because we need secret provisioning, this variant is not built/cached
         # by hydra.
-        kanidm-daemon-slim = (prev.kanidm.withSecretProvisioning).overrideAttrs (prevAttrs: {
+        kanidm-daemon-slim = (prev.kanidm.withSecretProvisioning).overrideAttrs (_prevAttrs: {
           # Only build daemon
           buildAndTestSubdir = "server/daemon";
           # Skip testing, assuming upstream has built and tested the complete package

@@ -61,7 +61,6 @@ rec {
     in
     let
       inherit (flake) inputs;
-      flake-meta = flake.meta;
 
       # Each target we want to (cross-)compile for
       # NOTE; Cross-compiling requires additional configuration on the build host
