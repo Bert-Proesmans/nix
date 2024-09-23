@@ -28,7 +28,26 @@ in
   };
 
   config = {
+    assertions = [
+      ({
+        assertion = cfg.enable -> config.microvm.vsock.cid == null;
+        message = ''
+          Options 'config.microvm.vsock.forwarding.enable' is incompatible with 'config.microvm.vsock.cid'.
+          Unset the option 'config.microvm.vsock.cid' to enable VSOCK forwarding.
+        '';
+      })
+      ({
+        assertion = cfg.enable -> cfg.cid != null;
+        message = ''
+          VSOCK forwarding requires the cid option to be set.
+          Add options 'microvm.vsock.forwarding.cid' to your configuration.
+        '';
+      })
+    ];
+
     microvm.qemu.extraArgs = lib.optionals (cfg.enable) [
+      # WARN; Assumes shared memory is already setup
+      # This is done by setting up other virtio stuff like shares.
       "-chardev"
       "socket,id=chardev-vsock,reconnect=0,path=${cfg.control-socket}"
       "-device"

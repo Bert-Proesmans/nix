@@ -3,7 +3,7 @@ let
   forwarding-guests = lib.filterAttrs (_: v: v.config.config.microvm.vsock.forwarding.enable) config.microvm.vms;
 in
 {
-  config.systemd.services.vhost-device-vsock = {
+  config.systemd.services.microvm-vhost-device-vsock = {
     enable = builtins.any (_: true) (lib.mapAttrsToList (_: _: true) forwarding-guests);
     description = "VSOCK Host daemon for MicroVM";
     after = lib.mapAttrsToList (name: _: "install-microvm-${name}.service") forwarding-guests;
@@ -53,7 +53,7 @@ in
             runtimeInputs = [ pkgs.proesmans.vhost-device ];
             text = ''
               exec vhost-device-vsock \
-                ${lib.concatStringsSep " \\\n" (lib.mapAttrsToList vm-args-daemon forwarding-guests)}
+                ${lib.concatStringsSep " \\\n  " (lib.mapAttrsToList vm-args-daemon forwarding-guests)}
             '';
           };
         in
