@@ -5,29 +5,37 @@ let
     options = {
       match.ip = lib.mkOption {
         description = "The IP address to match and perform a redirect";
-        type = lib.net.types.cidrv4-in ip-scope-parent;
-        default = "127.175.0.0";
+        type = lib.types.nullOr (lib.net.types.cidrv4-in ip-scope-parent);
+        default = if ip-scope-parent == "127.175.0.0/32" then "127.175.0.0" else null;
       };
 
       match.port = lib.mkOption {
         description = "The port to match and perform a redirect";
-        type = lib.types.port;
+        type = lib.types.nullOr lib.types.port;
+        default = null;
       };
 
-      to.socket = lib.mkOption {
+      to.socket.path = lib.mkOption {
         description = ''
-          The socket file to redirect to.
-          Manually create a unix socket at this path manually, or fill in options `to.vsock.{cid,port}` to
-          automatically create files instructing to redirect through AF_VSOCK.
+          The socket file.
 
-          This property is readonly because;    
+          1. If 'to.vsock.cid' and 'to.vsock.port' are not null, this path is created automatically.
+          => Assumes redirection through AF_VSOCK
+
+          2. if 'to.vsock.cid' and 'to.vsock.port' are null, you are expected to manually create the path.
+          => Assumes redirection through AF_UNIX
+
+          3. If 'match.port' is not null, a path restriction is applied because the queried socket path
+          is hardcoded inside the unsock library.
+          => Assumes AF_INET socket swap, into either AF_UNIX or AF_VSOCK
           
-          * The socket directory must be the same for all proxies within the same process
-          * The filename calculation is hardcoded within the library so and must be adhered to
+          4. If 'match.port' is null, no path restriction. Then see 1 or 2.
+
+          In summary you can point your software to an IP address or a UNIX socket, then UNSOCK will rewrite
+          the IP to a UNIX or VSOCK connection or the UNIX socket to a VSOCK connection.
         '';
         type = lib.types.path;
         default = "${socket-directory-parent}/${toString config.match.port}.sock";
-        readOnly = true;
       };
 
       to.vsock.cid = lib.mkOption {
@@ -38,9 +46,9 @@ let
             - VMADDR_CID_LOCAL = 1 (AKA loopback)
             - VMADDR_CID_HOST = 2 (AKA hypervisor)
 
-          ERROR; Binding/connecting to VMADDR_CID_LOCAL requires loaded kernel module "vhost_loopback"
-          so the loopback transport is available. If the module is not loaded, connections will never
-          complete AKA a silent "failure".
+          ERROR; Binding/connecting to VMADDR_CID_LOCAL means using the loopback transport, this transport is loaded
+          when the kernel module "vhost_loopback" (aka driver) is loaded.
+          If the module is not loaded, connections will never complete AKA a silent "failure".
         '';
         type = lib.types.nullOr (lib.types.addCheck lib.types.int (x: x == -1 || x > 0));
         default = null;
@@ -110,6 +118,7 @@ in
               export UNSOCK_FILE="''${1:-UNSOCK_FILE}"
               export UNSOCK_VSOCK_CID="''${2:-UNSOCK_VSOCK_CID}"
               export UNSOCK_VSOCK_PORT="''${3:-UNSOCK_VSOCK_PORT}"
+              export UNSOCK_VSOCK_CONNECT_SIBLING="''${4:-UNSOCK_VSOCK_CONNECT_SIBLING}"
 
               [ -e "$UNSOCK_FILE" ] && rm --force "$UNSOCK_FILE"
 
@@ -151,22 +160,26 @@ in
                   '';
                 })
               ]
-              ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
-                "Unsock: service ${name}: You have multiple proxies pointing to the same socket path. This could be intentional, otherwise verify your proxy configuration."
-                [ ])
-              ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-vsock-proxies)
-                "Unsock: service ${name}: You have multiple proxies pointing to the same VSOCK listener. This could be intentional, otherwise verify your proxy configuration."
-                [ ])
-              ++ (builtins.map
-                (proxies: {
+              # ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
+              #   "Unsock: service ${name}: You have multiple proxies pointing to the same socket path. This could be intentional, otherwise verify your proxy configuration."
+              #   [ ])
+              # ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-vsock-proxies)
+              #   "Unsock: service ${name}: You have multiple proxies pointing to the same VSOCK listener. This could be intentional, otherwise verify your proxy configuration."
+              #   [ ])
+              ++ (lib.pipe cfg.proxies [
+                (builtins.filter (v: v.match.port != null))
+                (builtins.groupBy ({ match, ... }: toString match.port))
+                (builtins.attrValues)
+                (builtins.map (proxies: {
                   assertion = (builtins.length proxies) == 1;
                   message = ''
                     Unsock: service ${name}: port matcher '${toString (builtins.head proxies).match.port}' is used ${toString (builtins.length proxies)} > 1 times.
                     Fix this by changing one of the ports to a unique value, see options `proesmans.proxies.*.match.port`.
                   '';
-                })
-                (builtins.attrValues (builtins.groupBy ({ match, ... }: toString match.port) cfg.proxies)))
-              ++ builtins.map
+
+                }))
+              ])
+              ++ (builtins.map
                 (proxy: {
                   assertion = (proxy.to.vsock.cid != null && proxy.to.vsock.port != null)
                   || (proxy.to.vsock.cid == null && proxy.to.vsock.port == null);
@@ -175,7 +188,17 @@ in
                     Fix this by updating the options at `proesmans.proxies.*.to.vsock.{cid, port}`.
                   '';
                 })
-                (cfg.proxies)
+                (cfg.proxies))
+              ++ (builtins.map
+                (proxy: {
+                  assertion = proxy.match.port != null -> proxy.to.socket.path == "${cfg.socket-directory}/${toString proxy.match.port}.sock";
+                  message = ''
+                    Unsock: service ${name}: The provided socket path '${proxy.to.socket.path}' does not conform the restrictions because IP:PORT matching is configured.
+                    To fix this, set options 'proesmans.proxies.*.to.socket.path' to "${cfg.socket-directory}/${toString proxy.match.port}.sock", or set options
+                    'proesmans.proxies.*.match.port' to null.
+                  '';
+                })
+                (cfg.proxies))
             );
 
           unsock.socket-directory = lib.mkIf (cfg.enable) (lib.mkDefault "/run/${name}-unsock");
@@ -195,9 +218,12 @@ in
             ExecStartPre = builtins.map
               (proxy: lib.concatStringsSep " " [
                 (lib.getExe generate-vsock-config-script)
-                (lib.escapeShellArg proxy.to.socket)
+                (lib.escapeShellArg proxy.to.socket.path)
                 (lib.escapeShellArg (toString proxy.to.vsock.cid))
                 (lib.escapeShellArg (toString proxy.to.vsock.port))
+                # Any CID larger that reserved set is assumed to be another (sibling) host, so we want to enable the flag
+                # that passes VSOCK data to the host.
+                (lib.escapeShellArg (if proxy.to.vsock.cid > 2 then "1" else "0"))
               ])
               (builtins.filter (v: v.to.vsock.cid != null) cfg.proxies);
           }
