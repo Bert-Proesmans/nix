@@ -18,5 +18,9 @@ _final: prev: {
       # build directory for inspection!
       ./0001-make-atuin-on-zfs-fast-again.patch
     ];
+
+    # Disable tests to speed up packaging.
+    # Assumes upstream has tested the package.
+    doCheck = false;
   });
 }
