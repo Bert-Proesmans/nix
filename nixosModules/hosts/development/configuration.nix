@@ -6,6 +6,7 @@
     ./wip.nix
     ./1-test-vm.nix
     ./2-test-vm.nix
+    ./3-test-vm.nix
   ];
 
   networking.hostName = "development";
@@ -29,6 +30,9 @@
 
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   sops.age.keyFile = "/etc/secrets/decrypter.age";
+
+  # Override this service for fun and debug profit
+  systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
 
   # Make me an admin!
   users.users.bert-proesmans = {
@@ -66,6 +70,16 @@
     pkgs.traceroute
     pkgs.socat
     pkgs.nmap # ncat
+    (pkgs.unsock.wrap pkgs.nginxStable)
+  ];
+
+  nixpkgs.overlays = [
+    (final: prev: {
+      nginxStable = prev.nginxStable.overrideAttrs (old: {
+        # Forcefully add poll module for event handling
+        configureFlags = old.configureFlags ++ [ "--with-poll_module" ];
+      });
+    })
   ];
 
   # Note; default firewall package is IPTables

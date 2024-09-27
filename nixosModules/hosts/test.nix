@@ -27,6 +27,9 @@
 
   systemd.services."acme-photos.alpha.proesmans.eu".serviceConfig.ExecStart = lib.mkForce "${pkgs.coreutils}/bin/true";
 
+  # Override this service for fun and debug profit
+  systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
+
   services.nginx = {
     enable = true;
     package = pkgs.unsock.wrap pkgs.nginxStable;
@@ -58,7 +61,7 @@
         default https-frontend;
         alpha.idm.proesmans.eu sso-upstream;
       }
-      
+
       server {
         listen 0.0.0.0:443;
 
@@ -74,37 +77,31 @@
           # to the unix sockets, due to incomplete filtering.
           listen = [
             { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; }
+            # { addr = "0.0.0.0"; port = 443; ssl = true; } # DEBUG
             # NOTE; Connections for each VHOST are accepted at port 80, where a redirect is
             # served into TLS. TLS connections are handled by the stream config (first).
             { addr = "0.0.0.0"; port = 80; ssl = false; }
           ];
 
           forceSSL = true;
-          # DEBUG; Nginx is doing something weird by stalling to reply with upstream data until
-          # proxy read timeout. All systems and tunnels work as expected, except this weird
-          # nginx behaviour .. 
-          #
-          # Nginx is sending connection: Close to upstream, even tough that's not what is
-          # configured.
-          # Upstream replies with connection: close and a body, even closes the connection
-          # yet nginx hangs.
-          # extraConfig = ''
-          #   proxy_set_header Connection "close";
-          #   proxy_buffering off;
-          # '';
         };
       in
       {
         "photos.alpha.proesmans.eu" = default-vhost-config // {
           enableACME = true; # DEBUG; self-signed cert
-          locations."/".proxyPass = "unix:/run/nginx-unsock/photos-upstream.vsock";
+          locations."/".proxyPass = "http://photos-upstream";
         };
       };
+
+    upstreams = {
+      photos-upstream.servers."unix:/run/nginx-unsock/photos-upstream.vsock" = { };
+    };
   };
 
   systemd.services.nginx = {
     unsock = {
       enable = true;
+      #enable = false; # DEBUG
       proxies = [
         {
           to.socket.path = "/run/nginx-unsock/sso-upstream.vsock";
@@ -113,7 +110,7 @@
         }
         {
           to.socket.path = "/run/nginx-unsock/photos-upstream.vsock";
-          to.vsock.cid = 90000; # To guest 2
+          to.vsock.cid = 90000; # To guest 2-test
           to.vsock.port = 10000;
         }
       ];

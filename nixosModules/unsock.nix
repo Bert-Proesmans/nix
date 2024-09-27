@@ -59,6 +59,9 @@ let
         type = lib.types.nullOr lib.types.port;
         default = null;
       };
+
+      to.vsock.flag-to-host = lib.mkEnableOption "diverting VSOCK communications to the host (CID 2)"
+        // { default = true; };
     };
   };
 in
@@ -132,40 +135,38 @@ in
         {
           assertions =
             let
-              by-socket-proxies = builtins.attrValues (builtins.groupBy ({ to, ... }: to.socket) cfg.proxies);
+              by-socket-proxies = builtins.attrValues (builtins.groupBy ({ to, ... }: to.socket.path) cfg.proxies);
               by-vsock-proxies = builtins.attrValues (builtins.groupBy ({ to, ... }: "${toString to.vsock.cid}-${toString to.vsock.port}") cfg.proxies);
             in
             lib.optionals (cfg.enable) (
-              [
-                ({
-                  assertion = (
-                    config?serviceConfig
-                    && config.serviceConfig?RestrictAddressFamilies
-                    && builtins.isList config.serviceConfig.RestrictAddressFamilies
-                  ) -> builtins.elem "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
-                  message = ''
-                    Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
-                    To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = ["AF_VSOCK"];
-                  '';
-                })
-                ({
-                  assertion = (
-                    config?serviceConfig
-                    && config.serviceConfig?RestrictAddressFamilies
-                    && builtins.isString config.serviceConfig.RestrictAddressFamilies
-                  ) -> lib.hasInfix "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
-                  message = ''
-                    Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
-                    To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = "AF_VSOCK";
-                  '';
-                })
-              ]
-              # ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
-              #   "Unsock: service ${name}: You have multiple proxies pointing to the same socket path. This could be intentional, otherwise verify your proxy configuration."
-              #   [ ])
-              # ++ (lib.warnIf (builtins.any (v: builtins.length v > 1) by-vsock-proxies)
-              #   "Unsock: service ${name}: You have multiple proxies pointing to the same VSOCK listener. This could be intentional, otherwise verify your proxy configuration."
-              #   [ ])
+              (lib.warnIf (builtins.any (v: builtins.length v > 1) by-socket-proxies)
+                "Unsock: service ${name}: You have multiple proxies pointing to the same socket path. This could be intentional, otherwise verify your proxy configuration.")
+                (lib.warnIf (builtins.any (v: builtins.length v > 1) by-vsock-proxies)
+                  "Unsock: service ${name}: You have multiple proxies pointing to the same VSOCK listener. This could be intentional, otherwise verify your proxy configuration.")
+                [
+                  ({
+                    assertion = (
+                      config?serviceConfig
+                      && config.serviceConfig?RestrictAddressFamilies
+                      && builtins.isList config.serviceConfig.RestrictAddressFamilies
+                    ) -> builtins.elem "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
+                    message = ''
+                      Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
+                      To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = ["AF_VSOCK"];
+                    '';
+                  })
+                  ({
+                    assertion = (
+                      config?serviceConfig
+                      && config.serviceConfig?RestrictAddressFamilies
+                      && builtins.isString config.serviceConfig.RestrictAddressFamilies
+                    ) -> lib.hasInfix "AF_VSOCK" config.serviceConfig.RestrictAddressFamilies;
+                    message = ''
+                      Unsock: service ${name}: You must whitelist AF_VSOCK within the service unit configuration, otherwise no VSOCK connections will be made.
+                      To fix this, set options systemd.services.${name}.serviceConfig.RestrictAddressFamilies = "AF_VSOCK";
+                    '';
+                  })
+                ]
               ++ (lib.pipe cfg.proxies [
                 (builtins.filter (v: v.match.port != null))
                 (builtins.groupBy ({ match, ... }: toString match.port))
@@ -223,7 +224,7 @@ in
                 (lib.escapeShellArg (toString proxy.to.vsock.port))
                 # Any CID larger that reserved set is assumed to be another (sibling) host, so we want to enable the flag
                 # that passes VSOCK data to the host.
-                (lib.escapeShellArg (if proxy.to.vsock.cid > 2 then "1" else "0"))
+                (lib.escapeShellArg (if proxy.to.vsock.flag-to-host then "1" else "0"))
               ])
               (builtins.filter (v: v.to.vsock.cid != null) cfg.proxies);
           }
