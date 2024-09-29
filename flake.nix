@@ -3,7 +3,7 @@ rec {
 
   inputs = {
     nixpkgs.follows = "nixpkgs-unstable";
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-24.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -22,8 +22,6 @@ rec {
     impermanence.url = "github:nix-community/impermanence";
     dns.url = "github:nix-community/dns.nix";
     dns.inputs.nixpkgs.follows = "nixpkgs";
-    # Nixpkgs PR#324127
-    immich-review.url = "github:jvanbruegge/nixpkgs/immich";
     nix-topology.url = "github:oddlama/nix-topology";
     nix-topology.inputs.nixpkgs.follows = "nixpkgs";
   };
