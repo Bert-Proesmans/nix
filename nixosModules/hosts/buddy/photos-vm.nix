@@ -1,10 +1,8 @@
 { lib, flake, special, meta-module, config, ... }: {
   sops.secrets = {
     "photos-vm/ssh_host_ed25519_key" = {
-      restartUnits = [
-        # New ssh key requires restart of guest
-        "microvm@photos.service"
-      ];
+      # New ssh key requires restart of guest
+      restartUnits = [ "microvm@photos.service" ];
     };
     "idm/openid-secret-immich" = { };
   };
@@ -112,7 +110,7 @@
               fsType = "ext4";
             }
             {
-              # Persist cache directory because machine learning
+              # Persist cache directory because machine learning stores models in cache directories
               autoCreate = true;
               image = "/var/cache/microvm/photos/cache-immich-disk.img";
               label = "cache-immich";
