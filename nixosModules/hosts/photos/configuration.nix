@@ -9,12 +9,47 @@
   users.users.bert-proesmans.extraGroups = [ "wheel" ];
   # DEBUG
 
-  environment.systemPackages = [ pkgs.proesmans.vsock-test ];
+  # Immich crashes when rebinding AF_INET to AF_VSOCK
+  # REF; https://github.com/kohlschutter/unsock/issues/3
+  #
+  # The code itself doesn't support binding to other types of sockets.
+  proesmans.vsock-proxy.proxies = [{
+    description = "Connect VSOCK to AF_INET for immich service";
+    listen.vsock.cid = -1; # Binds to localhost
+    listen.port = 8080;
+    transmit.tcp.ip = config.services.immich.host;
+    transmit.port = config.services.immich.port;
+  }];
+
+  # nixpkgs.overlays = [
+  #   (final: prev:
+  #     let
+  #       machine-learning-upstream = prev.immich.passthru.machine-learning;
+  #     in
+  #     {
+  #       immich = prev.unsock.wrap (prev.immich.overrideAttrs (old: {
+  #         # WARN; Assume upstream has properly tested for quicker build completion
+  #         doCheck = false;
+  #         passthru = old.passthru // {
+  #           # ERROR; 'Immich machine learning' is pulled from the passed through property of 'Immich'
+  #           machine-learning = final.immich-machine-learning;
+  #         };
+  #       }));
+  #       # immich-machine-learning = prev.unsock.wrap (prev.immich-machine-learning.overrideAttrs (old: {
+  #       #   # WARN; Assume upstream has properly tested for quicker build completion
+  #       #   doCheck = false;
+  #       # }));
+  #       immich-machine-learning = prev.unsock.wrap (machine-learning-upstream.overrideAttrs (old: {
+  #         # WARN; Assume upstream has properly tested for quicker build completion
+  #         doCheck = false;
+  #       }));
+  #     })
+  # ];
 
   services.immich = {
     enable = true;
     host = "127.175.0.0";
-    openFirewall = true;
+    port = 8080;
     mediaLocation = "/var/lib/immich";
 
     environment = {
@@ -67,6 +102,47 @@
       # the original files require root access. This unit executes with user immich permissions.
       "CONFIG:${config.microvm.suitcase.secrets."immich-config.json".path}"
     ];
+
+    unsock = {
+      enable = false;
+      tweaks.accept-convert-vsock = true;
+      proxies = [
+        {
+          match.port = config.services.immich.port;
+          to.vsock.cid = -1; # Bind to loopback
+          to.vsock.port = 8080;
+        }
+        # NOTE; No proxy for machine learning, i don't care if both server modules talk to each other
+        # over loopback AF_INET
+      ];
+    };
+
+    serviceConfig = {
+      # ERROR; Must manually open up the usage of VSOCKs.
+      RestrictAddressFamilies = [ "AF_VSOCK" ];
+    };
+  };
+
+  systemd.services.immich-machine-learning = {
+    unsock = {
+      enable = false;
+      socket-directory = config.systemd.services.immich-server.unsock.socket-directory;
+      tweaks.accept-convert-vsock = true;
+      proxies = [
+        {
+          match.port = config.services.immich.port;
+          to.vsock.cid = -1; # Bind to loopback
+          to.vsock.port = 8080;
+        }
+        # NOTE; No proxy for machine learning, i don't care if both server modules talk to each other
+        # over loopback AF_INET
+      ];
+    };
+
+    serviceConfig = {
+      # ERROR; Must manually open up the usage of VSOCKs.
+      RestrictAddressFamilies = [ "AF_VSOCK" ];
+    };
   };
 
   services.postgresql = {
@@ -90,14 +166,6 @@
   systemd.services.postgresql.serviceConfig = {
     StateDirectory = [ "wal-postgresql wal-postgresql/${config.services.postgresql.package.psqlSchema}" ];
   };
-
-  proesmans.vsock-proxy.proxies = [{
-    description = "Connect VSOCK to AF_INET for immich service";
-    listen.vsock.cid = -1; # Binds to localhost
-    listen.port = 8080;
-    transmit.tcp.ip = config.services.immich.host;
-    transmit.port = config.services.immich.port;
-  }];
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

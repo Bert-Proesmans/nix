@@ -21,6 +21,16 @@
       pkgs.kanidm
     ];
 
+    # NOTE; kanidm-provision uses hardcoded curl that we cannot individually wrap into unsock.
+    # So the second best approach is a dedicated VSOCK proxy service.
+    proesmans.vsock-proxy.proxies = [{
+      description = "Connect VSOCK to AF_INET for kanidm service";
+      listen.vsock.cid = -1; # Binds to guest localhost
+      listen.port = 8443;
+      transmit.tcp.ip = "127.175.0.0";
+      transmit.port = 8443;
+    }];
+
     nixpkgs.overlays = [
       (_: prev: {
         # Lightweight build of kanidm (only daemon) so it doesn't break my groove for hours ... ~10 minutes
@@ -69,7 +79,8 @@
       };
 
       provision.instanceUrl = "https://127.175.0.0:8443";
-      provision.acceptInvalidCerts = true; # Certificate won't validate IP address
+      # ERROR; Certificate is bound to DNS name won't validate IP address
+      provision.acceptInvalidCerts = true;
       provision.idmAdminPasswordFile = "/run/credentials/kanidm.service/IDM_PASS";
       provision.systems.oauth2."photos".basicSecretFile = "/run/credentials/kanidm.service/IMMICH_OAUTH2";
     };
@@ -86,16 +97,6 @@
         ];
       };
     };
-
-    # NOTE; kanidm-provision uses hardcoded curl that we cannot individually wrap into unsock.
-    # So the second best approach is a dedicated VSOCK proxy service.
-    proesmans.vsock-proxy.proxies = [{
-      description = "Connect VSOCK to AF_INET for kanidm service";
-      listen.vsock.cid = -1; # Binds to guest localhost
-      listen.port = 8443;
-      transmit.tcp.ip = "127.175.0.0";
-      transmit.port = 8443;
-    }];
 
     # Ignore below
     # Consistent defaults accross all machine configurations.
