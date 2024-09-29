@@ -389,14 +389,11 @@ rec {
       packages = eachSystem (pkgs:
         lib.makeScope pkgs.newScope (
           self: {
-            inherit flake;
-            nixosLib = lib;
-
             # NOTE; You can find the generated iso file at ./result/iso/*.iso
             default = self.bootstrap;
             development = self.bootstrap.override { withDevelopmentConfig = true; };
           } // lib.packagesFromDirectoryRecursive {
-            callPackage = self.callPackage;
+            callPackage = pkgs: args: self.callPackage pkgs (args // { inherit flake; nixosLib = lib; });
             directory = ./packages;
           }
         )
