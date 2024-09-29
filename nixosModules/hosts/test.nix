@@ -30,89 +30,63 @@
   # Override this service for fun and debug profit
   systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
 
-  services.nginx = {
+
+  # nixpkgs.overlays = [
+  #   (final: prev:
+  #     let
+  #       machine-learning-upstream = prev.immich.passthru.machine-learning;
+  #     in
+  #     {
+  #       immich = prev.unsock.wrap (prev.immich.overrideAttrs (old: {
+  #         # WARN; Assume upstream has properly tested for quicker build completion
+  #         doCheck = false;
+  #         passthru = old.passthru // {
+  #           # ERROR; 'Immich machine learning' is pulled from the passed through property of 'Immich'
+  #           machine-learning = final.immich-machine-learning;
+  #         };
+  #       }));
+  #       # immich-machine-learning = prev.unsock.wrap (prev.immich-machine-learning.overrideAttrs (old: {
+  #       #   # WARN; Assume upstream has properly tested for quicker build completion
+  #       #   doCheck = false;
+  #       # }));
+  #       immich-machine-learning = prev.unsock.wrap (machine-learning-upstream.overrideAttrs (old: {
+  #         # WARN; Assume upstream has properly tested for quicker build completion
+  #         doCheck = false;
+  #       }));
+  #     })
+  # ];
+
+  services.immich = {
     enable = true;
-    package = pkgs.unsock.wrap pkgs.nginxStable;
-    recommendedOptimisation = true;
-    recommendedTlsSettings = true;
-    recommendedProxySettings = true; # DEBUG
-    recommendedGzipSettings = true;
-    # Triggers recompilation
-    # Additional setting for server are automatically included
-    recommendedBrotliSettings = true;
+    # WARN; Host IP matches unsock configuration!
+    host = "127.175.0.0";
+    port = 8080;
+    openFirewall = false;
+    mediaLocation = "/var/lib/immich";
 
-    # DEBUG; Log to stderr from debug upwards
-    logError = "stderr debug";
+    environment = {
+      IMMICH_LOG_LEVEL = "log";
+      # The timezone used for interpreting date/timestamps without time zone indicator
+      TZ = "Europe/Brussels";
+    };
 
-    # Snoop all connections and;
-    #
-    # - Either terminate on host
-    # - Forward special connections as-is upstream
-    streamConfig = ''
-      upstream https-frontend {
-          server unix:/run/nginx/https-frontend.sock;
-      }
-
-      upstream sso-upstream {
-          server unix:/run/nginx-unsock/sso-upstream.vsock;
-      }
-
-      map $ssl_preread_server_name $upstream {
-        default https-frontend;
-        alpha.idm.proesmans.eu sso-upstream;
-      }
-
-      server {
-        listen 0.0.0.0:443;
-
-        proxy_pass $upstream;
-        ssl_preread on;
-      }
-    '';
-
-    virtualHosts =
-      let
-        default-vhost-config = {
-          # WARN; Need a special listen setup because the default listen fallback adds ports
-          # to the unix sockets, due to incomplete filtering.
-          listen = [
-            { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; }
-            # { addr = "0.0.0.0"; port = 443; ssl = true; } # DEBUG
-            # NOTE; Connections for each VHOST are accepted at port 80, where a redirect is
-            # served into TLS. TLS connections are handled by the stream config (first).
-            { addr = "0.0.0.0"; port = 80; ssl = false; }
-          ];
-
-          forceSSL = true;
-        };
-      in
-      {
-        "photos.alpha.proesmans.eu" = default-vhost-config // {
-          enableACME = true; # DEBUG; self-signed cert
-          locations."/".proxyPass = "http://photos-upstream";
-        };
-      };
-
-    upstreams = {
-      photos-upstream.servers."unix:/run/nginx-unsock/photos-upstream.vsock" = { };
+    machine-learning = {
+      environment = { };
     };
   };
 
-  systemd.services.nginx = {
+  systemd.services.immich-server = {
     unsock = {
-      enable = true;
-      #enable = false; # DEBUG
+      enable = false;
+      tweaks.accept-convert-vsock = true;
       proxies = [
         {
-          to.socket.path = "/run/nginx-unsock/sso-upstream.vsock";
-          to.vsock.cid = 2; # To hypervisor
-          to.vsock.port = 10001;
+          match.port = config.services.immich.port;
+          to.vsock.cid = -1; # Bind to loopback
+          to.vsock.port = 8080;
         }
-        {
-          to.socket.path = "/run/nginx-unsock/photos-upstream.vsock";
-          to.vsock.cid = 90000; # To guest 2-test
-          to.vsock.port = 10000;
-        }
+        # NOTE; No proxy for machine learning, i don't care if both server modules talk to each other
+        # over loopback AF_INET
       ];
     };
 
@@ -121,6 +95,51 @@
       RestrictAddressFamilies = [ "AF_VSOCK" ];
     };
   };
+
+  systemd.services.immich-machine-learning = {
+    environment = {
+      # WARN; The machine learning server takes the same environment variables as the frontend server!
+      # These environment variable names could cause confusion!
+      # IMMICH_HOST = lib.mkForce config.services.immich.host;
+      # IMMICH_PORT = lib.mkForce (toString 5555);
+    };
+    unsock = {
+      enable = false;
+      socket-directory = config.systemd.services.immich-server.unsock.socket-directory;
+      tweaks.accept-convert-vsock = true;
+      proxies = [
+        {
+          match.port = config.services.immich.port;
+          to.vsock.cid = -1; # Bind to loopback
+          to.vsock.port = 8080;
+        }
+        # NOTE; No proxy for machine learning, i don't care if both server modules talk to each other
+        # over loopback AF_INET
+      ];
+    };
+
+    serviceConfig = {
+      # ERROR; Must manually open up the usage of VSOCKs.
+      RestrictAddressFamilies = [ "AF_VSOCK" ];
+    };
+  };
+
+  services.postgresql = {
+    enableJIT = true;
+    enableTCPIP = false;
+    package = pkgs.postgresql_15_jit;
+  };
+
+  systemd.services.postgresql.serviceConfig = { };
+
+  proesmans.vsock-proxy.proxies = [{
+    description = "Connect VSOCK to AF_INET for immich service";
+    listen.vsock.cid = -1; # Binds to localhost
+    listen.port = 8080;
+    transmit.tcp.ip = config.services.immich.host;
+    transmit.port = config.services.immich.port;
+  }];
+
 
   system.stateVersion = "24.05";
 }

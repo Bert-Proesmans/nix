@@ -23,6 +23,9 @@
 
         config = {
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
+          microvm.vcpu = 2;
+          microvm.mem = 2 * 1024; # MB
+
           microvm.vsock = {
             cid = 555;
             # forwarding.enable = true;
@@ -49,6 +52,18 @@
           #     tag = "dir-share";
           #   })
           # ];
+
+          microvm.volumes = [
+            {
+              # filesystem for heavy duty file usage
+              autoCreate = true;
+              image = "/var/cache/microvm/3-test/var.img";
+              label = "var-test";
+              mountPoint = "/var";
+              size = 20 * 1024; # Megabytes
+              fsType = "ext4";
+            }
+          ];
 
           microvm.suitcase.secrets = {
             "ssh_host_ed25519_key".source = guest-ssh-key;
