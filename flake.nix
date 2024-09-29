@@ -115,8 +115,6 @@ rec {
       profiles-nixos = lib.rakeLeaves ./nixosModules/profiles;
     in
     {
-      test = flake;
-
       # Builds an attribute set of all our library code.
       # Each library file is applied with the lib from nixpkgs.
       #
@@ -387,16 +385,30 @@ rec {
       # The default iso is basically a minimal image.
       # The development-iso attribute is basically the same as default plus a bigger payload size.
       packages = eachSystem (pkgs:
-        lib.makeScope pkgs.newScope (
-          self: {
+        # NOTE; lib.fix creates a recursive scope, sort of like let in {} with nix lazy evaluation.
+        # ERROR; Don't use lib.{new,create}Scope because those inject additional attributes that 'nix flake check'
+        # doesn't like!
+        lib.fix (self:
+          let
+            # NOTE; Create our own callPackage function with our recursive scope, this function
+            # will apply the necessary arguments to each package recipe.
+            callPackage = pkgs.newScope (self // {
+              inherit flake;
+              nixosLib = lib;
+
+              # Add more custom package arguments, only the ones that are _NOT_ derivations!, here.
+            });
+          in
+          {
             # NOTE; You can find the generated iso file at ./result/iso/*.iso
             default = self.bootstrap;
             development = self.bootstrap.override { withDevelopmentConfig = true; };
+
+            # Add more package set customisations here.
           } // lib.packagesFromDirectoryRecursive {
-            callPackage = pkgs: args: self.callPackage pkgs (args // { inherit flake; nixosLib = lib; });
+            inherit callPackage;
             directory = ./packages;
-          }
-        )
+          })
       );
 
       # Verify flake configurations with;
