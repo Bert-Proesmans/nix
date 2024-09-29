@@ -60,20 +60,19 @@ in
         lib.getExe script;
       ExecStartPost =
         let
-          # TODO; Just chmod each socket
+          chmod-sock-script = socket-basename: ''
+            while ! find /run/microvm/vsock -type s -name ${socket-basename} -exec chmod 0777 {} \;
+            do
+              sleep 1  # No better way to wait for socket files to exist ..
+            done
+          '';
           script = pkgs.writeShellApplication {
             name = "chmod-sockets";
             runtimeInputs = [ pkgs.findutils pkgs.coreutils ];
             # Allow everyone to write to the sockets created by this service.
             # No other way to specifically change permissions around binding time of the actual socket.. 
             # One of those "yeah, this was never solved" things.
-            text = ''
-              while ! find /run/microvm/vsock -type s -print -quit; do
-                sleep 1  # No better way to wait for socket files to exist ..
-              done
-
-              find /run/microvm/vsock -type s -exec chmod 0777 {} +
-            '';
+            text = lib.concatStringsSep "\n" (lib.mapAttrsToList (name: _: chmod-sock-script "${name}.vsock") forwarding-guests);
           };
         in
         lib.getExe script;
