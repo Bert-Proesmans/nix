@@ -61,7 +61,7 @@ let
       };
 
       to.vsock.flag-to-host = lib.mkEnableOption "diverting VSOCK communications to the host (CID 2)"
-        // { default = true; };
+        // { default = config.to.vsock.cid != -1; };
     };
   };
 in
@@ -79,6 +79,9 @@ in
         package = lib.mkPackageOption pkgs "unsock" {
           extraDescription = "This is the package used to generate AF_VSOCK instruction files, if those are defined as proxies.";
         };
+
+        tweaks.accept-convert-all = lib.mkEnableOption "provide AF_INET-like address to accept";
+        tweaks.accept-convert-vsock = lib.mkEnableOption "provided AF_INET-like address to accept when socket swapped into VSOCK only";
 
         socket-directory = lib.mkOption {
           description = ''
@@ -207,6 +210,8 @@ in
           environment = lib.optionalAttrs (cfg.enable) {
             UNSOCK_DIR = cfg.socket-directory;
             UNSOCK_ADDR = cfg.ip-scope;
+            UNSOCK_ACCEPT_CONVERT_ALL = if cfg.tweaks.accept-convert-all then "1" else "0";
+            UNSOCK_ACCEPT_CONVERT_VSOCK = if cfg.tweaks.accept-convert-vsock then "1" else "0";
           };
 
           serviceConfig = lib.optionalAttrs (cfg.enable) ({
