@@ -10,7 +10,7 @@
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   # WARN; Customisations to make NGINX compatible with UNSOCK
-  options.proesmans.fixes.unsock-nginx.enable = true;
+  proesmans.fixes.unsock-nginx.enable = true;
 
   services.nginx = {
     enable = true;
