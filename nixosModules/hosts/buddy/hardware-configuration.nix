@@ -13,7 +13,11 @@
   # NOTE; Force importing is possible, ofcourse.
   networking.hostId = "525346fb";
   boot.supportedFilesystems = [ "zfs" ];
-  boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
+  # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
+  # at unexpected moments and cause kernel downgrade.
+  # Leave the boot.kernelPackages options at default to use the long-term stable kernel. The LTS is practically
+  # guaranteed to be compatible with the latest zfs release.
+  # REMOVED; boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
   disko.devices.zpool.local.datasets = {
     "root" = {
