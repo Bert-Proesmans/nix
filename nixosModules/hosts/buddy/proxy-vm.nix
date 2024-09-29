@@ -14,43 +14,6 @@
     unitConfig.ConditionPathExists = "${config.security.acme.certs."alpha.proesmans.eu".directory}/fullchain.pem";
   };
 
-  # ERROR; AF_VSOCK packets are dropped by Qemu vhost-vsock{-pci} driver when the arrive at the host side
-  # without correct CID. AKA using connect flag VMADDR_FLAG_TO_HOST to setup a proxied VSOCK connection between sibling
-  # virtual machines is not possible currently!
-  # REF; https://lore.kernel.org/kvm/nojtsdora7chbhnblvygozoa4qui3ghivndvg5ixbsgebos4hg@e2jldxpf7sum/
-  # ASIDE; There was talk about adding "-object vsock-forward", but that didn't get implemented yet. Something to do
-  # with firewalling between siblings... 
-  #
-  # NOTE; vhost-user-vsock seems like the current future for sibling communications, "vhost-user-vsock" is a different qemu backend
-  # driver that needs more configuration and a user-space proxy daemon.
-  # REF; https://github.com/rust-vmm/vhost-device/tree/main/vhost-device-vsock#sibling-vm-communication
-  #
-  # NOTE; Alternatively, we could literally hairpin between guests and hosts by agreeing on ports.
-  #
-  proesmans.vsock-proxy.proxies =
-    let
-      cid-shared-hosts = lib.pipe flake.outputs.host-facts [
-        (lib.filterAttrs (_: v: v.meta.parent == config.networking.hostName))
-        (lib.mapAttrs' (_: v: lib.nameValuePair v.host-name v.meta.vsock-id))
-      ];
-    in
-    [
-      ({
-        description = "Proxy <-> Photos";
-        listen.vsock.cid = -1;
-        listen.port = 10000;
-        transmit.vsock.cid = cid-shared-hosts."photos";
-        transmit.port = 8080;
-      })
-      ({
-        description = "Proxy <-> SSO";
-        listen.vsock.cid = -1;
-        listen.port = 10001;
-        transmit.vsock.cid = cid-shared-hosts."sso";
-        transmit.port = 8443;
-      })
-    ];
-
   microvm.vms."proxy" =
     let
       parent-hostname = config.networking.hostName;
@@ -73,7 +36,15 @@
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
           # ERROR; Number must be unique for each VM!
           # NOTE; This setting enables a bidirectional socket AF_VSOCK between host and guest.
-          microvm.vsock.cid = 3000;
+          microvm.vsock = {
+            #cid = 3000;
+            forwarding.enable = true;
+            forwarding.cid = 3000;
+            forwarding.allowTo = [
+              42 # Photos
+              300 # SSO
+            ];
+          };
 
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;

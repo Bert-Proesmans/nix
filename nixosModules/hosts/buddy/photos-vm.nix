@@ -81,7 +81,11 @@
           nixpkgs.hostPlatform = lib.systems.examples.gnu64;
           microvm.vcpu = 2;
           microvm.mem = 4096; # MB
-          microvm.vsock.cid = 42;
+          microvm.vsock = {
+            # cid = 42;
+            forwarding.enable = true;
+            forwarding.cid = 42;
+          };
 
           proesmans.facts.tags = [ "virtual-machine" ];
           proesmans.facts.meta.parent = parent-hostname;
