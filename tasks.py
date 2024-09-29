@@ -126,7 +126,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
     print(f"Checking if host {hostname} builds..")
     subprocess.run(
-        ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+        ["nom", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
     )
 
     if not ask_user_input(
@@ -299,7 +299,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     if not yes:
         print(f"Checking if host {flake_attr} builds..")
         subprocess.run(
-            ["nix", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+            ["nom", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
         )
 
     print(f"Evaluating machine facts to find {flake_attr}..")
