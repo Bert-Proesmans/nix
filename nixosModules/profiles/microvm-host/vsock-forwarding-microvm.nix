@@ -24,15 +24,20 @@ in
 
       ExecStart =
         let
-          forwarding-guests-for = my-cid: lib.pipe forwarding-guests [
-            (lib.filterAttrs (_: v: builtins.elem my-cid v.config.config.microvm.vsock.forwarding.allowTo))
-            (lib.mapAttrsToList (_: v: "group${toString v.config.config.microvm.vsock.forwarding.cid}"))
-          ];
-          my-groups = my-cid: lib.concatStringsSep "+" ([ "group${toString my-cid}" ] ++ (forwarding-guests-for my-cid));
-
-          vm-args-daemon = name: v:
+          my-groups = guest:
             let
-              cfg = v.config.config.microvm.vsock;
+              cfg = guest.config.config.microvm.vsock;
+              my-cid = cfg.forwarding.cid;
+              i-forward-to = cfg.forwarding.allowTo;
+            in
+            lib.concatStringsSep "+" (
+              [ "group${toString my-cid}" ]
+              ++ (builtins.map (x: "group${toString x}") i-forward-to)
+            );
+
+          vm-args-daemon = name: guest:
+            let
+              cfg = guest.config.config.microvm.vsock;
               state-directory = "/var/lib/microvms";
               my-cid = cfg.forwarding.cid;
               control-socket-path = "${state-directory}/${name}/${cfg.forwarding.control-socket}";
@@ -46,7 +51,7 @@ in
               #"forward-listen=22+2222" # DEBUG; Forward from host to guest for ports 22+2222
             ]
             ++ (lib.optional cfg.forwarding.freeForAll "groups=default")
-            ++ (lib.optional (cfg.forwarding.freeForAll == false) "groups=${my-groups my-cid}")
+            ++ (lib.optional (cfg.forwarding.freeForAll == false) "groups=${my-groups guest}")
             );
 
           script = pkgs.writeShellApplication {
