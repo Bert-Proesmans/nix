@@ -16,6 +16,12 @@ in
     ../microvm-host/vsock-forwarding-microvm.nix
   ];
 
+  environment.systemPackages = [
+    # Packages required for connecting to guests
+    pkgs.socat
+    pkgs.proesmans.firecracker-vsock-proxy
+  ];
+
   # The hypervisor infrastructure is ran by the systemd framework
   networking.useNetworkd = true;
   microvm.host.enable = lib.mkDefault false;
@@ -42,13 +48,9 @@ in
   programs.ssh.extraConfig =
     let
       vsock-match-block = name: v:
-        let
-          # ERROR; Must include the interpreter executable because the script directly cannot be "exec'ed".
-          proxy-script = pkgs.writers.writePython3 "firecracker-vsock-proxy" { } (builtins.readFile ./firecracker-proxy.py);
-        in
         if v.forwarding then ''
           Host ${name}
-            ProxyCommand "${pkgs.python3}/bin/python" ${proxy-script} "/run/microvm/vsock/${name}.vsock" 22
+            ProxyCommand "${lib.getExe pkgs.proesmans.firecracker-vsock-proxy}" "/run/microvm/vsock/${name}.vsock" 22
         ''
         else ''
           Host ${name}

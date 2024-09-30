@@ -18,7 +18,8 @@ in
       User = "microvm";
       Group = "kvm";
       PrivateTmp = "yes";
-
+      # WARN; The created sockets MUST be writeable by everyone to mimic system driver VSOCK!
+      UMask = "000";
       RuntimeDirectory = "microvm microvm/vsock";
 
       ExecStart =
@@ -58,24 +59,25 @@ in
           };
         in
         lib.getExe script;
-      ExecStartPost =
-        let
-          chmod-sock-script = socket-basename: ''
-            while ! find /run/microvm/vsock -type s -name ${socket-basename} -exec chmod 0777 {} \;
-            do
-              sleep 1  # No better way to wait for socket files to exist ..
-            done
-          '';
-          script = pkgs.writeShellApplication {
-            name = "chmod-sockets";
-            runtimeInputs = [ pkgs.findutils pkgs.coreutils ];
-            # Allow everyone to write to the sockets created by this service.
-            # No other way to specifically change permissions around binding time of the actual socket.. 
-            # One of those "yeah, this was never solved" things.
-            text = lib.concatStringsSep "\n" (lib.mapAttrsToList (name: _: chmod-sock-script "${name}.vsock") forwarding-guests);
-          };
-        in
-        lib.getExe script;
+      # I made an oopsie and UMask update is enough to make the sockets world writeable..
+      # ExecStartPost =
+      #   let
+      #     chmod-sock-script = socket-basename: ''
+      #       while ! find /run/microvm/vsock -type s -name ${socket-basename} -exec chmod 0777 {} \;
+      #       do
+      #         sleep 1  # No better way to wait for socket files to exist ..
+      #       done
+      #     '';
+      #     script = pkgs.writeShellApplication {
+      #       name = "chmod-sockets";
+      #       runtimeInputs = [ pkgs.findutils pkgs.coreutils ];
+      #       # Allow everyone to write to the sockets created by this service.
+      #       # No other way to specifically change permissions around binding time of the actual socket.. 
+      #       # One of those "yeah, this was never solved" things.
+      #       text = lib.concatStringsSep "\n" (lib.mapAttrsToList (name: _: chmod-sock-script "${name}.vsock") forwarding-guests);
+      #     };
+      #   in
+      #   lib.getExe script;
     };
   };
 }

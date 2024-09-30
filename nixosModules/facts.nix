@@ -64,6 +64,14 @@
           type = lib.types.nullOr lib.types.ints.positive;
           default = null;
         };
+
+        meta.vsock-vmm = lib.mkOption {
+          description = ''
+            True if this host is configured with the userspace VSOCK daemon VMM for VSOCK communications.
+          '';
+          type = lib.types.nullOr lib.types.bool;
+          default = false;
+        };
       };
     };
   };
@@ -81,5 +89,6 @@
         ];
       in
       lib.mkIf (valid-options != [ ]) (builtins.head valid-options);
+    meta.vsock-vmm = (config.microvm.vsock.forwarding.cid or null) != null;
   };
 }
