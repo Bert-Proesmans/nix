@@ -4,20 +4,25 @@
 
 ## Bootstrap VM
 
-1. Download the nixos minimal installer ISO
-1. Create a VM to boot this installer ISO
+1. Download latest bootstrap image from Github releases: [https://github.com/Bert-Proesmans/nix/releases/tag/latest](https://github.com/Bert-Proesmans/nix/releases/tag/latest)
+2. Boot bare-metal or virtual machine from the ISO
+3. Git clone this repository: [https://github.com/Bert-Proesmans/nix](https://github.com/Bert-Proesmans/nix)
+4. Change directory into the cloned repository
+5. Open development environment: `nix develop`
+6. Install/deploy the development machine or any other: `invoke deploy development root@localhost` 
 
-> Bonus points for setting up SSH
-> 1. Set a password on the nixos-install machine
-> 1. Setup host ssh config to connect to machine
+## Nix from scratch
 
-3. Generate a sample NixOS system configuration
+1. Download bootstrap image from official distribution: [https://nixos.org/download/#nixos-iso](https://nixos.org/download/#nixos-iso)
+2. Boot bare-metal or virtual machine from the ISO
+3. Setup disks, partitions, and mounts
+4. Generate a sample NixOS system configuration
     > nixos-generate-config --dir ./
-1. Generate a sample flake configuration file
+5. Generate a sample flake configuration file
     > nix --extra-experimental-features "nix-command flakes" flake init
-1. Do flake magix
+6. Do flake magix
     > I really have no easy explanation other than ["do what others do"](https://nixos.wiki/wiki/Flakes#Output_schema)
-1. Build an installer image to install your development machine on top of the VM currently booting that installer image
+7. Build out your machine configuration and keep re-applying changes
 
 ## Nix IDE
 
