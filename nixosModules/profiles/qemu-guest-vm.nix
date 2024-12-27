@@ -43,6 +43,13 @@
     # securityModel = "mapped";
   }];
 
+  microvm.virtiofsd = {
+    extraArgs = [
+      # Enable proper handling of bindmounts in shared directory!
+      "--announce-submounts"
+    ];
+  };
+
   networking.useNetworkd = true;
 
   users.users.bert-proesmans = {

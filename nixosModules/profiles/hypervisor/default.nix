@@ -26,12 +26,6 @@ in
   networking.useNetworkd = true;
   microvm.host.enable = lib.mkDefault false;
   microvm.autostart = [ ];
-  microvm.virtiofsd = {
-    extraArgs = [
-      # Enable proper handling of bindmounts in shared directory!
-      "--announce-submounts"
-    ];
-  };
 
   # ERROR; Secrets disappear when rebuilding the host, mounted folders outside the
   # secrets directory become empty.
