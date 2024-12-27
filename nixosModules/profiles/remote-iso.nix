@@ -13,7 +13,7 @@
   # Fallback quickly if substituters are not available.
   nix.settings.connect-timeout = lib.mkForce 5;
   # Enable flakes
-  nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
   # The default at 10 is rarely enough.
   nix.settings.log-lines = lib.mkForce 25;
   # Dirty git repo warnings become tiresome really quickly...

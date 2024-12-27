@@ -56,7 +56,7 @@ in
       # Fallback quickly if substituters are not available.
       nix.settings.connect-timeout = lib.mkDefault 5;
       # Enable flakes
-      nix.settings.experimental-features = [ "nix-command" "flakes" "repl-flake" ];
+      nix.settings.experimental-features = [ "nix-command" "flakes" ];
       # No building by default!
       # ERROR; You must override this setting on builder hosts!
       nix.settings.max-jobs = lib.mkDefault 0;
