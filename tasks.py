@@ -5,6 +5,7 @@ import subprocess
 from tempfile import TemporaryDirectory
 import json
 import warnings
+import platform
 
 # REF; https://www.pyinvoke.org/
 from invoke import task
@@ -316,6 +317,19 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
 
     subprocess.run(["ssh", ssh_connection_string, f"sudo {format_script}"], check=True)
     
+    alert_finish()
+
+@task
+# USAGE; invoke dev-rebuild
+def dev_rebuild(c: Any) -> None:
+    """
+    Rebuild the current machine with the host configuration for "development"
+    """
+    this_hostname = platform.node()
+    assert this_hostname == "development", """
+        This machine does not have the hostname 'development'. This script will exit to prevent clobbering configuration!
+    """
+    c.run(f"sudo nixos-rebuild --flake {FLAKE}#development switch")
     alert_finish()
 
 
