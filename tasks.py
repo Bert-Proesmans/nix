@@ -84,8 +84,8 @@ def check(c: Any) -> None:
     Evaluate and build all outputs from the flake common schema, including all attribute sets from the output 'checks'.
     This command does not stop executing after encountering an error, and will run until all tasks have ended.
     """
-    # NOTE; --skip-cached skips cached evaluations!
-    c.run("nix-fast-build")
+    # NOTE; --skip-cached skips realized outputs already present in binary caches!
+    c.run("nix-fast-build --no-link")
     alert_finish()
 
 
@@ -101,13 +101,15 @@ def ci(c: Any) -> None:
         capture_output=True,
     ).stdout.strip()
 
-    # NOTE; --skip-cached skips cached evaluations!
+    # NOTE; --skip-cached skips realized outputs already present in binary caches!
     c.run(
-        f"nix-fast-build --no-nom --skip-cached --flake \".#hydraJobs.{system}\""
+        f'nix-fast-build --no-nom --skip-cached --no-link --flake ".#hydraJobs.{system}"'
     )
 
     if "x86_64-linux" == system:
-        c.run("nix-fast-build --no-nom --skip-cached --flake '.#hydraJobs.no-system'")
+        c.run(
+            "nix-fast-build --no-nom --skip-cached --no-link --flake '.#hydraJobs.no-system'"
+        )
     alert_finish()
 
 
