@@ -3,14 +3,10 @@
   imports = [
     special.profiles.hypervisor
     ./hardware-configuration.nix
-    ./wip.nix
-    ./1-test-vm.nix
-    ./2-test-vm.nix
-    ./3-test-vm.nix
   ];
 
   networking.hostName = "development";
-  networking.domain = "alpha.proesmans.eu";
+  networking.domain = "internal.proesmans.eu";
   proesmans.facts.tags = [ "virtual-machine" "hypervisor" ];
 
   proesmans.filesystem.simple-disk.enable = true;
@@ -39,7 +35,7 @@
     isNormalUser = true;
     description = "Bert Proesmans";
     extraGroups = [
-      "wheel"
+      "wheel" # Allows sudo access
       "systemd-journal" # Read the systemd service journal without sudo
       "kvm" # Interact with forwarded VSOCK files
     ];
@@ -70,16 +66,6 @@
     pkgs.traceroute
     pkgs.socat
     pkgs.nmap # ncat
-    (pkgs.unsock.wrap pkgs.nginxStable)
-  ];
-
-  nixpkgs.overlays = [
-    (_final: prev: {
-      nginxStable = prev.nginxStable.overrideAttrs (old: {
-        # Forcefully add poll module for event handling
-        configureFlags = old.configureFlags ++ [ "--with-poll_module" ];
-      });
-    })
   ];
 
   # Note; default firewall package is IPTables

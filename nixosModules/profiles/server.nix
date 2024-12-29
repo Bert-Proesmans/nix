@@ -5,7 +5,8 @@
   # Prevent replacing the running kernel without reboot
   security.protectKernelImage = true;
 
-  # WARN; Don't wait for online, it slows boots and rebuilds
+  # WARN; Don't wait for online, our servers should service requests asap independantly from online status!
+  # This unit also slows down boot times, rebuilds, and introduces lots of jitter in those timings.
   systemd.services.NetworkManager-wait-online.enable = false;
   systemd.network.wait-online.enable = false;
 
