@@ -103,12 +103,12 @@ def ci(c: Any) -> None:
 
     # NOTE; --skip-cached skips realized outputs already present in binary caches!
     c.run(
-        f'nix-fast-build --no-nom --skip-cached --no-link --flake ".#hydraJobs.{system}"'
+        f'nix-fast-build --no-nom --skip-cached --no-link --flake "{FLAKE}#hydraJobs.{system}"'
     )
 
     if "x86_64-linux" == system:
         c.run(
-            "nix-fast-build --no-nom --skip-cached --no-link --flake '.#hydraJobs.no-system'"
+            f"nix-fast-build --no-nom --skip-cached --no-link --flake '{FLAKE}#hydraJobs.no-system'"
         )
     alert_finish()
 
@@ -154,7 +154,9 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
         Create a decrypter key for host {hostname} first!
     """
 
-    host_attr_path = f".#nixosConfigurations.{hostname}.config.system.build.toplevel"
+    host_attr_path = (
+        f"{FLAKE}#nixosConfigurations.{hostname}.config.system.build.toplevel"
+    )
 
     print(f"Checking if host {hostname} builds..")
     subprocess.run(
@@ -341,7 +343,9 @@ def dev_rebuild(c: Any) -> None:
 @task
 # USAGE; invoke rebuild development
 def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
-    host_attr_path = f".#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
+    host_attr_path = (
+        f"{FLAKE}#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
+    )
 
     if not yes:
         print(f"Checking if host {flake_attr} builds..")
