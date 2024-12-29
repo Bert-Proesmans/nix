@@ -80,7 +80,7 @@ rec {
       # Shortcut to create behaviour that abstracts over different package indexes
       eachSystem = f: lib.genAttrs systems (system: f inputs.nixpkgs.legacyPackages.${system});
 
-      # Same shortcut, but using a customized instantiation of nixpkgs.
+      # Same shortcut as eachSystem, but using a customized instantiation of nixpkgs.
       #
       # NOTE; Valid nixpkgs-config attributes can be found at pkgs/toplevel/default.nix
       # REF; https://github.com/NixOS/nixpkgs/blob/master/pkgs/top-level/default.nix
@@ -389,24 +389,26 @@ rec {
         # NOTE; lib.fix creates a recursive scope, sort of like let in {} with nix lazy evaluation.
         # ERROR; Don't use lib.{new,create}Scope because those inject additional attributes that 'nix flake check'
         # doesn't like!
-        lib.fix (self:
+        lib.fix (final:
           let
             # NOTE; Create our own callPackage function with our recursive scope, this function
             # will apply the necessary arguments to each package recipe.
-            callPackage = pkgs.newScope (self // {
+            callPackage = pkgs.newScope (final // {
+              # HERE; Add more custom package arguments. Only items that are _NOT_ derivations!
+
               inherit flake;
               nixosLib = lib;
-
-              # Add more custom package arguments, only the ones that are _NOT_ derivations!, here.
             });
           in
           {
-            # NOTE; You can find the generated iso file at ./result/iso/*.iso
-            default = self.bootstrap;
-            development = self.bootstrap.override { withDevelopmentConfig = true; };
+            # HERE; Add aliasses and/or overrides.
 
-            # Add more package set customisations here.
-          } // lib.packagesFromDirectoryRecursive {
+            # NOTE; You can find the generated iso file at ./result/iso/*.iso
+            default = final.bootstrap;
+            development = final.bootstrap.override { withDevelopmentConfig = true; };
+          } //
+          # NOTE; This function retrieves and imports "package.nix" files.
+          lib.packagesFromDirectoryRecursive {
             inherit callPackage;
             directory = ./packages;
           })
