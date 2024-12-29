@@ -18,6 +18,9 @@ os.chdir(FLAKE)
 
 DEV_KEY = (FLAKE / "development.age").absolute()
 
+def alert_finish():
+    # Riiiing my bell ! Ring my bell ! TINGELINGELING
+    print('\a')
 
 def ask_user_input(message: str) -> bool:
     user_reply = input(f"{message} [y/N]: ")
@@ -79,6 +82,7 @@ def check(c: Any) -> None:
     This command does not stop executing after encountering an error, and will run until all tasks have ended.
     """
     c.run("nix flake check --keep-going")
+    alert_finish()
 
 
 @task
@@ -209,6 +213,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
             env=environment,
             check=True,
         )
+        alert_finish()
 
 
 @task
@@ -287,8 +292,8 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
     )
 
     subprocess.run(["ssh", ssh_connection_string, f"sudo {format_script}"], check=True)
-
-    return
+    
+    alert_finish()
 
 
 @task
@@ -351,6 +356,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         ],
         check=True,
     )
+    alert_finish()
 
 
 @task

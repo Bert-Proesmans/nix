@@ -15,6 +15,9 @@ python3Packages.buildPythonApplication {
 
   # Do direct install
   dontUnpack = true;
+
+  # NOTE; One of the post installation steps is replacing the shebang (!#) line
+  # inside the script file.
   installPhase = ''
     install -Dm755 ${./firecracker-proxy.py} $out/bin/${pname}
   '';

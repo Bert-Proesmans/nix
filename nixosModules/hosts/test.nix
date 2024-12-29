@@ -12,9 +12,7 @@
     pkgs.tcpdump
     pkgs.python3
     pkgs.nmap # ncat
-    pkgs.proesmans.unsock
     pkgs.netcat-openbsd
-    pkgs.proesmans.vsock-test
   ];
 
   security.acme = {

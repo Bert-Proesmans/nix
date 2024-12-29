@@ -429,9 +429,7 @@ rec {
       # eg; (nix extensible attr set) _ = lib.extends (lib.composeManyExtensions (builtins.attrValues self.outputs.overlays));
       #
       # See also; nixosModules.nix-system
-      overlays = {
-        atuin = import ./overlays/atuin;
-      };
+      overlays = { };
 
       # Render your topology via the command below, the resulting directory will contain your finished svgs.
       # nix build .#topology.x86_64-linux.config.output

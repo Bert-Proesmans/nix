@@ -1,8 +1,13 @@
 {
-    "[nix]": {
-      "editor.formatOnSave": true,
-      "editor.defaultFormatter": "jnoortheen.nix-ide"
-    },
-    "nix.enableLanguageServer": false, // Language server integration TODO
-    "nix.formatterPath": "nixpkgs-fmt",
+  "[nix]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "jnoortheen.nix-ide"
+  },
+  "nix.enableLanguageServer": false, // Language server integration TODO
+  "nix.formatterPath": "nixpkgs-fmt",
+  "terminal.integrated.enableVisualBell": true,
+  "accessibility.signals.terminalBell": {
+    "sound": "on",
+    "announcement": "auto"
+  },
 }
