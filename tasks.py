@@ -81,7 +81,30 @@ def check(c: Any) -> None:
     Evaluate and build all outputs from the flake common schema, including all attribute sets from the output 'checks'.
     This command does not stop executing after encountering an error, and will run until all tasks have ended.
     """
-    c.run("nix flake check --keep-going")
+    # NOTE; --skip-cached skips cached evaluations!
+    c.run("nix-fast-build")
+    alert_finish()
+
+
+@task
+def ci(c: Any) -> None:
+    """
+    Similar to task 'check', but also builds the no-system jobs!
+    """
+    system = subprocess.run(
+        ["nix", "eval", "--raw", "--impure", "--expr builtins.currentSystem"],
+        text=True,  # stdin/stdout are opened in text mode
+        check=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    # NOTE; --skip-cached skips cached evaluations!
+    c.run(
+        "nix-fast-build --no-nom --skip-cached --flake '.#hydraJobs.$(nix eval --raw --impure --expr builtins.currentSystem)'"
+    )
+
+    if "x86_64-linux" == system:
+        c.run("nix-fast-build --no-nom --skip-cached --flake '.#hydraJobs.no-system'")
     alert_finish()
 
 
@@ -130,7 +153,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
     print(f"Checking if host {hostname} builds..")
     subprocess.run(
-        ["nom", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+        ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
     )
 
     if not ask_user_input(
@@ -304,7 +327,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     if not yes:
         print(f"Checking if host {flake_attr} builds..")
         subprocess.run(
-            ["nom", "build", host_attr_path, "--no-link", "--no-eval-cache"], check=True
+            ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
         )
 
     print(f"Evaluating machine facts to find {flake_attr}..")

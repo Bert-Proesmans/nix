@@ -203,8 +203,9 @@ rec {
                 # For development
                 git bat
                 outils# sha{1,256,5120}/md5
-                # For introspection
+                # For building and introspection
                 nix-output-monitor
+                nix-fast-build
                 ;
             };
 
@@ -411,15 +412,47 @@ rec {
           })
       );
 
-      # Verify flake configurations with;
-      # nix flake check --no-eval-cache --keep-going
+      # Execute and validate tests against this flake configuration;
+      # nix-fast-build
+      # [BROKEN] nix flake check --no-eval-cache --keep-going
       #
       # `nix flake check` by default evaluates and builds derivations (if applicable) of common flake schema outputs.
       # It's not necessary to explicitly add packages, devshells, nixosconfigurations (build.toplevel attribute) to this attribute set.
       # Add custom derivations, like nixos-tests or custom format outputs of nixosSystem, to this attribute set for
       # automated validation through a CLI-oneliner.
       #
-      checks = eachSystem (_pkgs: { });
+      # ERROR; Do _not_ use `nix flake check` directly due to memory issues during evaluation. Use "nix-fast-build" or "hydra" instead!
+      #
+      # WARN; Not all CI systems actually build, but stop after evaluation! "nix-eval-jobs" for example only _evaluates_ but does not build!
+      # This is important because nixos tests effectively run _during build_ (which doesn't really make sense but okay..)!
+      checks = eachSystem (_pkgs: {
+        # example = pkgs.testers.runNixOSTest {
+        #   name = "example";
+        #   nodes = { };
+        #   testScript = ''
+        #     # TODO
+        #   '';
+        # };
+      });
+
+      # Build everything defined (basically nix flake check);
+      # [INTERACTIVE] nix-fast-build --flake .#hydraJobs
+      # [CI] nix-fast-build --no-nom --skip-cached --flake ".#hydraJobs.$(nix eval --raw --impure --expr builtins.currentSystem)"
+      #
+      # NOTE; First attribute underneath hydraJobs is set to system to make filtering jobs easier.
+      hydraJobs = eachSystem
+        (pkgs: {
+          recurseForDerivations = true;
+
+          formatter = self.outputs.formatter.${pkgs.system};
+          devShells = self.outputs.devShells.${pkgs.system};
+          packages = self.outputs.packages.${pkgs.system};
+          checks = self.outputs.checks.${pkgs.system};
+          topology = self.outputs.topology.${pkgs.system};
+        }) // {
+        no-system.recurseForDerivations = true;
+        no-system.nixosConfigurations = self.outputs.nixosConfigurations;
+      };
 
       # Overwrite (aka patch) functionality defined by the inputs, mostly nixpkgs.
       #
