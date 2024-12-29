@@ -450,10 +450,10 @@ rec {
           devShells = self.outputs.devShells.${pkgs.system};
           packages = self.outputs.packages.${pkgs.system};
           checks = self.outputs.checks.${pkgs.system};
-          topology = self.outputs.topology.${pkgs.system};
+          topology = self.outputs.topology.${pkgs.system}.config.output;
         }) // {
         no-system.recurseForDerivations = true;
-        no-system.nixosConfigurations = self.outputs.nixosConfigurations;
+        no-system.nixosConfigurations = lib.mapAttrs (_: v: v.config.system.build.toplevel) self.outputs.nixosConfigurations;
       };
 
       # Overwrite (aka patch) functionality defined by the inputs, mostly nixpkgs.

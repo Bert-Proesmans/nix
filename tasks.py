@@ -95,7 +95,7 @@ def ci(c: Any) -> None:
     Similar to task 'check', but also builds the no-system jobs!
     """
     system = subprocess.run(
-        ["nix", "eval", "--raw", "--impure", "--expr builtins.currentSystem"],
+        ["nix", "eval", "--raw", "--impure", "--expr", "builtins.currentSystem"],
         text=True,  # stdin/stdout are opened in text mode
         check=True,
         capture_output=True,
@@ -103,7 +103,7 @@ def ci(c: Any) -> None:
 
     # NOTE; --skip-cached skips cached evaluations!
     c.run(
-        "nix-fast-build --no-nom --skip-cached --flake '.#hydraJobs.$(nix eval --raw --impure --expr builtins.currentSystem)'"
+        f"nix-fast-build --no-nom --skip-cached --flake \".#hydraJobs.{system}\""
     )
 
     if "x86_64-linux" == system:
