@@ -78,14 +78,19 @@ def dev_key_decrypt() -> str:
 
 
 @task
-# USAGE: invoke check
-def check(c: Any) -> None:
+# USAGE: invoke check all|<hostName>
+def check(c: Any, hostName: str) -> None:
     """
     Evaluate and build all outputs from the flake common schema, including all attribute sets from the output 'checks'.
     This command does not stop executing after encountering an error, and will run until all tasks have ended.
     """
-    # NOTE; --skip-cached skips realized outputs already present in binary caches!
-    c.run("nix-fast-build --no-link")
+    if "all" == hostName:
+        # NOTE; --skip-cached skips realized outputs already present in binary caches!
+        c.run("nix-fast-build --no-link")
+    else:
+        c.run(
+            f"nix-fast-build --no-link --flake {FLAKE}#nixosConfigurations.{hostName}.config.system.build.toplevel"
+        )
     alert_finish()
 
 
