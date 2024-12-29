@@ -1,4 +1,4 @@
-{ lib, pkgs, config, flake, ... }: {
+{ pkgs, config, ... }: {
   networking.domain = "alpha.proesmans.eu";
 
   # DEBUG

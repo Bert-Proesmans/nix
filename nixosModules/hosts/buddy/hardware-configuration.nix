@@ -1,4 +1,4 @@
-{ lib, config, ... }: {
+{ lib, ... }: {
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 

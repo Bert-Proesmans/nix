@@ -69,7 +69,7 @@ while not completed_handshake:
                     # Valid handshake reply
                     completed_handshake = True
                     # Cut the buffer right after the newline character
-                    stow = buffer_handshake[match_response.end():]
+                    stow = buffer_handshake[match_response.end() :]
                     # NOTE; We're reading in non-blocking, so pushing data out
                     # into stdout must be followed by a flush
                     sys.stdout.buffer.write(stow)

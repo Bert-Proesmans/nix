@@ -74,7 +74,7 @@
   ];
 
   nixpkgs.overlays = [
-    (final: prev: {
+    (_final: prev: {
       nginxStable = prev.nginxStable.overrideAttrs (old: {
         # Forcefully add poll module for event handling
         configureFlags = old.configureFlags ++ [ "--with-poll_module" ];

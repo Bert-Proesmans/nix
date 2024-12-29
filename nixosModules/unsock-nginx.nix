@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }:
+{ lib, config, ... }:
 let
   # ERROR; Infinite recursion
   # any-unsock-enabled = builtins.any (v: v == true) (lib.mapAttrsToList (_: v: v.unsock.enable) config.systemd.services);
@@ -12,7 +12,7 @@ in
 
   config = lib.mkIf cfg.enable {
     nixpkgs.overlays = [
-      (final: prev: {
+      (_final: prev: {
         # Do this for all nginx packages, why are there so many .. 
         nginxStable = prev.nginxStable.overrideAttrs (old: {
           # Forcefully add poll module for event handling. This method can be used with UNSOCK

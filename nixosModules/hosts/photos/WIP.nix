@@ -1,4 +1,4 @@
-{ flake, config, ... }: {
+{ ... }: {
   # In this file you'll find changes that are communicated upstream but not yet incorporated
   # into the standard set of dependencies.
   # Expect this file to dissapear in time.

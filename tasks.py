@@ -19,9 +19,11 @@ os.chdir(FLAKE)
 
 DEV_KEY = (FLAKE / "development.age").absolute()
 
+
 def alert_finish():
     # Riiiing my bell ! Ring my bell ! TINGELINGELING
-    print('\a')
+    print("\a")
+
 
 def ask_user_input(message: str) -> bool:
     user_reply = input(f"{message} [y/N]: ")
@@ -316,8 +318,9 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
     )
 
     subprocess.run(["ssh", ssh_connection_string, f"sudo {format_script}"], check=True)
-    
+
     alert_finish()
+
 
 @task
 # USAGE; invoke dev-rebuild
