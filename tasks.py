@@ -165,7 +165,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
     print(f"Checking if host {hostname} builds..")
     subprocess.run(
-        ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
+        ["nix", "build", host_attr_path, "--no-link"], check=True
     )
 
     if not ask_user_input(

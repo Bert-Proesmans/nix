@@ -35,7 +35,7 @@
 
           nix develop "${devShells "deployment-shell"}" \
             --command bash \
-            -c "invoke --search-root ${flake} host-deploy development root@localhost"
+            -c "invoke --search-root ${flake} deploy development root@localhost"
         '';
       };
 
