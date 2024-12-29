@@ -26,7 +26,7 @@
           _module.args.flake = flake;
 
           networking.hostName = lib.mkForce "installer";
-          networking.domain = lib.mkForce "alpha.proesmans.eu";
+          networking.domain = lib.mkForce "internal.proesmans.eu";
 
           users.users.bert-proesmans = {
             isNormalUser = true;
@@ -43,6 +43,9 @@
             #     + Less downloading 
             #     + Less RAM usage (nix/store is kept in RAM on live boots!)
             flake.outputs.nixosConfigurations.development.config.system.build.toplevel
+            #
+            # Include runtime packages for the development shell
+            flake.outputs.devShells."${system}"."deployment-shell"
           ];
 
           nixpkgs.hostPlatform = lib.mkForce system;
