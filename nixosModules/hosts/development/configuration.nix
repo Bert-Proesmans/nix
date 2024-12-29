@@ -9,8 +9,6 @@
   networking.domain = "internal.proesmans.eu";
   proesmans.facts.tags = [ "virtual-machine" "hypervisor" ];
 
-  proesmans.filesystem.simple-disk.enable = true;
-  proesmans.filesystem.simple-disk.systemd-boot.enable = true;
   proesmans.nix.garbage-collect.enable = true;
   # Garbage collect less often, so we don't drop build artifacts from other systems
   proesmans.nix.garbage-collect.development-schedule.enable = true;

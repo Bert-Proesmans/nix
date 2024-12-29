@@ -1,18 +1,22 @@
 { lib, ... }: {
+  imports = [
+    ./zfs.nix
+  ];
+
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.
   boot.kernelModules = [ "kvm-amd" "kvm-intel" ];
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.editor = false;
 
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
   # It's best practise to mark the pools as 'exported' before moving them between systems.
   # NOTE; Force importing is possible, ofcourse.
   networking.hostId = "9c522fc1";
-
-  boot.supportedFilesystems = [ "zfs" ]; # enables zfs
 
   # Load Hyper-V kernel modules
   virtualisation.hypervGuest.enable = true;
