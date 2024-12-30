@@ -91,10 +91,47 @@
   #
   # @@ ZFS Datasets @@
   # On top of the pools is a dataset structure based on snapshot and replication policies, performance, and security.
+  # See disko.zpool.<pool name>.datasets.
   #
-  # Pool "local" has some datasets in preparation for impermanence.
+  # Pool "local" has some datasets in preparation for impermanence, holds the host filesystem.
+  # Pool "storage" is optimised for spinning hard drives, bulk storage.
   #
-  # Pool "storage" is optimised for spinning hard drives.
+  #
+  # @@ ZFS mountpoint "legacy" within NixOS @@
+  # The paths below must be mounted to start NixOS. There is a bunch of integration work happening right now so the
+  # timing moments of stage-1/stage-2 and 'before SystemD starts' are not exactly right depending on system configuration.
+  #
+  # pathsNeededForBoot = [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/var/lib/nixos" "/etc" "/usr" ];
+  # REF; https://github.com/NixOS/nixpkgs/blob/f7c8b09122de4faf7324c34b8df7550dde6feac0/nixos/lib/utils.nix#L56
+  #
+  # The default system configuration will mount the above paths during stage-1 boot.
+  # Stage-1 is driven by a shell script contained within the initial RAMdisk (initrd/initramfs), it takes the declarative
+  # filesystem information to figure out what needs to be mounted and in which order.
+  # Stage-1 prepares a new filesystem root to load stage-2, this requires recursively re-mounting from current root to the new one.
+  # Stage-2 is then SystemD init, loaded from the mounted /nix/store, taking over boot until and after the ~interactive stage.
+  #
+  # Moving into each stage starts with re-mounting the root filesystem recursively (all submounts too). The unmounting/remounting
+  # action, in combination the zfs driver trying to automatically mount datasets, is currently not completely path ordering aware
+  # because two different systems race each other (and are not aware of each other). This leads to the following symptoms;
+  #   - hidden submount of child dataset (filsystem directory is empty) because parent dataset mounts afterwards
+  #   - parent dataset unmount fails because child dataset is mounted
+  #   - dataset is already mounted
+  #
+  # To prevent double-mount-error and other mounting errors mentioned above, configure dataset "mountpoint" option to value "legacy".
+  # This option prevents zfs from automatically mounting datasets, and gives full control back to the stage-1 boot script.
+  #
+  # @@ ZFS errors on datasets for booting without mountpoint "legacy" @@
+  # The datasets that mount on one of the "pathsNeededForBoot" will be loaded during stage-1-boot. This is also the stage where
+  # zpool import executes and automatically mounts its datasets on the current root (or through the SystemD unit "zfs-mount.service").
+  # NixOS stage-1 automatically calculates the required mounts for the above paths, and will manually mount the datasets on the
+  # soon-to-be switched into root.
+  # An error will occur if that dataset was (already) auto-mounted by pool import on the current filesystem root.
+  #
+  # There is a (supposed) upstream solution called ZFS automount generator (like FSTAB mount generator). This would(?) solve 
+  # the requirement for explicitly setting mountpoint "legacy" on declaratively defined filesystem datasets.
+  # This generator creates dynamic SystemD unit files for each dataset, and explicitly controls mounting and mount ordering.
+  # The ZFS automount generator script hasn't been turned into nixos options yet, but it is accessible through the ZFS upstream package.
+  # REF; https://github.com/NixOS/nixpkgs/issues/62644 (I'm not sure if this is actually better than explicitly setting "legacy")
   #
   disko.devices = {
     disk.slog = {
@@ -510,52 +547,21 @@
         setuid = "off";
       };
 
-      # @@ WIP BELOW @@
-      #
-      # NOTE; You can create nested datasets without defining any parent. The parent datasets will exist ephemerally
-      # and be automatically configured from the parent-parent dataset or pool-filesystem options.
-      # Explicitly defining parent datasets becomes interesting to change a default option that will apply
-      # automatically to all child datasets.
-      #
-      # ERROR; The following paths must exist before systemd is started!
-      # pathsNeededForBoot = [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/var/lib/nixos" "/etc" "/usr" ];
-      # REF; https://github.com/linj-fork/nixpkgs/blob/master/nixos/lib/utils.nix#L13
-      # The datasets that mount on those paths will be loaded during stage-1-boot under the zpool import action. The zpool import
-      # happens before changing root, but ZFS is unaware of the soon-to-be root.
-      # Nix automatically calculates the required mounts for the above paths, and will manually mount the datasets on the
-      # soon-to-be root. An error will occur if that dataset was auto-mounted by pool import, so the datasets linked to any of the
-      # above mountpoints needs option `mountpoint=legacy` to prevent this double-mount-error.
-      # NOTE; "legacy" in NixOS means that the `filesystem.<mount-point>` option will (declaratively ofcourse) perform the mounting
-      # at stage-1 boot. Any other option invokes on dynamic runtime behaviour, hence the error, and cannot be declaratively built upon.
-      #
-      # WARN; Switching root will unmount everything recursively and swap into the new root filesystem. That means the datasets
-      # that were automounted are unmounted again. After systemd start, there is a single unit "zfs-mount.service" that remounts
-      # those datasets.
-      # If there are random boot failures, this could indicate a mount ordering issue in the context of systemd service units.
-      # Systemd could be helpful and create paths for services, basically racing the zfs-mount service. The problem typically is
-      # lack of ordering between units.
-      # There is an upstream solution (i think, dunno what it exactly does) called ZFS automount generator (generators are a systemd
-      # concept). This presumably solves shizzle? The ZFS automount generator script hasn't been turned into nixos options yet,
-      # but it is accessible through the ZFS upstream package. So try it out, it will probably work because of the interlinking order
-      # of dataset hierarchy.
-      #
+      # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will
+      # be automatically created (as nomount?).
       datasets = {
         "volumes" = {
           # Default storage location for vm state data without requirements.
+          # NOTE; Qemu does its own application level caching on backing volume (cache=writeback by default)
           # HELP; Create sub datasets to specialize storage behaviour to the application.
           type = "zfs_fs";
           options = {
             mountpoint = "/var/cache/microvm";
-            # Qemu does its own application level caching
-            # HELP; Set to none if you'd be storing raw- or qcow backed volumes.
-            # NOTE; My virtual machines will run from a tmpfs by default!
-            primarycache = "metadata";
-            # Asynchronous IO for maximal volume performance
-            logbias = "throughput";
+            # Don't cache metadata because I expect infrequent reads and large write streams.
+            # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
+            primarycache = "none";
             # Haven't done benchmarking to change away from the default
             recordsize = "128K";
-            # Don't store access times
-            atime = "off";
           };
         };
         "media" = {
@@ -565,40 +571,42 @@
             # ACL required for virtiofs
             acltype = "posixacl";
             # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
-            # Back of enveloppe calculation; HDD seek time is ~10 ms, reading 16MB is ~130ms.
-            # The record is split accross 2 disks (data + 1 parity) so each disk is held for
-            # 75ms PER record. This literally kills our IOPS (cut by factor 7) in relation 
-            # to 128kb (~11ms latency) on record miss.
-            # NOW.. an average NAS diskstation will have 150-250 ms latency, so is 700% latency
-            # difference _worst case_ really that bad?
-            # HELP; To properly solve this I should build another pool for database storage
-            # AKA all other storage types that won't be impacted by the higher latency.
+            # Back of enveloppe calculation for recordzise 16MiB;
+            #   - HDD seek time is ~10 ms, reading 16MiB is ~130ms.
+            #   - Records are split accross 2 disks (data + 1 parity (RAIDZ1)).
+            # => Each disk is held for 75ms PER record.
+            # This literally kills our IOPS (cut by factor 7) in contrast to 128kb (~11ms latency) on record miss.
+            # NOW.. an average NAS diskstation will have 150-250 ms latency, so is 700% latency difference _worst case_ really that bad?
             #
-            # WARN; Records are processed in full, aka full 16M in RAM, full 16M checksummed.
-            # A defect means the full 16MB must be resilvered.
+            # NOTE; Records are processed in full, aka full 16M in RAM, full 16M checksummed. A defect means a record is defected,
+            # meaning the full 16MB must be resilvered.
             #
-            # NOTE; ~45ms aka 20-25 IOPS seems like an OK(?) situation, also considering 
-            # ARC prefetching is enabled and database caches should be in RAM.
-            # HELP; HEAVILY VIRTUALIZE INTO RAM BOIISS
-            recordsize = "1M";
+            # NOTE; ~45ms for 10MiB aka 20-25 IOPS seems like an OK(?) situation. Thats (rounded up) about 25 media items loaded from the pool
+            # per second, or 10 media items per 400ms (target response latency of internet request).
+            # Pictures are smaller than 10MiB, up to a third, so the picture 
+            #
+            # HELP; Perform application caching as much as possible (AKA heavily virtualize into RAM).
+            # Lower the recordsize for latency, increase the recordsize for increased compression ratio.
+            recordsize = "10M"; # == Maximum recordsize
             compression = "zstd-3";
           };
         };
         "media/pictures" = {
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             mountpoint = "/storage/media/pictures";
           };
         };
         "media/video" = {
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             mountpoint = "/storage/media/video";
-            # SEEALSO; recordsize comment on dataset media
-            recordsize = "8M";
           };
         };
         "media/transcodes" = {
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             mountpoint = "/storage/media/transcodes";
@@ -612,20 +620,23 @@
             acltype = "posixacl";
             atime = "off";
 
-            # Performance notes;
+            # Performance notes for postgres itself;
             #   - Disable database checksumming
             #     - Checksumming is a necessity in HA clusters with timelines though (eg Patroni)
 
-            # Postgres page size is fixed 8K. A bigger recordsize is more performant on reads, but not writes.
+            # Postgres page size is fixed 8K (hardcoded). A bigger recordsize is more performant on reads, but not writes.
+            # Latency of any read under 1MiB is dominated by disk seek time (~10ms), so the choice of recordsize
+            # between 8K and 128K is basically meaningless (as long as it's a multiple of 8K).
             recordsize = "32K";
-            # Assumes all postgres state fits in RAM, so no double caching of data files
+            # Assumes all postgres state fits in RAM, so no double caching of data files.
+            # Caches metadata for lower latency retrieval of non-cached records.
             primarycache = "metadata";
             # No fragmented writes from ZIL to data pool
             logbias = "latency";
           };
         };
         "postgres/state" = {
-          # NOTE; Inherit from this dataset!
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             canmount = "off";
@@ -633,7 +644,7 @@
           };
         };
         "postgres/wal" = {
-          # NOTE; Inherit from this dataset!
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             canmount = "off";
@@ -647,15 +658,18 @@
             # ACL required for virtiofs
             acltype = "posixacl";
             atime = "off";
+
+            # Performance notes for sqlite itself;
+            #   - Set page size to 64KiB
             # SEEALSO; dataset options for postgres
+
             recordsize = "64K";
             primarycache = "metadata";
             logbias = "latency";
           };
         };
         "sqlite/state" = {
-          # NOTE; Inherit from this dataset!
-          # WARN; SQLite page size can and should be set to 64K
+          # HELP; Inherit from this dataset for your application!
           type = "zfs_fs";
           options = {
             canmount = "off";
@@ -703,10 +717,10 @@
     options zfs zfs_immediate_write_sz=1048576
 
     # Disable prefetcher. Zfs could proactively read data expecting inflight, or future requests, into the ARC.
-    # We have a system with pools on (low IOPS) hard drives, including high random access load from databases.
-    # HELP; It's best to not introduce additional I/O latency when the potential for random access is high!
+    # We have a system with pools on low IOPS hard drives, including high random access load from databases.
+    # I choose to not introduce additional I/O latency when the potential for random access is high!
     #
-    # NOTE; Re-enable prefetch on full ssd array.. one day
+    # HELP; Re-enable prefetch on system with fast pools (like full ssd-array)
     options zfs zfs_prefetch_disable=1
   '';
 }
