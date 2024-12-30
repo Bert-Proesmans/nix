@@ -7,6 +7,7 @@
     ./hardware-configuration.nix
     ./postgres.nix
     ./immich.nix
+    ./nginx.nix
     # ./dns-vm.nix
     # ./sso-vm.nix
     # ./photos-vm.nix
