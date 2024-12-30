@@ -1,4 +1,4 @@
-{ lib, ... }: {
+{ lib, pkgs, config, ... }: {
   boot.supportedFilesystems = [ "zfs" ];
   # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
   # at unexpected moments and cause kernel downgrade.
@@ -44,13 +44,30 @@
   services.zfs.autoScrub.enable = true;
   services.zfs.autoScrub.interval = "weekly";
 
+  systemd.tmpfiles.settings."1-base-datasets" = {
+    # Remove world-permissions from zfs pool parent path, to prevent unauthorized reads on all data.
+    "/storage" = {
+      # Create directory owned by root  
+      d = {
+        user = config.users.users.root.name;
+        group = config.users.groups.root.name;
+        mode = "0700";
+      };
+      # Set ACL defaults
+      "A+".argument = "group::r-X,other::---,mask::r-x,default:group::r-X,default:other::---,default:mask::r-X";
+    };
+  };
+
   # @@ ZFS setup rundown @@
   #   - pool LOCAL, not mounted
   #     - / (root)
   #     - /nix
   #     - /tmp + /var/tmp (reduce RAM usage when storage is plenty)
   #   - pool STORAGE, not mounted but base-path at /storage
-  #     - 
+  #     - media
+  #     - postgres
+  #     - sqlite
+  #     - etc
   #
   # @@ ZFS Pools @@
   # Creates a RAIDZ1 pool from 3 disks + 1 SLOG device.
@@ -137,6 +154,12 @@
     disk.slog = {
       type = "disk";
       device = "/dev/disk/by-id/ata-M4-CT128M4SSD2_00000000114708FF549B";
+      preCreateHook = ''
+        if ! blkid "/dev/disk/by-id/ata-M4-CT128M4SSD2_00000000114708FF549B" >&2; then
+          # If drive contents were discarded, mark all sectors on drive as discarded
+          blkdiscard "/dev/disk/by-id/ata-M4-CT128M4SSD2_00000000114708FF549B"
+        fi
+      '';
       content = {
         type = "gpt";
         partitions = {
@@ -150,6 +173,12 @@
     disk.local-one = {
       type = "disk";
       device = "/dev/disk/by-id/nvme-INTEL_SSDPEKKW256G7_BTPY64630GRV256D";
+      preCreateHook = ''
+        if ! blkid "/dev/disk/by-id/nvme-INTEL_SSDPEKKW256G7_BTPY64630GRV256D" >&2; then
+          # If drive contents were discarded, mark all sectors on drive as discarded
+          blkdiscard "/dev/disk/by-id/nvme-INTEL_SSDPEKKW256G7_BTPY64630GRV256D"
+        fi
+      '';
       content = {
         type = "gpt";
         partitions = {
@@ -328,6 +357,11 @@
             zfs list -t snapshot -H -o name | grep -E '^local/root@empty$' || zfs snapshot 'local/root@empty'
           '';
           options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
+          options = {
+            # ERROR; Must enable acl on root for sub mounts and directories. The full path up to including root must have
+            # ACL-support enabled!
+            acltype = "posixacl";
+          };
         };
         "nix" = {
           # Nix filestore, contains no state
@@ -430,10 +464,9 @@
         # NOTE; ZSTD-1 (minus 1, aka faster) mode, performs better compression with ballpark same throughput of LZ4.
         # HELP; Doesn't require overwriting on sub-datasets
         compression = "zstd-fast-1";
-        # NOTE; Disable extended access control lists and use basic owner/group/other!
-        # HELP; Set this parameter to `posixacl` when required, check documentation of your software!
-        # HELP; Set this parameter to `posixacl` when using virtio shares!
-        acltype = "off";
+        # NOTE; Since the storage location is central, granular access must be given to each directory within. Also virtio shares
+        # require ACL enabled so just enable ACL for the entire storage set.
+        acltype = "posixacl";
         # NOTE; Store file metadata as extensions in inode structure (for performance)
         xattr = "sa";
         # NOTE; Increase inode size, if ad-hoc necessary, from the default 512-byte
@@ -557,6 +590,7 @@
           type = "zfs_fs";
           options = {
             mountpoint = "/var/cache/microvm";
+            acltype = "off";
             # Don't cache metadata because I expect infrequent reads and large write streams.
             # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
             primarycache = "none";
@@ -568,8 +602,6 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
-            # ACL required for virtiofs
-            acltype = "posixacl";
             # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
             # Back of enveloppe calculation for recordzise 16MiB;
             #   - HDD seek time is ~10 ms, reading 16MiB is ~130ms.
@@ -587,42 +619,22 @@
             #
             # HELP; Perform application caching as much as possible (AKA heavily virtualize into RAM).
             # Lower the recordsize for latency, increase the recordsize for increased compression ratio.
-            recordsize = "10M"; # == Maximum recordsize
+            #
+            # ERROR; recordsize must be power of 2 between 512B and 16M => It's not possible to pick 10, must be 8M or 16M!
+            recordsize = "8M"; # == Maximum recordsize
             compression = "zstd-3";
-          };
-        };
-        "media/pictures" = {
-          # HELP; Inherit from this dataset for your application!
-          type = "zfs_fs";
-          options = {
-            mountpoint = "/storage/media/pictures";
-          };
-        };
-        "media/video" = {
-          # HELP; Inherit from this dataset for your application!
-          type = "zfs_fs";
-          options = {
-            mountpoint = "/storage/media/video";
-          };
-        };
-        "media/transcodes" = {
-          # HELP; Inherit from this dataset for your application!
-          type = "zfs_fs";
-          options = {
-            mountpoint = "/storage/media/transcodes";
           };
         };
         "postgres" = {
           type = "zfs_fs";
           options = {
             canmount = "off";
-            # ACL required for virtiofs
-            acltype = "posixacl";
             atime = "off";
 
             # Performance notes for postgres itself;
             #   - Disable database checksumming
             #     - Checksumming is a necessity in HA clusters with timelines though (eg Patroni)
+            #   - Disable full_page_writes
 
             # Postgres page size is fixed 8K (hardcoded). A bigger recordsize is more performant on reads, but not writes.
             # Latency of any read under 1MiB is dominated by disk seek time (~10ms), so the choice of recordsize
@@ -655,8 +667,6 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
-            # ACL required for virtiofs
-            acltype = "posixacl";
             atime = "off";
 
             # Performance notes for sqlite itself;

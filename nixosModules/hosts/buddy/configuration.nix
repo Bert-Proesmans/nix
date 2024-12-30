@@ -5,6 +5,8 @@
     special.profiles.server
     special.profiles.hypervisor
     ./hardware-configuration.nix
+    ./postgres.nix
+    ./immich.nix
     # ./dns-vm.nix
     # ./sso-vm.nix
     # ./photos-vm.nix
@@ -32,15 +34,6 @@
   security.sudo.enable = true;
   # Allow for passwordless sudo
   security.sudo.wheelNeedsPassword = false;
-
-  systemd.tmpfiles.settings."1-base-datasets" = {
-    # Remove world-permissions from zfs pool parent path, to prevent unauthorized reads on all data.
-    "/storage".d = {
-      user = "root";
-      group = "root";
-      mode = "0700";
-    };
-  };
 
   sops.secrets.ssh_host_ed25519_key = {
     path = "/etc/ssh/ssh_host_ed25519_key";
