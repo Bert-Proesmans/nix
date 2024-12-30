@@ -47,7 +47,7 @@ in
   systemd.services.postgresql = lib.mkIf config.services.postgresql.enable {
     wants = [ "systemd-tmpfiles-setup.service" ];
     after = [ "systemd-tmpfiles-setup.service" ];
-    environment.TZ = "UTC";
+    environment.TZ = "Etc/UTC";
     serviceConfig.ReadWritePaths = [ state_pg wal_pg ];
     # Upstream configuration uses value type 'string' instead of list, so must force override value.
     unitConfig.RequiresMountsFor = lib.mkForce [ state_pg wal_pg ];
