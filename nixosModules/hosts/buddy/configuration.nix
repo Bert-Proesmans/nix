@@ -5,15 +5,14 @@
     special.profiles.server
     special.profiles.hypervisor
     ./hardware-configuration.nix
-    ./disks.nix
-    ./dns-vm.nix
-    ./sso-vm.nix
-    ./photos-vm.nix
-    ./proxy-vm.nix
+    # ./dns-vm.nix
+    # ./sso-vm.nix
+    # ./photos-vm.nix
+    # ./proxy-vm.nix
   ];
 
   networking.hostName = "buddy";
-  networking.domain = "alpha.proesmans.eu";
+  networking.domain = "internal.proesmans.eu";
   proesmans.facts.tags = [ "bare-metal" "hypervisor" ];
 
   proesmans.nix.garbage-collect.enable = true;
@@ -33,6 +32,15 @@
   security.sudo.enable = true;
   # Allow for passwordless sudo
   security.sudo.wheelNeedsPassword = false;
+
+  systemd.tmpfiles.settings."1-base-datasets" = {
+    # Remove world-permissions from zfs pool parent path, to prevent unauthorized reads on all data.
+    "/storage".d = {
+      user = "root";
+      group = "root";
+      mode = "0700";
+    };
+  };
 
   sops.secrets.ssh_host_ed25519_key = {
     path = "/etc/ssh/ssh_host_ed25519_key";
