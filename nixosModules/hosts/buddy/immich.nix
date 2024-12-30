@@ -95,10 +95,15 @@
       let
         script = pkgs.writeShellApplication {
           name = "symlink-uploads-directory-immich";
-          runtimeInputs = [ pkgs.coreutils ];
+          runtimeInputs = [ pkgs.coreutils pkgs.util-linux ];
+          # ERROR; Note the escaping of the dollar sign ($) when setting TARGET
           text = ''
-            ln --symbolic --force /var/tmp "${config.services.immich.mediaLocation}/upload"
-            ln --symbolic --force /var/tmp "${config.services.immich.mediaLocation}/backup" # DEBUG
+            # ERROR; Must re-create the hidden immich file otherwise the server won't start
+            TARGET="''${TMPDIR:-/var/tmp}"
+            mkdir -p "$TARGET/upload" "$TARGET/backup"
+            touch "$TARGET/upload/.immich" "$TARGET/backup/.immich"
+            ln --symbolic --force "$TARGET/upload" "${config.services.immich.mediaLocation}/upload"
+            ln --symbolic --force "$TARGET/backup" "${config.services.immich.mediaLocation}/backup" # DEBUG
           '';
         };
       in
