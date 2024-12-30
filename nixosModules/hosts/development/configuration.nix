@@ -3,6 +3,7 @@
   imports = [
     special.profiles.hypervisor
     ./hardware-configuration.nix
+    ./wip.nix
   ];
 
   networking.hostName = "development";
