@@ -1,7 +1,9 @@
 { lib, pkgs, config, ... }:
 let
   json-convert = pkgs.formats.json { };
-  imm-pass = "*XeIF&SPDqcerU&FZ1P!8XWkFAAmgul6"; # DEBUG
+  # Oauth2 secrets must fit certain syntax!
+  # tr --complement --delete 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkpqrstuvwxyz0123456789' < /dev/urandom | head --bytes 48
+  imm-pass = "SA6X979SfXxaN6g9621qw18eycZC9jawvc2342952pX7xtUb";
 in
 {
   sops.secrets.test-secret = {
@@ -57,20 +59,21 @@ in
         clientId = "photos";
         # clientSecret = config.sops.placeholder.test-secret;
         clientSecret = imm-pass; # DEBUG
-        defaultStorageQuota = 50;
+        defaultStorageQuota = 100;
         issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
         mobileOverrideEnabled = false;
         mobileRedirectUri = "";
         profileSigningAlgorithm = "none";
         scope = "openid email profile";
         signingAlgorithm = "RS256";
+        # NOTE; Immich currently ONLY applies these claims during account creation!
         storageLabelClaim = "immich_label";
         storageQuotaClaim = "immich_quota";
       };
       passwordLogin.enabled = true;
       reverseGeocoding.enabled = true;
       server.externalDomain = "https://photos.alpha.proesmans.eu";
-      server.loginPageMessage = "Proesmans Photos";
+      server.loginPageMessage = "Proesmans Photos system, proceed by clicking the button at the bottom";
       server.publicUsers = true;
       storageTemplate.enabled = true;
       # 2024/2024-12[-06][ Sinterklaas]/IMG_001.jpg
@@ -98,6 +101,7 @@ in
 
   systemd.services.immich-server = {
     environment.IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
+    #environment.IMMICH_CONFIG_FILE = lib.mkForce null;
     # DEBUG; Disable self-signed certificate validation.
     # This is a non-issue with publicly issued certificates.
     environment.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -137,6 +141,10 @@ in
       locations."/" = {
         proxyPass = "http://127.175.0.1:8080";
         proxyWebsockets = true;
+        extraConfig = ''
+          # Required for larger uploads to be possible (defaults at 10M)
+          client_max_body_size 500M;
+        '';
       };
     };
     virtualHosts."alpha.idm.proesmans.eu" = {
@@ -209,6 +217,7 @@ in
     provision = {
       enable = true;
       instanceUrl = "https://127.204.0.1:8443";
+      # D&M0Ln6%z9JA2Z%yyvg4*Dd0hRhb6y!H
       idmAdminPasswordFile = config.sops.secrets.test-secret.path;
       # ERROR; Certificate is bound to DNS name won't validate IP address
       acceptInvalidCerts = true;
@@ -221,7 +230,7 @@ in
 
         "immich.access" = { };
         "immich.admin" = { };
-        # "immich.quota.200G" = { };
+        "immich.quota.large" = { };
       };
       persons."bert-proesmans" = {
         displayName = "Bert Proesmans";
@@ -232,7 +241,7 @@ in
           "household.alpha"
           "immich.access"
           "immich.admin"
-          # "immich.quota.200G"
+          "immich.quota.large"
         ];
       };
 
@@ -253,10 +262,17 @@ in
         enableLegacyCrypto = true;
         scopeMaps."immich.access" = [ "openid" "email" "profile" ];
         claimMaps = {
-          # "immich_quota".valuesByGroup."immich.quota.200G" = [ "200" ]; # 200GB storage
-          "immich_label".valuesByGroup = {
-            "household.alpha" = [ "alpha" ]; # storage label "alpha" (organises library location by household)
-            "household.beta" = [ "beta" ];
+          # NOTE; Immich currently ONLY applies these claims during account creation!
+          "immich_label" = {
+            joinType = "ssv"; # Immich requires a string type
+            valuesByGroup = {
+              "household.alpha" = [ "alpha" ]; # storage label "alpha" (organises library location by household)
+              "household.beta" = [ "beta" ];
+            };
+          };
+          "immich_quota" = {
+            joinType = "ssv"; # Immich requires a string type
+            valuesByGroup."immich.quota.large" = [ "500" ]; # 500GB storage
           };
         };
       };
