@@ -134,28 +134,28 @@ in
   networking.firewall.allowedTCPPorts = [ 80 443 ];
   services.nginx = {
     enable = true;
-    virtualHosts."photos.alpha.proesmans.eu" = {
-      # Use the generated wildcard certificate, see security.acme.certs.<name>
-      useACMEHost = "alpha.proesmans.eu";
-      forceSSL = true;
-      locations."/" = {
-        proxyPass = "http://127.175.0.1:8080";
-        proxyWebsockets = true;
-        extraConfig = ''
-          # Required for larger uploads to be possible (defaults at 10M)
-          client_max_body_size 500M;
-        '';
-      };
-    };
-    virtualHosts."alpha.idm.proesmans.eu" = {
-      # Use the generated wildcard certificate, see security.acme.certs.<name>
-      useACMEHost = "idm.proesmans.eu";
-      forceSSL = true;
-      locations."/" = {
-        proxyPass = "https://127.204.0.1:8443";
-        proxyWebsockets = true;
-      };
-    };
+    # virtualHosts."photos.alpha.proesmans.eu" = {
+    #   # Use the generated wildcard certificate, see security.acme.certs.<name>
+    #   useACMEHost = "alpha.proesmans.eu";
+    #   forceSSL = true;
+    #   locations."/" = {
+    #     proxyPass = "http://127.175.0.1:8080";
+    #     proxyWebsockets = true;
+    #     extraConfig = ''
+    #       # Required for larger uploads to be possible (defaults at 10M)
+    #       client_max_body_size 500M;
+    #     '';
+    #   };
+    # };
+    # virtualHosts."alpha.idm.proesmans.eu" = {
+    #   # Use the generated wildcard certificate, see security.acme.certs.<name>
+    #   useACMEHost = "idm.proesmans.eu";
+    #   forceSSL = true;
+    #   locations."/" = {
+    #     proxyPass = "https://127.204.0.1:8443";
+    #     proxyWebsockets = true;
+    #   };
+    # };
   };
 
   # DEBUG; Access to kanidm self-signed certificates.
