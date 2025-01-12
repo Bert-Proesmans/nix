@@ -4,6 +4,7 @@
     special.profiles.hypervisor
     ./hardware-configuration.nix
     ./wip.nix
+    # ./immich-wip.nix
   ];
 
   networking.hostName = "development";
