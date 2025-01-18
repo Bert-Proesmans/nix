@@ -1,4 +1,11 @@
-{ lib, config, ... }: {
+{ lib, config, ... }:
+let
+  # A config priority number that is preferred over mkDefault.
+  # Useful when multiple options lead to clobbering a singular attribute set, like filesystems being set either
+  # manually or through volume definitions etc.
+  mkProfileArbitration = lib.mkOverride 900;
+in
+{
   imports = [
     ./microvm-guest/central-microvm.nix
     ./microvm-guest/suitcase-microvm.nix
@@ -18,7 +25,9 @@
   # Configure default root filesystem minimizing ram usage.
   # NOTE; All required files for boot and configuration are within the /nix mount!
   # What's left are temporary files, application logs and -artifacts, and to-persist application data.
-  fileSystems."/" = {
+  #
+  # WARN; Custom overide priority so the virtual machine could define volumes to mount at "/"
+  fileSystems."/" = mkProfileArbitration {
     device = "rootfs";
     fsType = "tmpfs";
     options = [ "size=100M,mode=0755" ];
