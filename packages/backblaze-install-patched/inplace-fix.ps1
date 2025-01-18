@@ -1,22 +1,12 @@
 #Requires -Version 5
 
-# Install-PackageProvider -Force nuget
-# Set-packageSource -Name nuget.org -NewLocation https://www.nuget.org/api/v2 -Trusted
-
-# Install-Package WixToolset.Dtf.WindowsInstaller
-# Get-ChildItem -Recurse -Filter *.dll -LiteralPath (Join-Path (Split-Path (Get-Package WixToolset.Dtf.WindowsInstaller).Source) lib/netstandard2.0) `
-# | ForEach-Object { Add-Type -LiteralPath $_.FullName }
-
 Add-Type -LiteralPath "C:\WixToolset.Dtf.WindowsInstaller.dll"
 
 $msiPath ="C:\bzinstall.msi"
-$transformPath ="C:\bzinstall.mst"
-$tempCopy = (New-TemporaryFile).FullName
+$finishedMsi = "C:\bzinstall-finished.msi"
 
-Copy-Item -Path $msiPath -Destination $tempCopy
-
-$originalDatabase = New-Object WixToolset.Dtf.WindowsInstaller.Database($msiPath, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::ReadOnly)
-$updatedDatabase = New-Object WixToolset.Dtf.WindowsInstaller.Database($tempCopy, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::Direct)
+Copy-Item -Path $msiPath -Destination $finishedMsi
+$updatedDatabase = New-Object WixToolset.Dtf.WindowsInstaller.Database($finishedMsi, [WixToolset.Dtf.WindowsInstaller.DatabaseOpenMode]::Direct)
 
 # ERROR; MSI sql-engine cannot handle more complex SQL strings!
 $executeSequenceQuery = @"
@@ -40,11 +30,6 @@ while ($record = $qView.Fetch()) {
 }
 
 $qView.Close()
-if(!($updatedDatabase.GenerateTransform($originalDatabase, $transformPath))) {
-	throw "Generation of transform failed!"
-}
-
 $updatedDatabase.Dispose()
-$originalDatabase.Dispose()
 
 "Custom actions after InstallFiles and InstallFinalize have been removed."

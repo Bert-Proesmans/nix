@@ -10,10 +10,19 @@ in
 
   environment.systemPackages = [
     # support both 32- and 64-bit applications
-    pkgs.wineWowPackages.stable
+    pkgs.wineWowPackages.stableFull
 
     # winetricks (all versions)
-    pkgs.winetricks
+    (pkgs.winetricks.overrideAttrs (_final: _previous: {
+      version = "20250102";
+      src = pkgs.fetchFromGitHub {
+        owner = "Winetricks";
+        repo = "winetricks";
+        rev = "e20b2f6f80d175f96208f51800130db7459dd28c"; # == 20250102
+        # nix-prefetch-url --unpack https://github.com/Winetricks/winetricks/archive/refs/tags/20250102.zip
+        sha256 = "02hdask7wn9vk4i0s43cyzg2xa9aphskbrn8slywsbic6rasyv9a";
+      };
+    }))
 
     pkgs.turbovnc
     pkgs.virtualgl
@@ -22,6 +31,36 @@ in
 
     pkgs.python312Packages.websockify
     pkgs.openssl
+
+    (pkgs.writeShellApplication {
+      name = "setup-wine-test";
+      runtimeInputs = [ pkgs.wineWowPackages.stableFull ];
+      text =
+        let
+          winInstallerNuget = pkgs.fetchzip {
+            url = "https://www.nuget.org/api/v2/package/WixToolset.Dtf.WindowsInstaller/5.0.2";
+            stripRoot = false;
+            extension = "zip";
+            # nix-prefetch-url --unpack <URL>
+            # Defaults to outputting sha256 hash.
+            # Note that the installer is not version pinned! Only when the hash is manually changed a redownload will occur
+            # (or a nix garbage collect has run)
+            sha256 = "17xk799yzykk2wjifnwk2dppjkrwb8q6c70gsf7rl8rw7q7l1z5v";
+          };
+          powershellWindows = pkgs.fetchurl {
+            url = "https://github.com/PowerShell/PowerShell/releases/download/v7.2.21/PowerShell-7.2.21-win-x64.msi";
+            sha256 = "1ba65dn1dzb7ihkdllhbh876zckl3n5yca92i73nxml93jql0xj0";
+          };
+        in
+        ''
+          export WINEPREFIX="$HOME/.wine"
+          rm -rf "$WINEPREFIX"
+          wineboot --init
+
+          cp ${winInstallerNuget}/lib/net20/WixToolset.Dtf.WindowsInstaller.dll "$WINEPREFIX"/drive_c/WixToolset.Dtf.WindowsInstaller.dll
+          wine msiexec /quiet /i ${powershellWindows} ENABLE_PSREMOTING=1 REGISTER_MANIFEST=1
+        '';
+    })
   ];
 
   microvm.vms.test =
