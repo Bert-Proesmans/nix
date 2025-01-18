@@ -1,35 +1,45 @@
 { lib
-, backblaze-installer
-, runCommand
+, writeShellApplication
+, backblaze-install-patched
 , wineWowPackages # 32+64 bit wine
 , winetricks
 }:
 let
-  wine = wineWowPackages.stable;
-
-  installedEnvironment = runCommand "wine-env" { buildInputs = [ wine winetricks ]; } ''
-    mkdir home
-    export HOME="$(realpath home)"
-
-    export WINEARCH="win64"
-    export WINEDLLOVERRIDES="mscoree=" # Disable Mono installation
-
-    wineboot --init
-
-    # Run desktop in window
-    winetricks vd="900x700"
-
-    # Unpack MSI files instead of installing.
-    # Besides unpacking the files this MSI database creates some shortcuts and auto-start entries.
-    # We'll manually run the authentication program.
-    msiexec /a "${backblaze-installer}" /q TARGETDIR="C:\Program Files (x86)\Backblaze"
-
-    mkdir $out
-    # Setup wine prefix with overlay filesystem, with read-only underlay at path `''${pkg}/share/.wine`.
-    mv --verbose "''${HOME}/.wine" "$out/share"
-
-    # Run sync gui with; "''${WINEPREFIX}/drive_c/Program Files (x86)/Backblaze/bzbui.exe" -noquiet
-    # Run authentication gui with; "''${WINEPREFIX}/.wine/drive_c/Program Files (x86)/Backblaze/bzdoinstall.exe"
-  '';
+  wine = wineWowPackages.stableFull;
 in
-installedEnvironment
+writeShellApplication {
+  name = "run-backblaze-wine-environment";
+  runtimeInputs = [ wine winetricks ];
+  text = ''
+    export WINEARCH="win64"
+    export WINEDLLOVERRIDES=""
+
+    if [ -z "$WINEPREFIX" ]; then
+      echo 'No Wine prefix environment variable set! Make sure to execute _export WINEPREFIX="<your directory>"_ first.'
+      exit 1
+    fi
+
+    if [ ! -d "$WINEPREFIX" ]; then
+      wineboot --init
+      wineserver --wait
+      
+      winecfg -v win11
+      wineserver --wait
+
+      # Run desktop in window
+      winetricks vd="900x700"
+      winetricks --unattended dotnet48
+      wineserver --wait
+      
+      cp '${backblaze-install-patched}' "$WINEPREFIX"/drive_c/backblaze_installer.msi
+      wine msiexec /quiet /i 'C:\backblaze_installer.msi' TARGETDIR="C:\Program Files (x86)\Backblaze"
+    fi
+
+    # Run authentication gui with; wine "C:/Program Files (x86)/Backblaze/bzdoinstall.exe"
+    # Run sync gui with; wine "C:/drive_c/Program Files (x86)/Backblaze/bzbui.exe" -noquiet
+    
+    # TODO; Perform check for logged in token and auto-start bzbui
+    # Then wait for wine exit;
+    # wineserver --wait
+  '';
+}
