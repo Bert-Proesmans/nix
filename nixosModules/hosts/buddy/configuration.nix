@@ -1,7 +1,6 @@
 { modulesPath, lib, config, special, ... }: {
 
   imports = [
-    "${modulesPath}/hardware/video/radeon.nix" # AMD Vega GPU (Radeon = pre-amdgpu)
     special.profiles.server
     special.profiles.hypervisor
     ./hardware-configuration.nix

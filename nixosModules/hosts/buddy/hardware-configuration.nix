@@ -11,6 +11,17 @@
   boot.kernelModules = [ "kvm-amd" ];
   hardware.cpu.amd.updateMicrocode = true;
 
+  # Acceleration and Vulkan through MESA RADV (_not_ AMDVLK)
+  # If AMDVLK is required, see https://wiki.nixos.org/wiki/AMD_GPU
+  #
+  # lspci;
+  # 08:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Raven Ridge [Radeon Vega Series / Radeon Vega Mobile Series] (rev cb)
+  hardware.graphics = {
+    enable = true; # By default includes amdgpu
+    enable32Bit = true;
+  };
+  hardware.enableRedistributableFirmware = true; # contains required amdgpu configuration blobs
+
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
   # It's best practise to mark the pools as 'exported' before moving them between systems.
