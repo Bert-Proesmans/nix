@@ -22,6 +22,16 @@
   };
   hardware.enableRedistributableFirmware = true; # contains required amdgpu configuration blobs
 
+  # Setup virtual display(s) for headless accelerated desktops (for vnc/sunshine)
+  # WARN; The amdgpu driver does not support a combination of physical and virtual displays as of writing. The screen will blank after
+  # loading the driver module. To see boot logs, do not add the amdgpu driver to initrd with this config!
+  # NOTE; But the driver _could_ support this, patches welcomed.
+  boot.extraModprobeConfig = ''
+    # PCI ID 08:00.0 == Raven Ridge GPU (APU)
+    # Last number is amount of virtual displays to create, in this example one (1)
+    options amdgpu virtual_display=0000:08:00.0,1
+  '';
+
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
   # It's best practise to mark the pools as 'exported' before moving them between systems.
