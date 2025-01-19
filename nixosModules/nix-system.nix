@@ -112,9 +112,9 @@ in
               inherit (prev) callPackage;
               directory = ../packages;
             };
-            # ERROR; special function unsock.wrap throws error about unresolved import "unsock"
-            # Need to special case unsock and pull it into the toplevel scope of pkgs.
-            unsock = final.proesmans.unsock;
+            # ERROR; The following custom packages were referred to by another custom package, so we need to create a toplevel alias
+            # for each referred package.
+            inherit (final.proesmans) unsock backblaze-installer backblaze-install-patched;
           })
         ];
 

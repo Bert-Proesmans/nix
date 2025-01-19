@@ -70,6 +70,29 @@
             '';
           };
         } // defaultListen;
+
+        "backup.alpha.proesmans.eu" = {
+          useACMEHost = "alpha.proesmans.eu";
+          forceSSL = true;
+          root = "${pkgs.novnc}/share/webapps/novnc";
+          locations."/" = {
+            index = "vnc.html";
+            tryFiles = "$uri $uri/ /vnc.html";
+          };
+
+          locations."/websockify" = {
+            # Points to websockify, the proxy between noVNC (websocket) and turboVNC (tcp)
+            proxyPass = "http://127.42.88.1:8080";
+            proxyWebsockets = true;
+            extraConfig = ''
+              # Avoid VNC connection timeout race
+              proxy_read_timeout 61s;
+
+              # Disable websocket caching
+              proxy_buffering off;
+            '';
+          };
+        } // defaultListen;
       };
 
     # Redirect the Idm traffic into kanidm for end-to-end encryption using the stream module
