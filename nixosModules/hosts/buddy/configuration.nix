@@ -9,6 +9,7 @@
     ./postgres.nix
     ./immich.nix
     ./nginx.nix
+    ./virtualgl.nix
     ./backblaze-backup/default.nix
     # ./dns-vm.nix
     # ./sso-vm.nix
