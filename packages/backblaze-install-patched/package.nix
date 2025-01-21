@@ -1,5 +1,4 @@
-{ lib
-, backblaze-installer
+{ backblaze-installer
 , fetchurl
 , fetchzip
 , runCommand

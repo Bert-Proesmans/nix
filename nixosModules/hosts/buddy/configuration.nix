@@ -1,4 +1,4 @@
-{ modulesPath, lib, config, special, ... }: {
+{ lib, config, special, ... }: {
 
   imports = [
     special.profiles.server

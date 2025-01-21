@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }: {
+{ lib, config, ... }: {
   boot.supportedFilesystems = [ "zfs" ];
   # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
   # at unexpected moments and cause kernel downgrade.

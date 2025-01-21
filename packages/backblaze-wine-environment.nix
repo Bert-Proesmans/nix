@@ -1,5 +1,4 @@
-{ lib
-, writeShellApplication
+{ writeShellApplication
 , backblaze-install-patched
 , wineWowPackages # 32+64 bit wine
 , winetricks

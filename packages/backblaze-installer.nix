@@ -1,5 +1,4 @@
-{ lib
-, fetchurl
+{ fetchurl
 , runCommand
 , wineWowPackages # 32+64 bit wine
 , findutils

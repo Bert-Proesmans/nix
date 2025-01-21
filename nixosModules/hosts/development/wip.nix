@@ -1,7 +1,4 @@
 { lib, flake, special, meta-module, pkgs, config, ... }:
-let
-
-in
 {
   services.xserver.enable = true;
   services.xserver.windowManager.ratpoison = {

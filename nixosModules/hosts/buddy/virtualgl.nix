@@ -1,5 +1,5 @@
 # Setup a secure bridge between virtualgl wrapped surfaces and the x-display attached to the graphics hardware
-{ lib, pkgs, config, ... }: {
+{ lib, pkgs, ... }: {
   # Setup virtual display(s) for headless accelerated desktops (for vnc/sunshine)
   # WARN; The amdgpu driver does not support a combination of physical and virtual displays as of writing. The screen will blank after
   # loading the driver module. To see boot logs, do not add the amdgpu driver to initrd with this config!
