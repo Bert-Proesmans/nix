@@ -343,6 +343,16 @@ rec {
               ./nixosModules/hosts/buddy/configuration.nix
             ];
           };
+
+          fart = lib.nixosSystem {
+            inherit lib;
+            system = null; # Deprecated, use nixpkgs.hostPlatform option
+            specialArgs = special-arguments;
+            modules = [
+              (meta-module "fart")
+              ./nixosModules/hosts/fart/configuration.nix
+            ];
+          };
         };
 
       # Home manager modules are just lambda's with an attribute set as argument (arity of all nix functions is

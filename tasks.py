@@ -211,7 +211,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
         deploy_flags = [
             "--debug",
-            "--no-substitute-on-destination",
+            #"--no-substitute-on-destination",
             # "--stop-after-disko", # DEBUG
             # "--no-reboot",
             # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for

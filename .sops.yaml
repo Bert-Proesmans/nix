@@ -19,6 +19,7 @@ keys:
   # HOST KEYS
   - &buddy_decryptor age1c27gckzuezcu4cqf7ksakksnxm4k694kjslysysas80jctjuwevsgd0ew3
   - &development_decryptor age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
+  - &fart_decryptor age1qw7ur23g0q8f36yj5sffghq28u7atx0d9m3wkjfurdyjhlhwxglqv48vus
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -41,6 +42,12 @@ creation_rules:
     key_groups:
       - age:
           - *development_decryptor
+          - *development_key
+
+  - path_regex: hosts/fart/[^/]+\.encrypted\.yaml$
+    key_groups:
+      - age:
+          - *fart_decryptor
           - *development_key
   
   # NOTE; No path_regex as fallback option
