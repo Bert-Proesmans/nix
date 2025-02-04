@@ -20,6 +20,11 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.netbootxyz.enable = true; # Allows for troubleshooting (low RAM available)
   boot.loader.efi.canTouchEfiVariables = true;
+  boot.supportedFilesystems = {
+    btrfs = lib.mkForce false;
+    zfs = lib.mkForce false;
+  };
+
   boot.tmp.useTmpfs = false; # Only have 1G RAM
   boot.tmp.cleanOnBoot = true;
 

@@ -10,7 +10,7 @@
 
   proesmans.nix.garbage-collect.enable = true;
   proesmans.internationalisation.be-azerty.enable = true;
-  proesmans.home-manager.enable = true;
+  proesmans.home-manager.enable = false;
 
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
 
