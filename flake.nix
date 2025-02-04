@@ -203,6 +203,7 @@ rec {
                 # For development
                 git bat
                 outils# sha{1,256,5120}/md5
+                nix-tree
                 # For building and introspection
                 nix-output-monitor
                 nix-fast-build
