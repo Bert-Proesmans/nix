@@ -18,20 +18,17 @@
     KERNEL=="card*|renderD*", MODE="0660", OWNER="root", GROUP="vglusers"
   '';
 
-  # _Only_ users in the "vglusers" group are allowed to perform rendering by executing vglrun !
-  users.groups.vglusers = { };
-
-  # DEBUG
-  users.users.bert-proesmans.extraGroups = [ "vglusers" ];
+  environment.systemPackages = [
+    pkgs.virtualgl
+    pkgs.pkgsi686Linux.virtualgl
+  ];
 
   systemd.tmpfiles.rules = [
     "d /etc/opt/VirtualGL 0750 lightdm vglusers -"
   ];
 
-  environment.systemPackages = [
-    pkgs.virtualgl
-    pkgs.pkgsi686Linux.virtualgl
-  ];
+  # _Only_ users in the "vglusers" group are allowed to perform rendering by executing vglrun !
+  users.groups.vglusers = { };
 
   services.xserver = {
     enable = true;
@@ -53,20 +50,33 @@
       extraSeatDefaults = ''
         allow-guest=false
         greeter-hide-users=true
-        greeter-setup-script=${lib.getExe (
-          # TODO; Should upstream this wrapper and create a nice nixos module around it
-          pkgs.symlinkJoin {
-            name = "deps-fixed-vglgenkey";
-            paths = [pkgs.virtualgl];
-            nativeBuildInputs = [ pkgs.makeWrapper ];
-            meta.mainProgram = "vglgenkey";
-            postBuild = ''
-              wrapProgram $out/bin/vglgenkey \
-                --prefix  PATH : "${lib.makeBinPath [ pkgs.xorg.xauth pkgs.gawk ]}"
-            '';
-          }
-        )}
+        greeter-setup-script=${lib.getExe' pkgs.virtualgl "vglgenkey"}
       '';
     };
   };
+
+  nixpkgs.overlays = [
+    (final: prev: {
+      virtualgl = prev.virtualgl.overrideAttrs (old: {
+        # TODO; Should upstream this wrapper and create a nice nixos module around it
+        #
+        # vglrun and vglgenkey lack PATH for referenced binaries
+        # vglrun is wrapped with runtime libraries for both virtualgl-64bit and virtualgl-32bit.
+        #
+        nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ final.makeWrapper ];
+
+        # WARN; when buildCommand is set, the phases will _not run_!
+        # REF; https://nixos.org/manual/nixpkgs/stable/#sec-stdenv-phases @paragraph-2
+        buildCommand = old.buildCommand + ''
+          # Suffixing the virtualgl libraries to not anger the gods of shared libraries!
+          wrapProgram $out/bin/vglrun \
+            --prefix PATH : "${lib.makeBinPath [ final.coreutils final.nettools final.gnused ]}" \
+            --suffix LD_LIBRARY_PATH : "${lib.makeLibraryPath [pkgs.virtualglLib pkgs.pkgsi686Linux.virtualglLib]}"
+
+          wrapProgram $out/bin/vglgenkey \
+            --prefix PATH : "${lib.makeBinPath [ final.xorg.xauth final.gawk ]}"
+        '';
+      });
+    })
+  ];
 }

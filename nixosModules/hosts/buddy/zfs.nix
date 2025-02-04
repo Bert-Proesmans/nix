@@ -598,6 +598,14 @@
             recordsize = "128K";
           };
         };
+        "backup" = {
+          # Filesystem for backup index storage
+          # TODO; tune, since now it's considered general purpose file storage
+          type = "zfs_fs";
+          options = {
+            canmount = "off";
+          };
+        };
         "media" = {
           type = "zfs_fs";
           options = {

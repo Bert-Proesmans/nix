@@ -17,6 +17,11 @@
   hardware.graphics.enable = true;
   hardware.enableRedistributableFirmware = true; # contains required amdgpu configuration blobs
 
+  environment.variables.LD_LIBRARY_PATH = [
+    "/run/opengl-driver/lib" # OpenGL shared libraries from graphics driver
+    "/run/opengl-driver-32/lib" # 32-bit shared libraries from graphics driver
+  ];
+
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
   # It's best practise to mark the pools as 'exported' before moving them between systems.
