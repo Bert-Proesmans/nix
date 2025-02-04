@@ -19,7 +19,6 @@
 
   environment.variables.LD_LIBRARY_PATH = [
     "/run/opengl-driver/lib" # OpenGL shared libraries from graphics driver
-    "/run/opengl-driver-32/lib" # 32-bit shared libraries from graphics driver
   ];
 
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`

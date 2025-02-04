@@ -68,10 +68,8 @@
         # WARN; when buildCommand is set, the phases will _not run_!
         # REF; https://nixos.org/manual/nixpkgs/stable/#sec-stdenv-phases @paragraph-2
         buildCommand = old.buildCommand + ''
-          # Suffixing the virtualgl libraries to not anger the gods of shared libraries!
           wrapProgram $out/bin/vglrun \
-            --prefix PATH : "${lib.makeBinPath [ final.coreutils final.nettools final.gnused ]}" \
-            --suffix LD_LIBRARY_PATH : "${lib.makeLibraryPath [pkgs.virtualglLib pkgs.pkgsi686Linux.virtualglLib]}"
+            --prefix PATH : "${lib.makeBinPath [ final.coreutils final.nettools final.gnused ]}"
 
           wrapProgram $out/bin/vglgenkey \
             --prefix PATH : "${lib.makeBinPath [ final.xorg.xauth final.gawk ]}"

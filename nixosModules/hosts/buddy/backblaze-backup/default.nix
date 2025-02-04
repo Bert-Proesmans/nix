@@ -6,6 +6,25 @@ let
     text = builtins.readFile ./xstartup-turbovnc.sh;
   };
 
+  backblaze-wine-environment = pkgs.proesmans.backblaze-wine-environment.override ({
+    # Add these packages to the share library path
+    libraries = [
+      pkgs.freetype # FreeType for Wine
+      pkgs.virtualglLib # VirtualGL libs (vglrun)
+      pkgs.pkgsi686Linux.virtualglLib # 32-bit VirtualGL libs (vglrun)
+    ];
+  });
+
+  # ERROR; vglrun FLIPPIN RESETS LD_LIBRARY_PATH!
+  # Manually configure the vgl invocation with proper arguments using TVNC_VGLRUN.
+  #
+  # +vm : enables window manager compatibility
+  # -ld : prefix this string before the reset LD_LIBRARY_PATH
+  #   - need freetype for wine
+  #   - add environment library path for opengl drivers (and other important stuff)
+  #NEWLLDP=(vglrun +vm -ld "${}:${config.environment.variables.LD_LIBRARY_PATH or ""}")
+  #TVNC_VGLRUN="''${NEWLLDP[*]}"; export TVNC_VGLRUN
+
   _vnc = pkgs.writeShellApplication {
     name = "vnc-up";
     runtimeInputs = [ pkgs.turbovnc pkgs.python312Packages.websockify pkgs.virtualgl ];
@@ -19,11 +38,11 @@ let
         -autokill \
         -geometry 1240x900 \
         -securitytypes none -localhost \
-        -vgl \
         -xstartup ${lib.getExe xstartup} \
         -wm 'none+ratpoison' \
         -depth 24 \
-        -nointerframe \
+        -nointerframe
+
     '';
   };
   vnc-up = pkgs.symlinkJoin {
@@ -35,7 +54,6 @@ let
       # freetype libraries added for wine to stop whineing huehehe
       # VGL_FPS limits the amount of rendered frames
       wrapProgram $out/bin/vnc-up \
-        --suffix LD_LIBRARY_PATH : "${lib.makeLibraryPath [ pkgs.freetype ]}" \
         --set-default XSESSIONSDIR "${config.services.displayManager.sessionData.desktops}/share/xsessions" \
         --set-default VGL_FPS 20 \
         --set-default DISABLE_VIRTUAL_DESKTOP true
@@ -47,6 +65,10 @@ in
   programs.turbovnc.ensureHeadlessSoftwareOpenGL = true;
   hardware.graphics.enable32Bit = true;
 
+  environment.variables.LD_LIBRARY_PATH = [
+    "/run/opengl-driver-32/lib" # 32-bit for wine
+  ];
+
   # Configure session file that's being called by turbovnc
   # Use session filename "none+ratpoison" (none = desktop manager, ratpoison = window manager)
   # ERROR; The package is configured with another 
@@ -57,7 +79,7 @@ in
   environment.etc."ratpoisonrc".text = ''
     echo Ratpoison started
     set border 1
-    #exec ${lib.getExe pkgs.proesmans.backblaze-wine-environment}
+    #exec ${lib.getExe backblaze-wine-environment}
     #echo WINE environment started
     # quit
   '';
@@ -83,7 +105,7 @@ in
     partOf = [ config.systemd.targets.backblaze-backup.name ];
     wants = [ "systemd-tmpfiles-setup.service" ];
     after = [ "systemd-tmpfiles-setup.service" config.systemd.services.display-manager.name ];
-    reloadTriggers = [ (config.environment.etc."ratpoisonrc".source or null) ];
+    restartTriggers = [ (config.environment.etc."ratpoisonrc".source or null) ];
 
     script = lib.getExe' vnc-up "vnc-up";
     serviceConfig.User = "backblaze";
@@ -106,7 +128,7 @@ in
 
   environment.systemPackages = [
     pkgs.mesa-demos # DEBUG
-    pkgs.proesmans.backblaze-wine-environment # DEBUG
+    backblaze-wine-environment # DEBUG - run-backblaze-wine-environment
     vnc-up
   ];
 
@@ -137,7 +159,7 @@ in
   };
 
   nixpkgs.overlays = [
-    (final: prev: {
+    (_final: prev: {
       winetricks = prev.winetricks.overrideAttrs ({
         version = "20250102";
         src = pkgs.fetchFromGitHub {

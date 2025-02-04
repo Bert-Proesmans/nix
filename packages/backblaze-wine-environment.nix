@@ -1,7 +1,10 @@
-{ writeShellApplication
+{ lib
+, writeShellApplication
 , backblaze-install-patched
 , wineWowPackages # 32+64 bit wine
 , winetricks
+, virtualgl
+, libraries ? [ ] # Libraries to add to LD_LIBRARY_PATH
 }:
 let
   wine = wineWowPackages.stable;
@@ -9,12 +12,16 @@ let
 in
 writeShellApplication {
   name = "run-backblaze-wine-environment";
-  runtimeInputs = [ wine winetricks ];
+  runtimeInputs = [ wine winetricks virtualgl ];
   text = ''
-    export WINEARCH="win64"
+    DRIVER_LIB_PATH="/run/opengl-driver/lib:/run/opengl-driver-32/lib"
+    LD_LIBRARY_PATH="${lib.makeLibraryPath libraries}:''${LD_LIBRARY_PATH:-''$DRIVER_LIB_PATH}"
+    export LD_LIBRARY_PATH
+
+    WINEARCH="win64"; export WINEARCH
     # mscoree dll linking to null disables the request for Mono installation on init.
     # we don't need mono as we're going to install netframework when the environment initializes.
-    export WINEDLLOVERRIDES="''${WINEDLLOVERRIDES:-mscoree=}"
+    WINEDLLOVERRIDES="''${WINEDLLOVERRIDES:-mscoree=}"; export WINEDLLOVERRIDES
 
     if [ -z "$WINEPREFIX" ]; then
       echo 'WINE: No Wine prefix environment variable set! Make sure to execute _export WINEPREFIX="<your directory>"_ first.'
@@ -53,11 +60,11 @@ writeShellApplication {
     fi
 
     if [ ! -f "$WINEPREFIX"/drive_c/ProgramData/Backblaze/bzdata/bzvol_system_volume/bzvol_id.xml ]; then
-      wine 'C:\Program Files (x86)\Backblaze\bzdoinstall.exe' -doinstall 'C:\Program Files (x86)\Backblaze'
+      vglrun wine 'C:\Program Files (x86)\Backblaze\bzdoinstall.exe' -doinstall 'C:\Program Files (x86)\Backblaze'
       wineserver --wait
     fi
 
-    wine 'C:\Program Files (x86)\Backblaze\bzbui.exe' -noquiet
+    vglrun wine 'C:\Program Files (x86)\Backblaze\bzbui.exe' -noquiet
     # wine control
     wineserver --wait
   '';
