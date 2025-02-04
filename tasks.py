@@ -226,7 +226,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
         # the current (buildhost) host will push the packages.
         # There are more situations where uploading from current host first is desired, as opposed to downloading from
         # the internet caches!
-        local_targets_marker = ["localhost", "127.0.0.1"]
+        local_targets_marker = ["localhost", "127.0.0.1", "192.168."]
         if any(x in ssh_connection_string for x in local_targets_marker):
             # Since we have a populated nix store, and this is a local install; do not let the target pull from
             # the external nix caches.
