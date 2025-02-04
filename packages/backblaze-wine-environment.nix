@@ -51,6 +51,8 @@ writeShellApplication {
       echo "Wine initialisation done" >&2
     fi
 
+    [ -f "$WINEPREFIX"/drive_c/backblaze_installer.msi ] && rm "$WINEPREFIX"/drive_c/backblaze_installer.msi
+
     if [ "$DISABLE_VIRTUAL_DESKTOP" = "true" ]; then
       echo "WINE: DISABLE_VIRTUAL_DESKTOP=true - Virtual Desktop mode will be disabled"
       winetricks vd=off
@@ -59,13 +61,13 @@ writeShellApplication {
       winetricks vd="900x700"
     fi
 
-    if [ ! -f "$WINEPREFIX"/drive_c/ProgramData/Backblaze/bzdata/bzvol_system_volume/bzvol_id.xml ]; then
+    while [ ! -f "$WINEPREFIX"/drive_c/ProgramData/Backblaze/bzdata/bzvol_system_volume/bzvol_id.xml ]
+    do
       vglrun wine 'C:\Program Files (x86)\Backblaze\bzdoinstall.exe' -doinstall 'C:\Program Files (x86)\Backblaze'
       wineserver --wait
-    fi
+    done
 
     vglrun wine 'C:\Program Files (x86)\Backblaze\bzbui.exe' -noquiet
-    # wine control
     wineserver --wait
   '';
 }
