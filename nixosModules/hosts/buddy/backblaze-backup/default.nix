@@ -1,12 +1,10 @@
 { lib, pkgs, config, ... }:
 let
-  xstartup = pkgs.writeShellApplication {
-    name = "xstartup.turbovnc";
-    runtimeInputs = [ pkgs.gnugrep pkgs.gnused pkgs.virtualgl ];
-    text = builtins.readFile ./xstartup-turbovnc.sh;
-  };
+  # Use this path to store the wine state data
+  winePrefix = "/storage/backup/backblaze/wineprefix";
 
   backblaze-wine-environment = pkgs.proesmans.backblaze-wine-environment.override ({
+    inherit winePrefix;
     # Add these packages to the share library path
     libraries = [
       pkgs.freetype # FreeType for Wine
@@ -15,49 +13,9 @@ let
     ];
   });
 
-  # ERROR; vglrun FLIPPIN RESETS LD_LIBRARY_PATH!
-  # Manually configure the vgl invocation with proper arguments using TVNC_VGLRUN.
-  #
-  # +vm : enables window manager compatibility
-  # -ld : prefix this string before the reset LD_LIBRARY_PATH
-  #   - need freetype for wine
-  #   - add environment library path for opengl drivers (and other important stuff)
-  #NEWLLDP=(vglrun +vm -ld "${}:${config.environment.variables.LD_LIBRARY_PATH or ""}")
-  #TVNC_VGLRUN="''${NEWLLDP[*]}"; export TVNC_VGLRUN
-
-  _vnc = pkgs.writeShellApplication {
-    name = "vnc-up";
-    runtimeInputs = [ pkgs.turbovnc pkgs.python312Packages.websockify pkgs.virtualgl ];
-    text = ''
-      # -vgl argument activates virtualgl rendering and requires virtual gl on path
-      # -localhost restricts accepted connections
-      # -nevershared + -disconnect force only one active connection into the session
-      # -nointerframe disables calculating interframe distances saving cpu and increasing bandwidth usage when software performs runaway draws
-      vncserver :1 \
-        -fg \
-        -autokill \
-        -geometry 1240x900 \
-        -securitytypes none -localhost \
-        -xstartup ${lib.getExe xstartup} \
-        -wm 'none+ratpoison' \
-        -depth 24 \
-        -nointerframe
-
-    '';
-  };
-  vnc-up = pkgs.symlinkJoin {
-    name = "vnc-up";
-    paths = [ _vnc ];
-    nativeBuildInputs = [ pkgs.makeWrapper ];
-
-    postBuild = ''
-      # freetype libraries added for wine to stop whineing huehehe
-      # VGL_FPS limits the amount of rendered frames
-      wrapProgram $out/bin/vnc-up \
-        --set-default XSESSIONSDIR "${config.services.displayManager.sessionData.desktops}/share/xsessions" \
-        --set-default VGL_FPS 20 \
-        --set-default DISABLE_VIRTUAL_DESKTOP true
-    '';
+  link-backup-mount = pkgs.writeShellApplication {
+    name = "link-backup-mounts";
+    runtimeInputs = [ ];
   };
 in
 {
@@ -79,8 +37,8 @@ in
   environment.etc."ratpoisonrc".text = ''
     echo Ratpoison started
     set border 1
-    #exec ${lib.getExe backblaze-wine-environment}
-    #echo WINE environment started
+    exec ${lib.getExe backblaze-wine-environment}    
+    echo WINE environment started
     # quit
   '';
 
@@ -89,7 +47,6 @@ in
     isNormalUser = true;
     group = "backblaze";
     extraGroups = [ "vglusers" ];
-    home = "/storage/backup/backblaze";
     useDefaultShell = true;
   };
   users.groups.backblaze = { };
@@ -104,14 +61,104 @@ in
     wantedBy = [ config.systemd.targets.backblaze-backup.name ];
     partOf = [ config.systemd.targets.backblaze-backup.name ];
     wants = [ "systemd-tmpfiles-setup.service" ];
-    after = [ "systemd-tmpfiles-setup.service" config.systemd.services.display-manager.name ];
+    after = [ "systemd-tmpfiles-setup.service" ];
+    upholds = [ config.systemd.services.display-manager.name ];
     restartTriggers = [ (config.environment.etc."ratpoisonrc".source or null) ];
 
-    script = lib.getExe' vnc-up "vnc-up";
-    serviceConfig.User = "backblaze";
-    serviceConfig.ReadWritePaths = [ "/storage/backup/backblaze" ];
+    path = [ pkgs.turbovnc pkgs.coreutils pkgs.mount pkgs.umount pkgs.gocryptfs ];
+    # WARN; Various helper scripts try to be helpful by purging LD_LIBRARY_PATH/LD_PRELOAD_PATH etc, 
+    # some environment variables from bigger scopes do not trickle down! Only set necessary variables
+    # in scope closest to where they're needed!
+    environment.XSESSIONSDIR = "${config.services.displayManager.sessionData.desktops}/share/xsessions";
+    enableStrictShellChecks = true;
+    script = lib.strings.concatStringsSep " " [
+      # -vgl argument activates virtualgl rendering and requires virtual gl on path
+      # ERROR; Do not enable virtualgl for the entire window manager because that exhausts the available x-session connections.
+      # Activate virtualgl _per application_ instead.
+      #
+      "vncserver"
+      "-fg"
+      "-autokill"
+      "-geometry 1240x900"
+      # NOTE; No security on the vnc server + only accept connections from localhost.
+      # Use openId security instead at the proxy level!
+      "-securitytypes none -localhost"
+      "-xstartup ${lib.getExe (pkgs.writeShellApplication {
+                  name = "xstartup.turbovnc";
+                  runtimeInputs = [ pkgs.gnugrep pkgs.gnused pkgs.virtualgl ];
+                  text = builtins.readFile ./xstartup-turbovnc.sh;
+                })}"
+      # IMPORTANT; Set this to the desktopManager+windoManager combo configured through the xserver options.
+      # SEEALSO; `services.xserver.windowManager.<name>.enable` above
+      "-wm 'none+ratpoison'"
+      "-depth 24"
+      # NOTE; Only one active connection active at a time and force disconnect the other
+      "-nevershared -disconnect"
+      # -nointerframe disables calculating interframe distances 
+      # NOTE; Saves cpu but increases bandwidth usage in case client applications performs runaway amount of draws
+      "-nointerframe"
+    ];
+
+    preStart = ''
+      # Source directory before overlays
+      # WARN; Contains bind mounts!
+      VAULT="/storage/backup/backblaze/drive_d/paths"
+
+      # Target drive for WINE
+      DRIVE="/storage/backup/backblaze/drive_d/data"
+
+
+      # 1. Prepare overlay structure
+
+      ENCRYPT_MIDDLE="/storage/backup/backblaze/drive_d/overlay/encrypted"
+      # ERROR; Requires to be on the same filesystem as UPPER for atomic file operations!
+      OVERLAY_WORK="/storage/backup/backblaze/drive_d/overlay/work"
+      OVERLAY_UPPER="/storage/backup/backblaze/drive_d/overlay/upper"
+
+      # NOTE; $VAULT should already be created, would be stupid otherwise. But still attempting to create if not exists to keep the show running
+      mkdir -p "$VAULT" "$DRIVE" "$ENCRYPT_MIDDLE" "$OVERLAY_WORK" "$OVERLAY_UPPER"
+
+      
+      # 2. Setup encrypted overlay
+      # TODO; Extrapolate init to only work once
+      # TODO; Set password
+      gocryptfs -reverse -init -plaintextnames "$VAULT"
+      # NOTE; Sub-mounts are automatically enabled (disable with -one-file-system)
+      gocryptfs -reverse -acl -rw "$VAULT" "$ENCRYPT_MIDDLE"
+
+
+      # 3. Setup rw-overlay
+      mount -t overlay overlay -o lowerdir="$ENCRYPT_MIDDLE",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" none "$DRIVE"
+      
+      # RESULT: VAULT => [encryption] => ENCRYPT_MIDDLE => [overlayed with r/w directory at OVERLAY_UPPER] => DRIVE
+      # Now symlink DRIVE into wine
+    '';
+
+    postStop = ''
+      DRIVE="/storage/backup/backblaze/drive_d/data"
+      ENCRYPT_MIDDLE="/storage/backup/backblaze/drive_d/overlay/encrypted"
+
+      umount "$DRIVE"
+    '';
+
     unitConfig.RequiresMountsFor = [ "/storage/backup/backblaze" ];
-    environment.WINEPREFIX = "/storage/backup/backblaze/wineprefix";
+    serviceConfig = {
+      User = "backblaze";
+      #ProtectSystem = "full";
+      #ProtectHome = true;
+      ReadWritePaths = [ "/storage/backup/backblaze" ];
+      BindPaths = [
+        # ERROR; Paths mounted as read-only into an overlayfs stay read-only, even though the overlay could make
+        # those locations writeable through the upper directory!
+        #
+        # NOTE; Group directories from the same pool into the same landing directory _on the same pool_
+        # Keeping all mounts on the same pool prevents total space fluctuations or miscalculations between
+        # filesystem total space and actual counted datasize (last one is mounted in and is larger)
+        "/storage/media/immich/originals:/storage/backup/backblaze/drive_d/paths/immich"
+        "/storage/postgres/state:/storage/backup/backblaze/drive_d/paths/postgresql"
+        "/storage/sqlite/state:/storage/backup/backblaze/drive_d/paths/sqlite"
+      ];
+    };
   };
 
   systemd.services."vnc-websockify" = {
@@ -121,28 +168,42 @@ in
     partOf = [ config.systemd.targets.backblaze-backup.name ];
     after = [ config.systemd.services.backblaze-backup.name ];
 
-    script = ''
-      ${pkgs.python3Packages.websockify}/bin/websockify '127.42.88.1:8080' '127.0.0.1:5901'
-    '';
+    path = [ pkgs.python3Packages.websockify ];
+    enableStrictShellChecks = true;
+    script = "websockify '127.42.88.1:8080' '127.0.0.1:5901'";
   };
 
   environment.systemPackages = [
-    pkgs.mesa-demos # DEBUG
-    backblaze-wine-environment # DEBUG - run-backblaze-wine-environment
-    vnc-up
+    # pkgs.mesa-demos # DEBUG
   ];
 
   systemd.tmpfiles.settings."backblaze-state" = {
     "/storage"."a+".argument = "group:backblaze:r-X";
     "/storage/backup"."a+".argument = "group:backblaze:r-X";
+    "/storage/backup/backblaze"."a+".argument = "group:backblaze:r-X,default:group:backblaze:r-X";
 
-    "/storage/backup/backblaze".d = {
+    "/storage/backup/backblaze/drive_d/paths".d = {
+      # To bind-mount all backup paths into
       user = "backblaze";
       group = "backblaze";
       mode = "0700";
     };
 
-    "/storage/backup/backblaze/wineprefix".d = {
+    "/storage/backup/backblaze/drive_d/overlay".d = {
+      # To prepare encryption and overlayfs
+      user = "backblaze";
+      group = "backblaze";
+      mode = "0700";
+    };
+
+    "/storage/backup/backblaze/drive_d/data".d = {
+      # Actual data presented to wine
+      user = "backblaze";
+      group = "backblaze";
+      mode = "0700";
+    };
+
+    "/storage/backup/backblaze/wineprefix".z = {
       user = "backblaze";
       group = "backblaze";
       mode = "0700";
@@ -154,6 +215,13 @@ in
       type = "zfs_fs";
       options = {
         mountpoint = "/storage/backup/backblaze";
+      };
+    };
+    "backup/backblaze/drive_c" = {
+      type = "zfs_fs";
+      options = {
+        mountpoint = "/storage/backup/backblaze/wineprefix";
+        refquota = "128GB"; # Consistent statistics of the drive_c
       };
     };
   };

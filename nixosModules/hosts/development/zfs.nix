@@ -98,6 +98,10 @@
             zfs list -t snapshot -H -o name | grep -E '^local/root@empty$' || zfs snapshot 'local/root@empty'
           '';
           options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
+          #
+          options = {
+            acltype = "posixacl";
+          };
         };
         "nix" = {
           # Nix filestore, contains no state

@@ -345,6 +345,10 @@
         relatime = "on";
         # NOTE; Opt out of built-in snapshotting
         "com.sun:auto-snapshot" = "false";
+        #
+        devices = "off";
+        setuid = "off";
+        exec = "off";
       };
 
       datasets = {
@@ -358,9 +362,12 @@
           '';
           options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
           options = {
-            # ERROR; Must enable acl on root for sub mounts and directories. The full path up to including root must have
-            # ACL-support enabled!
+            # ERROR; Permissions not working if the _full hierarchival path_ doesn't have acl enabled!
+            # Must enable acl from target file up to and including root.
             acltype = "posixacl";
+            # /dev is devtmps, does not require dev = on
+            # /run/wrappers houses special binaries, does not require setuid = on
+            # /nix/store holds all binaries, does not require exec = on
           };
         };
         "nix" = {
@@ -371,6 +378,7 @@
           options = {
             atime = "off"; # nix store doesn't use access time
             acltype = "posixacl"; # Required for virtio shares
+            exec = "on";
           };
         };
         "nix/reserve" = {
@@ -578,6 +586,7 @@
         # Restrict privilege elevation in both directions of host<->guest through file sharing.
         devices = "off";
         setuid = "off";
+        exec = "off";
       };
 
       # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will
