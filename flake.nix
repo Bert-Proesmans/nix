@@ -318,6 +318,9 @@ rec {
               _module.args.flake = flake;
               _module.args.meta-module = meta-module;
 
+              # Nixos utils package is available as module argument, made available sorta like below.
+              #_module.args.utils = import "${inputs.nixpkgs}/nixos/lib/utils.nix" { inherit lib config pkgs; };
+
               # The hostname of each configuration _must_ match their attribute name.
               # This prevent the footgun of desynchronized identifiers.
               networking.hostName = lib.mkForce hostname;
