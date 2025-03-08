@@ -1,7 +1,6 @@
 { inputs, pkgs }:
+# WARN; TreeFMT-nix is built to be used with "flake-parts", but we set it up manually without "flake-parts".
 (inputs.treefmt-nix.lib.evalModule pkgs {
-  projectRootFile = "flake.nix";
-
   programs.nixpkgs-fmt.enable = true;
   programs.deadnix.enable = true;
   programs.shellcheck.enable = true;

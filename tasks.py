@@ -657,3 +657,11 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
         env=environment,
         check=True,
     )
+
+@task
+def format(c: Any) -> None:
+    """
+    Use the defined formatter to format all source files in this repository
+    """
+    subprocess.run(["nix", "fmt", PROJECT_DIR], cwd=FLAKE, check=False)
+
