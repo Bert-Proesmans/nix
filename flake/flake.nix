@@ -9,14 +9,10 @@
     nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-24.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    systems.url = "path:./flake.systems.nix";
-    systems.flake = false;
-
     # WARN; Seems like everybody is using flake-utils, but this dependency does not bring anything
     # functional without footguns or anything we can't do ourselves.
     # It's imported to simplify/merge the input chain, but unused in this flake.
     flake-utils.url = "github:numtide/flake-utils";
-    flake-utils.inputs.systems.follows = "systems";
 
 
     treefmt-nix.url = "github:numtide/treefmt-nix";
@@ -43,7 +39,7 @@
     nix-topology.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, systems, ... }:
+  outputs = { self, ... }:
     let
       inherit (self) inputs;
 
@@ -61,7 +57,7 @@
         (_: _: self.outputs.lib) # Our own lib
       ]);
 
-      __forSystems = lib.genAttrs (import systems);
+      __forSystems = lib.genAttrs [ "x86_64-linux" ];
       __forPackages = __forSystems (system: inputs.nixpkgs.legacyPackages.${system});
       eachSystem = mapFn: __forSystems (system: mapFn __forPackages.${system});
     in
