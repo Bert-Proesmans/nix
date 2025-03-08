@@ -112,7 +112,7 @@ rec {
       # eg; virtual machine guest configuration, reused by all hosts that are running on top of a hypervisor
       #
       # SEEALSO; self.outputs.nixosModules
-      profiles-nixos = lib.rakeLeaves ./nixosModules/profiles;
+      profiles-nixos = lib.rakeLeaves ./source/nixosModules/profiles;
     in
     {
       # Builds an attribute set of all our library code.
@@ -120,8 +120,8 @@ rec {
       #
       # NOTE; This library set is extended into the nixpkgs library set later, see let .. in above.
       lib = { }
-        // (import ./library/importers.nix (inputs.nixpkgs.lib))
-        // (import ./library/network.nix (inputs.nixpkgs.lib));
+        // (import ./source/library/importers.nix (inputs.nixpkgs.lib))
+        // (import ./source/library/network.nix (inputs.nixpkgs.lib));
 
       # Format entire flake with;
       # nix fmt

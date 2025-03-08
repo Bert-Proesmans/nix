@@ -17,7 +17,7 @@ INVOKED_PATH = Path.cwd()
 FLAKE = Path(__file__).parent.resolve()
 os.chdir(FLAKE)
 
-DEV_KEY = (FLAKE / "development.age").absolute()
+DEV_KEY = (FLAKE / "source" / "development.age").absolute()
 
 
 def alert_finish():

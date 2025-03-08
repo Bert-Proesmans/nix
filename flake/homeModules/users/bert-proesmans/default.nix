@@ -52,8 +52,16 @@
   # programs.home-manager.enable = true;
 
   # Automatically activate developer environment when entering project folders.
-  programs.direnv.enable = true;
-  programs.direnv.nix-direnv.enable = true;
+  programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
+    config = {
+      load_dotenv = true;
+      strict_env = true;
+      warn_timeout = "5s";
+      global.hide_env_diff = true;
+    };
+  };
 
   programs.ssh.enable = true;
   programs.ssh.hashKnownHosts = true;
@@ -169,7 +177,7 @@
       rebase.autosquash = "true";
       rebase.autostash = true;
       rebase.updateRefs = true;
-      # Remember merge conflict resolution during rebase and automatically re-apply when
+      # Remember merge conflict resolution during rebase and automatically re-apply when                                         
       # similar conflicts are detected. GODS GIFT BRUH
       rerere.enabled = true;
       #
@@ -181,6 +189,38 @@
       transfer.fsckobjects = true;
       fetch.fsckobjects = true;
       receive.fsckObjects = true;
+    };
+
+    ignores = [
+      # Ignore all dotfiles except gitignore
+      ".*"
+      "!.gitignore"
+      #
+      "*.pdb"
+      "*.qcow2"
+      # Normally any non-leading slash forces the match to start at the root of the repo.
+      # But result could be a directory _or file_ symlink, and is a pretty generic name too, so it's pinned 
+      # to the root explicitly.
+      "/result"
+      # These match directories with same name, at any level
+      "debug/"
+      "target/"
+    ];
+  };
+
+  editorconfig.enable = true;
+  editorconfig.settings = {
+    "*" = {
+      charset = "utf-8";
+      end_of_line = "lf";
+      trim_trailing_whitespace = true;
+      insert_final_newline = true;
+      max_line_width = 130;
+      indent_style = "tab";
+      indent_size = 2;
+    };
+    "*.nix" = {
+      indent_size = 4;
     };
   };
 

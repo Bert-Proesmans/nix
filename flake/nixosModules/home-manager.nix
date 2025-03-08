@@ -2,7 +2,7 @@
 let
   cfg = config.proesmans.home-manager;
   cfg-users = config.users.users;
-  facts = flake.outputs.host-facts;
+  facts = flake.outputs.host-facts or { }; # TODO
 
   # WARN; Unpack the home modules until an attribute set of <user> = <config> remains!
   home-modules = flake.outputs.homeModules.users;
