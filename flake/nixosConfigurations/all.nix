@@ -4,7 +4,8 @@ let
   system = null;
 
   # NixOS modules that implement partial host configuration
-  profiles = lib.rakeLeaves ./profiles;
+  profiles = flake.outputs.nixosModules.profiles;
+  modules = builtins.attrValues (lib.filterAttrs (n: _: n != "profiles") flake.outputs.nixosModules);
 
   specialArgs = {
     # Define arguments here that must be be resolvable at module import stage.
@@ -20,7 +21,7 @@ in
 {
   development = lib.nixosSystem {
     inherit lib system specialArgs;
-    modules = (builtins.attrValues flake.outputs.nixosModules) ++ [
+    modules = modules ++ [
       flake.inputs.nix-topology.nixosModules.default
       ({
         # This is an anonymous module and requires a marker for error messages and import deduplication.
