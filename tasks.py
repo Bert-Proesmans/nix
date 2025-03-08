@@ -14,9 +14,10 @@ from invoke import task
 
 INVOKED_PATH = Path.cwd()
 
-FLAKE = Path(__file__).parent.resolve()
-os.chdir(FLAKE)
+PROJECT_DIR = Path(__file__).parent.resolve()
+os.chdir(PROJECT_DIR)
 
+FLAKE = PROJECT_DIR / "flake"
 DEV_KEY = (FLAKE / "source" / "development.age").absolute()
 
 
@@ -86,7 +87,7 @@ def check(c: Any, hostName: str) -> None:
     """
     if "all" == hostName:
         # NOTE; --skip-cached skips realized outputs already present in binary caches!
-        c.run("nix-fast-build --no-link")
+        c.run(f"nix-fast-build --no-link --flake {FLAKE}#checks")
     else:
         c.run(
             f"nix-fast-build --no-link --flake {FLAKE}#nixosConfigurations.{hostName}.config.system.build.toplevel"

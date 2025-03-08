@@ -41,7 +41,7 @@
 
   outputs = { self, ... }:
     let
-      inherit (self) inputs;
+      inherit (self) inputs outputs;
 
       # Shorten calls to library functions;
       # lib.genAttrs == inputs.nixpkgs.lib.genAttrs
@@ -54,7 +54,7 @@
       # eg; nixpkgs.legacyPackages.<system>.lib.nixosSystem => does _not_ exist
       lib = inputs.nixpkgs.lib.extend (inputs.nixpkgs.lib.composeManyExtensions [
         (_: _: { dns = inputs.dns.lib; }) # lib from dns.nix
-        (_: _: self.outputs.lib) # Our own lib
+        (_: _: outputs.lib) # Our own lib
       ]);
 
       __forSystems = lib.genAttrs [ "x86_64-linux" ];
@@ -62,7 +62,7 @@
       eachSystem = mapFn: __forSystems (system: mapFn __forPackages.${system});
     in
     {
-      lib = import ./library/all.nix { inherit inputs lib; };
+      lib = import ./library/all.nix { inherit lib; };
 
       formatter = eachSystem (pkgs: import ./formatters.nix { inherit inputs pkgs; });
 
@@ -70,8 +70,8 @@
 
       overlays = { };
 
-      nixosModules = self.outputs.lib.rakeLeaves ./nixosModules;
-      homeModules = self.outputs.lib.rakeLeaves ./homeModules;
+      nixosModules = outputs.lib.rakeLeaves ./nixosModules;
+      homeModules = outputs.lib.rakeLeaves ./homeModules;
 
       hostInventory = import ./host-inventory.nix;
       nixosConfigurations = import ./nixosConfigurations/all.nix { inherit lib; flake = self; };
@@ -79,17 +79,17 @@
 
       packages = eachSystem (pkgs: import ./packages/all.nix { inherit pkgs; });
 
-      checks = { };
+      checks = eachSystem (_: { });
       hydraJobs = eachSystem
         (pkgs: {
           recurseForDerivations = true;
-          formatter = self.outputs.formatter.${pkgs.system};
-          devShells = self.outputs.devShells.${pkgs.system};
-          packages = self.outputs.packages.${pkgs.system};
-          checks = self.outputs.checks.${pkgs.system};
+          formatter = outputs.formatter.${pkgs.system};
+          devShells = outputs.devShells.${pkgs.system};
+          packages = outputs.packages.${pkgs.system};
+          checks = outputs.checks.${pkgs.system};
         }) // {
         no-system.recurseForDerivations = true;
-        no-system.nixosConfigurations = lib.mapAttrs (_: v: v.config.system.build.toplevel) self.outputs.nixosConfigurations;
+        no-system.nixosConfigurations = lib.mapAttrs (_: v: v.config.system.build.toplevel) outputs.nixosConfigurations;
       };
     };
 }
