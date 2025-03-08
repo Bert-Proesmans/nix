@@ -1,6 +1,8 @@
 #!/usr/bin/env nix-shell
 #!nix-shell -i bash -p gnugrep gnused virtualgl
 
+# shellcheck shell=bash
+
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 unset WAYLAND_DISPLAY
