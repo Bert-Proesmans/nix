@@ -37,14 +37,14 @@
           name = "find-editor";
           runtimeInputs = [ pkgs.nano ];
           text = ''
-            if ! type "code" > /dev/null; then
-              nano "$@"
+            if type "code" > /dev/null; then
+              # Since VScode works interactively there is an instant process fork.
+              # The code calling $EDITOR is (very likely) synchronous, so we want to wait until
+              # the specific (new) editor pane has closed!
+              exec code --wait "$@"
             fi
 
-            # Since VScode works interactively there is an instant process fork.
-            # The code calling $EDITOR is (very likely) synchronous, so we want to wait until
-            # the specific (new) editor pane has closed!
-            code --wait "$@"
+            exec nano "$@"
           '';
         };
       in
