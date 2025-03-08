@@ -4,6 +4,8 @@ let
   system = null;
 
   # NixOS modules that implement partial host configuration
+  # eg; dns server program configuration, reused by all the dns server hosts (OSI layer 7 high-availability)
+  # eg; virtual machine guest configuration, reused by all hosts that are running on top of a hypervisor
   profiles = flake.outputs.nixosModules.profiles;
   modules = builtins.attrValues (lib.filterAttrs (n: _: n != "profiles") flake.outputs.nixosModules);
 

@@ -59,27 +59,170 @@
 
       __forSystems = lib.genAttrs [ "x86_64-linux" ];
       __forPackages = __forSystems (system: inputs.nixpkgs.legacyPackages.${system});
+      # Helper creating attribute sets for each supported system.
       eachSystem = mapFn: __forSystems (system: mapFn __forPackages.${system});
     in
     {
+      # NOTE; This library set is extended into the nixpkgs library set, see let .. in above.
       lib = import ./library/all.nix { inherit lib; };
 
+      # Format entire flake with;
+      # nix fmt 
+      #
       formatter = eachSystem (pkgs: import ./formatters.nix { inherit inputs pkgs; });
 
+      # Build and run development shell with;
+      # nix flake develop
+      #
+      # NOTE; The "default" shell will be loaded by nix-direnv on entering the repository directory.
+      #
       devShells = eachSystem (pkgs: import ./devshells.nix { inherit pkgs lib; });
 
-      overlays = { };
+      # Overwrite (aka patch) declarative configuration, most often build recipes from nixpkgs.
+      #
+      # These attributes are lambda's that don't do anything on their own. Use the `overlay` options to incorporate them into 
+      # your configuration.
+      # eg; (nixos options) nixpkgs.overlays = builtins.attrValues self.outputs.overlays;
+      # eg; (nix extensible attr set) _ = lib.extends (lib.composeManyExtensions (builtins.attrValues self.outputs.overlays));
+      #
+      # See also; self.outputs.nixosModules.nix-system
+      #
+      overlays = {
+        # example = final: previous: {
+        #   hello = previous.hello.overrideAttrs (old: {
+        #     version = "${old.version}-superior";
+        #   });
+        # };
+      };
 
+      # NixOS modules are anonymous lambda functions with an attribute set as the first argument (arity of all nix functions is
+      # always one). NixOS modules on their own do nothing, but need to be composed into a nixosConfiguration.
+      #
+      # Refer to the filepath ./nixosConfigurations for the definition/configuration of each host machine. Starting from 
+      # the configuration.nix file, other nixos module files are imported. The collective set of all imported modules is 
+      # turned into the host configuration.
+      # Because the configuration.nix file is typically imported first, it's called the toplevel (nixos) module.
+      #
+      # NOTE; The type of this value is attrSet[<name>, <path>]
+      # eg {filesystem = ./nixosModules/filesystem.nix;}
+      #
+      # NOTE; Paths are a value type in nix, and nix will resolve these paths to their fixed store path
+      # (eg /nix/store/aaabbbcccdddd/nixosModules/filesystem.nix) during evaluation (when derivations files are created).
+      # The prefix in the resulting path (/aaabbbcccddd) comes from the outPath attribute of this flake.
+      #
       nixosModules = outputs.lib.rakeLeaves ./nixosModules;
+
+      # Home (manager) modules share the same evaluation mechanism as NixOS modules and are structurally the same. Home modules
+      # have different option declarations, that is the only difference.
+      #
+      # SEEALSO; self.outputs.nixosModules
+      #
       homeModules = outputs.lib.rakeLeaves ./homeModules;
 
+      # Print and externall process host information with;
+      # nix eval --json .#hostInventory
+      #
+      # TODO; Examples of using this data
+      #
       hostInventory = import ./host-inventory.nix;
+
+      # nixosConfigurations are the full interconnected configuration data to build a host machine. This collection of data resolves
+      # to an output (of any kind) depending on the attribute you ask it to build. These attributes are under the ".config" set
+      # because that is the standardized attribute path for evaluated nixos module configurations.
+      #
+      # Build the disk contents to run a machine with;
+      # nix build .#nixosConfigurations.<hostname>.config.system.build.toplevel
+      #
+      # NOTE; Deployment of hosts in this flake is handled by the "invoke" framework, the deploy task executes "nixos-anywhere" to
+      # prepare the host hardware and install the NixOS distribution on the target.
+      # SEEALSO; self.outputs.devShells.default
+      # SEEALSO; ./tasks.py file
+      #
+      #
+      # Deploy with nixos-anywhere; 
+      # nix run github:nix-community/nixos-anywhere -- --flake .#<hostname (attribute-name within nixosConfigurations)> <user>@<ip address>
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name, 
+      # "nixosConfigurations" can thus be omitted from the command line invocation.
+      # NOTE; <user> must be root or have passwordless sudo on the target host machine, most often the target is booted from the installer iso.
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine.
+      #
+      #
+      # Update with; nixos-rebuild switch --flake .#<hostname> --target-host <user>@<ip address>
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name, 
+      # "nixosConfigurations" can thus be omitted from the command line invocation.
+      # NOTE; <user> must be root or have passwordless sudo on the target host machine, most often the target is booted from the installer iso.
+      # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine.
+      #
+      #
+      # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. 
+      # Using this optimization depends on properties of the build-host and the target-host.
+      # eg use it when the upload speed of the build-host is slower than the download speed of the target-host.
+      #
       nixosConfigurations = import ./nixosConfigurations/all.nix { inherit lib; flake = self; };
       # no homeConfigurations
 
-      packages = eachSystem (pkgs: import ./packages/all.nix { inherit pkgs; });
+      # Build a bootstrap image using;
+      # nix build
+      #
+      # Build vsock-proxy, or any other program by attribute name using;
+      # nix build .#vsock-proxy
+      #
+      # Collection of derivations that build concrete binary file packages.
+      # All attributes this flake defines lead to creating some concrete file. The semantics for "packages" is binaries, but could
+      # be anything really.
+      #
+      packages = eachSystem (pkgs:
+        # NOTE; lib.fix creates a recursive scope, sort of like let in {} with nix lazy evaluation.
+        # ERROR; Don't use lib.{new,create}Scope because those inject additional attributes that 'nix flake check'
+        # doesn't like!
+        lib.fix (final:
+          let
+            # NOTE; Create our own callPackage function with our recursive scope, this function
+            # will apply the necessary arguments to each package recipe.
+            callPackage = pkgs.newScope (final // {
+              # HERE; Add more custom package arguments. Only items that are _NOT_ derivations!
 
-      checks = eachSystem (_: { });
+              flake = self;
+              nixosLib = lib;
+            });
+          in
+          {
+            # HERE; Add aliasses and/or overrides.
+
+            default = final.bootstrap;
+          } //
+          lib.packagesFromDirectoryRecursive {
+            inherit callPackage;
+            # NOTE; Imports and processes files named "package.nix".
+            directory = ./packages;
+          })
+      );
+
+      # Execute and validate tests against this flake configuration;
+      # nix-fast-build
+      # [BROKEN; keeps running out of memory, use nix-fast-build] nix flake check --no-eval-cache --keep-going
+      #
+      # WARN; "nix-eval-jobs" only _evaluates_ nix code and derivations, nothing concrete is build! During Continuous Integration (CI)
+      # this could be enough, otherwise also _build your derivations_.
+      # NixOS tests run during build (which is kinda weird but okay..), unless the runInteractive attribute is evaluated and built.
+      #
+      checks = eachSystem (_: {
+        # example = pkgs.testers.runNixOSTest {
+        #   name = "example";
+        #   nodes = { };
+        #   testScript = ''
+        #     # TODO
+        #   '';
+        # };
+      });
+
+      # Build everything defined (basically similar to nix flake check);
+      # (interactive) nix-fast-build --flake .#hydraJobs
+      # (noninteractive/CI] nix-fast-build --no-nom --skip-cached --flake ".#hydraJobs.$(nix eval --raw --impure --expr builtins.currentSystem)"
+      #
+      # NOTE; There is no schema for the hydraJobs attribute set, but the trend of "packages"/"checks" is followed for easy 
+      # filtering on target host system type.
+      #
       hydraJobs = eachSystem
         (pkgs: {
           recurseForDerivations = true;
