@@ -12,11 +12,6 @@ let
       pkgs.pkgsi686Linux.virtualglLib # 32-bit VirtualGL libs (vglrun)
     ];
   });
-
-  link-backup-mount = pkgs.writeShellApplication {
-    name = "link-backup-mounts";
-    runtimeInputs = [ ];
-  };
 in
 {
   # GPU/Graphics configuration

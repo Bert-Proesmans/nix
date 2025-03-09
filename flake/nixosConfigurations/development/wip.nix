@@ -1,4 +1,4 @@
-{ lib, flake, special, meta-module, pkgs, config, utils, ... }:
+{ lib, pkgs, config, utils, ... }:
 {
   systemd.tmpfiles.settings."wip-backup-mount" = {
     "/backup".d = {

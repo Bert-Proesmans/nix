@@ -659,6 +659,7 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
         check=True,
     )
 
+
 @task
 def format(c: Any) -> None:
     """
