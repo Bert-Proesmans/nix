@@ -18,6 +18,7 @@ PROJECT_DIR = Path(__file__).parent.resolve()
 os.chdir(PROJECT_DIR)
 
 FLAKE = PROJECT_DIR / "flake"
+DOCS = PROJECT_DIR / "documentation"
 DEV_KEY = (FLAKE / "source" / "development.age").absolute()
 
 
@@ -212,7 +213,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
         deploy_flags = [
             "--debug",
-            #"--no-substitute-on-destination",
+            # "--no-substitute-on-destination",
             # "--stop-after-disko", # DEBUG
             # "--no-reboot",
             # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
@@ -665,3 +666,22 @@ def format(c: Any) -> None:
     """
     subprocess.run(["nix", "fmt", PROJECT_DIR], cwd=FLAKE, check=False)
 
+
+@task
+def documentation(c: Any) -> None:
+    """
+    Build host and network documentation
+    """
+    host_attr_path = f"{DOCS}#topology.x86_64-linux.config.output"
+
+    subprocess.run(
+        [
+            "nix",
+            "build",
+            host_attr_path,
+            "--override-input",
+            "configuration",
+            FLAKE,
+        ],
+        check=True,
+    )
