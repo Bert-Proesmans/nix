@@ -69,7 +69,7 @@
       # Format entire flake with;
       # nix fmt 
       #
-      formatter = eachSystem (pkgs: import ./formatters.nix { inherit inputs pkgs; });
+      formatter = eachSystem (pkgs: inputs.treefmt-nix.lib.mkWrapper pkgs ./treefmt.nix);
 
       # Build and run development shell with;
       # nix flake develop
