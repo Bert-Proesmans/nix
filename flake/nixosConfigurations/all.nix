@@ -6,15 +6,15 @@ let
   # NixOS modules that implement partial host configuration
   # eg; dns server program configuration, reused by all the dns server hosts (OSI layer 7 high-availability)
   # eg; virtual machine guest configuration, reused by all hosts that are running on top of a hypervisor
-  profiles = flake.outputs.nixosModules.profiles;
-  modules = builtins.attrValues (lib.filterAttrs (n: _: n != "profiles") flake.outputs.nixosModules);
+  profiles = lib.filterAttrs (n: _: n != "archive") flake.outputs.nixosModules.profiles;
+  modules = builtins.attrValues (lib.filterAttrs (n: _: n != "profiles" && n != "archive") flake.outputs.nixosModules);
 
   specialArgs = {
     # Define arguments here that must be be resolvable at module import stage.
     #
     # For everything else use the _module.args option instead (inside configuration).
     # SEEALSO; meta-module, below
-    special = {
+    flake = {
       inherit profiles;
       inherit (flake) inputs;
     };
@@ -30,7 +30,9 @@ in
         _file = "${./all.nix}#development";
 
         config = {
-          _module.args.flake = flake;
+          # DO NOT USE `flake` TO IMPORT STUFF !
+          # _module.args.flake = flake;
+
           # Nixos utils package is available as module argument, made available sorta like below.
           #_module.args.utils = import "${inputs.nixpkgs}/nixos/lib/utils.nix" { inherit lib config pkgs; };
 

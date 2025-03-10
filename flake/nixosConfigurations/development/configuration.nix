@@ -1,31 +1,29 @@
-{ lib, config, pkgs, special, ... }: {
+{ lib, config, pkgs, flake, ... }: {
 
   imports = [
-    special.profiles.hypervisor
+    flake.profiles.virtual-machine
+    flake.profiles.hypervisor
     ./hardware-configuration.nix
     ./wip.nix
-    # ./immich-wip.nix
   ];
 
-  networking.hostName = "development";
-  networking.domain = "internal.proesmans.eu";
-  proesmans.facts.tags = [ "virtual-machine" "hypervisor" ];
-
-  proesmans.nix.garbage-collect.enable = true;
-  # Garbage collect less often, so we don't drop build artifacts from other systems
-  proesmans.nix.garbage-collect.development-schedule.enable = true;
-  proesmans.nix.registry.nixpkgs.fat = true;
+  proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
-  proesmans.vscode.enable = true;
-  proesmans.vscode.nix-dependencies.enable = true;
-  proesmans.home-manager.enable = true;
+  proesmans.sopsSecrets.enable = true;
+  sops.defaultSopsFile = ./secrets.encrypted.yaml;
+  proesmans.sopsSecrets.sshHostkeyControl.enable = true;
+
+  # proesmans.nix.garbage-collect.enable = true;
+  # # Garbage collect less often, so we don't drop build artifacts from other systems
+  # proesmans.nix.garbage-collect.development-schedule.enable = true;
+  # proesmans.nix.registry.nixpkgs.fat = true;
+  # proesmans.vscode.enable = true;
+  # proesmans.vscode.nix-dependencies.enable = true;
+  # proesmans.home-manager.enable = true;
 
   # Customise nix to allow building on this host
   nix.settings.max-jobs = "auto";
   nix.settings.trusted-users = [ "@wheel" ];
-
-  sops.defaultSopsFile = ./secrets.encrypted.yaml;
-  sops.age.keyFile = "/etc/secrets/decrypter.age";
 
   # Override this service for fun and debug profit
   systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
@@ -45,7 +43,6 @@
   };
 
   # Allow for remote management
-  services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
 
   # Allow privilege elevation to administrator role
@@ -87,23 +84,6 @@
     "git.sr.ht".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
   };
-
-  sops.secrets.ssh_host_ed25519_key = {
-    path = "/etc/ssh/ssh_host_ed25519_key";
-    owner = config.users.users.root.name;
-    group = config.users.users.root.group;
-    mode = "0400";
-    restartUnits = [ config.systemd.services.sshd.name ];
-  };
-
-  services.openssh.hostKeys = [
-    {
-      path = "/etc/ssh/ssh_host_ed25519_key";
-      type = "ed25519";
-    }
-  ];
-
-  microvm.host.enable = lib.mkForce true;
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

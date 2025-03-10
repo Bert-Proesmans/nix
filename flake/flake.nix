@@ -120,11 +120,11 @@
       homeModules = outputs.lib.rakeLeaves ./homeModules;
 
       # Print and externall process host information with;
-      # nix eval --json .#hostInventory
+      # nix eval --json .#inventory
       #
       # TODO; Examples of using this data
       #
-      hostInventory = import ./host-inventory.nix;
+      inventory = import ./inventory.nix;
 
       # nixosConfigurations are the full interconnected configuration data to build a host machine. This collection of data resolves
       # to an output (of any kind) depending on the attribute you ask it to build. These attributes are under the ".config" set

@@ -1,17 +1,17 @@
 # Simple hardware and disk configuration for physicl/virtual machines
-{ lib, special, config, options, ... }:
+{ lib, flake, config, options, ... }:
 let
   cfg = config.proesmans.filesystem;
 in
 {
-  imports = [ special.inputs.disko.nixosModules.disko ];
+  imports = [ flake.inputs.disko.nixosModules.disko ];
 
   options.proesmans.filesystem = {
-    simple-disk.enable = lib.mkEnableOption (lib.mdDoc "Enable a simple disk layout");
+    simple-disk.enable = lib.mkEnableOption "Enable a simple disk layout";
     simple-disk.device = lib.mkOption {
       default = "/dev/sda";
       type = lib.types.str;
-      description = lib.mdDoc "The name of the one disk to format";
+      description = "The name of the one disk to format";
     };
   };
 
@@ -23,14 +23,6 @@ in
         Set one at 'proesmans.filesystem.simple-disk.device'.
       '';
     }];
-
-    # EFI boot!
-    boot.loader.systemd-boot.enable = lib.mkDefault true;
-    boot.loader.systemd-boot.editor = lib.mkDefault false;
-
-    # Cleaning tmp directory not required if it's a tmpfs
-    # Enabling tmpfs for tmp also prevents additional SSD writes
-    boot.tmp.cleanOnBoot = lib.mkDefault (!config.boot.tmp.useTmpfs);
 
     disko.devices = {
       disk.root = {
