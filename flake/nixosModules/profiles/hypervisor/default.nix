@@ -12,8 +12,10 @@
   sops.keepGenerations = lib.mkForce 0;
   systemd.timers.auto-reboot = {
     description = "Automatically reboot host after succesful NixOS deployment.";
-    reloadTriggers = [ config.system.build.toplevel ];
-    timerConfig.OnActiveSec = "12h";
+    requiredBy = ["sysinit-reactivation.target"];
+    after = ["sysinit-reactivation.target"];
+    bindsTo = ["sysinit-reactivation.target"];
+    timerConfig.OnActiveSec = "4h";
     timerConfig.Unit = "reboot.target";
   };
 
