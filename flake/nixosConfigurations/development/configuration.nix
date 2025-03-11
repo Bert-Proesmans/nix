@@ -1,4 +1,4 @@
-{ lib, config, pkgs, flake, ... }: {
+{ pkgs, flake, ... }: {
 
   imports = [
     flake.profiles.virtual-machine

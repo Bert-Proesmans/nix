@@ -1,4 +1,4 @@
-{ lib, pkgs, flake, config, ... }: {
+{ lib, flake, ... }: {
   imports = [
     flake.inputs.microvm.nixosModules.host
   ];
@@ -12,9 +12,9 @@
   sops.keepGenerations = lib.mkForce 0;
   systemd.timers.auto-reboot = {
     description = "Automatically reboot host after succesful NixOS deployment.";
-    requiredBy = ["sysinit-reactivation.target"];
-    after = ["sysinit-reactivation.target"];
-    bindsTo = ["sysinit-reactivation.target"];
+    requiredBy = [ "sysinit-reactivation.target" ];
+    after = [ "sysinit-reactivation.target" ];
+    bindsTo = [ "sysinit-reactivation.target" ];
     timerConfig.OnActiveSec = "4h";
     timerConfig.Unit = "reboot.target";
   };
