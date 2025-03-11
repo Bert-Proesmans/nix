@@ -1,13 +1,13 @@
-{ lib, pkgs, special, config, ... }:
+{ lib, pkgs, flake, config, ... }:
 let
   cfg = config.proesmans.vscode;
 in
 {
-  imports = [ special.inputs.vscode-server.nixosModules.default ];
+  imports = [ flake.inputs.vscode-server.nixosModules.default ];
 
   options.proesmans.vscode = {
-    enable = lib.mkEnableOption (lib.mdDoc "Enable vscode server compatibility");
-    nix-dependencies.enable = lib.mkEnableOption (lib.mdDoc "Pre-install dependencies for nix development");
+    enable = lib.mkEnableOption "vscode server compatibility";
+    nix-dependencies.enable = lib.mkEnableOption "pre-installed dependencies for nix development";
   };
 
   config = lib.mkMerge [

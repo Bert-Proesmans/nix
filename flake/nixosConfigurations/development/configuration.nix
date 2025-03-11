@@ -13,12 +13,13 @@
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   proesmans.sopsSecrets.sshHostkeyControl.enable = true;
 
+  proesmans.vscode.enable = true;
+  proesmans.vscode.nix-dependencies.enable = true;
+
   # proesmans.nix.garbage-collect.enable = true;
   # # Garbage collect less often, so we don't drop build artifacts from other systems
   # proesmans.nix.garbage-collect.development-schedule.enable = true;
   # proesmans.nix.registry.nixpkgs.fat = true;
-  # proesmans.vscode.enable = true;
-  # proesmans.vscode.nix-dependencies.enable = true;
   # proesmans.home-manager.enable = true;
 
   # Customise nix to allow building on this host
