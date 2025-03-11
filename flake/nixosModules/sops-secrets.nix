@@ -44,8 +44,6 @@ in
       restartUnits = [ config.systemd.services.sshd.name ];
     };
 
-    services.openssh.enable = lib.mkIf cfg.sshHostkeyControl.enable (lib.mkDefault true);
-
     services.openssh.hostKeys = lib.mkIf cfg.sshHostkeyControl.enable [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";

@@ -22,28 +22,8 @@
   # proesmans.nix.registry.nixpkgs.fat = true;
   # proesmans.home-manager.enable = true;
 
-  # Customise nix to allow building on this host
-  nix.settings.max-jobs = "auto";
-  nix.settings.trusted-users = [ "@wheel" ];
-
-  # Override this service for fun and debug profit
-  systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
-
-  # Make me an admin!
-  users.users.bert-proesmans = {
-    isNormalUser = true;
-    description = "Bert Proesmans";
-    extraGroups = [
-      "wheel" # Allows sudo access
-      "systemd-journal" # Read the systemd service journal without sudo
-      "kvm" # Interact with forwarded VSOCK files
-    ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
-    ];
-  };
-
   # Allow for remote management
+  services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
 
   # Allow privilege elevation to administrator role
@@ -71,6 +51,14 @@
     5201 # Allow incoming IPerf traffic when acting as a server
   ];
 
+  # Override this service for fun and debug profit
+  # USAGE; systemctl edit --runtime test
+  systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
+
+  # Customise nix to allow building on this host
+  nix.settings.max-jobs = "auto";
+  nix.settings.trusted-users = [ "@wheel" ];
+
   # Avoid TOFU MITM with github by providing their public key here.
   programs.ssh.knownHosts = {
     "github.com".hostNames = [ "github.com" ];
@@ -84,6 +72,20 @@
     "git.sr.ht".hostNames = [ "git.sr.ht" ];
     "git.sr.ht".publicKey =
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMZvRd4EtM7R+IHVMWmDkVU3VLQTSwQDSAvW0t2Tkj60";
+  };
+
+  # Make me an admin!
+  users.users.bert-proesmans = {
+    isNormalUser = true;
+    description = "Bert Proesmans";
+    extraGroups = [
+      "wheel" # Allows sudo access
+      "systemd-journal" # Read the systemd service journal without sudo
+      "kvm" # Interact with forwarded VSOCK files
+    ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
+    ];
   };
 
   # Ignore below
