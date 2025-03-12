@@ -9,6 +9,8 @@
 
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
+  proesmans.nix.registry.fat-nixpkgs.enable = true;
+  proesmans.nix.garbage-collect.lower-frequency.enable = true;
   proesmans.sopsSecrets.enable = true;
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   proesmans.sopsSecrets.sshHostkeyControl.enable = true;
@@ -16,11 +18,10 @@
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
 
-  # proesmans.nix.garbage-collect.enable = true;
-  # # Garbage collect less often, so we don't drop build artifacts from other systems
-  # proesmans.nix.garbage-collect.development-schedule.enable = true;
-  # proesmans.nix.registry.nixpkgs.fat = true;
   # proesmans.home-manager.enable = true;
+
+  # This is a build host, so allow building !
+  nix.settings.max-jobs = "auto";
 
   # Allow for remote management
   services.openssh.enable = true;
@@ -34,6 +35,11 @@
   # Automatically load development shell in project working directories
   programs.direnv.enable = true;
   programs.direnv.nix-direnv.enable = true;
+  # Retain all outputs and derivations. This assists nix-direnv, retaining devshell outputs.
+  # Devshells are constructed from the local user context. Those outputs are rooted inside the project directories, and 
+  # nix gc doesn't/cannot know those.
+  nix.settings.keep-outputs = true;
+  nix.settings.keep-derivations = true;
 
   # Pre-install some tools for debugging network/disk/code
   environment.systemPackages = [
@@ -54,10 +60,6 @@
   # Override this service for fun and debug profit
   # USAGE; systemctl edit --runtime test
   systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
-
-  # Customise nix to allow building on this host
-  nix.settings.max-jobs = "auto";
-  nix.settings.trusted-users = [ "@wheel" ];
 
   # Avoid TOFU MITM with github by providing their public key here.
   programs.ssh.knownHosts = {

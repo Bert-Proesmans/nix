@@ -17,6 +17,11 @@ let
     flake = {
       inherit profiles;
       inherit (flake) inputs;
+      outputs = {
+        # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
+        # anyway. Their evaluation could change depending on introduced overlays!
+        inherit (flake.outputs) overlays;
+      };
     };
   };
 in
