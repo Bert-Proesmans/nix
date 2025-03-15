@@ -1,4 +1,4 @@
-{ lib, pkgs, facts, osConfig, ... }:
+{ lib, pkgs, osConfig, ... }:
 {
   # Values are preset for the next attribute names;
   # - home.username
@@ -66,42 +66,42 @@
   programs.ssh.enable = true;
   programs.ssh.hashKnownHosts = true;
   programs.ssh.forwardAgent = false;
-  programs.ssh.matchBlocks =
-    let
-      resolve-endpoint = fact-node: lib.findFirst (x: x != null) fact-node [
-        facts."${fact-node}".management.domain-name
-        facts."${fact-node}".management.ip-address
-      ];
+  # programs.ssh.matchBlocks =
+  #   let
+  #     resolve-endpoint = fact-node: lib.findFirst (x: x != null) fact-node [
+  #       facts."${fact-node}".management.domain-name
+  #       facts."${fact-node}".management.ip-address
+  #     ];
 
-      # Currently filtering out the current host itself to disambiguate connections, which often need to be handled seperately
-      # unless a sort of network hairpin is provided.
-      # TODO; A simple network hairpin could be a consistent DNS server reply.
-      others-facts = lib.filterAttrs
-        (_: v: osConfig.proesmans.facts.host-name != v.host-name && osConfig.proesmans.facts.host-name != v.meta.parent)
-        facts;
+  #     # Currently filtering out the current host itself to disambiguate connections, which often need to be handled seperately
+  #     # unless a sort of network hairpin is provided.
+  #     # TODO; A simple network hairpin could be a consistent DNS server reply.
+  #     others-facts = lib.filterAttrs
+  #       (_: v: osConfig.proesmans.facts.host-name != v.host-name && osConfig.proesmans.facts.host-name != v.meta.parent)
+  #       facts;
 
-      physical-hosts = lib.mapAttrs
-        (name: _v: { hostname = resolve-endpoint name; })
-        (lib.filterAttrs (_: v: !(builtins.elem "virtual-machine" v.tags)) others-facts);
+  #     physical-hosts = lib.mapAttrs
+  #       (name: _v: { hostname = resolve-endpoint name; })
+  #       (lib.filterAttrs (_: v: !(builtins.elem "virtual-machine" v.tags)) others-facts);
 
-      guest-proxy-command = facts:
-        if facts.meta.vsock-vmm then "${lib.getExe pkgs.proesmans.firecracker-vsock-proxy} /run/microvm/vsock/${facts.host-name}.vsock 22"
-        else "${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString facts.meta.vsock-id}:22";
+  #     guest-proxy-command = facts:
+  #       if facts.meta.vsock-vmm then "${lib.getExe pkgs.proesmans.firecracker-vsock-proxy} /run/microvm/vsock/${facts.host-name}.vsock 22"
+  #       else "${lib.getExe pkgs.socat} - VSOCK-CONNECT:${toString facts.meta.vsock-id}:22";
 
-      virtual-machines = lib.pipe others-facts [
-        (lib.filterAttrs (_: v: builtins.elem "virtual-machine" v.tags))
-        (lib.filterAttrs (_: v: v.meta.parent != null)) # Parent could be unset!
-        (lib.mapAttrs
-          (_name: v: {
-            # ERROR; Using proxy/jumphost means your current host controls all network steering!
-            # AKA your current host must instruct to switch over to VSOCK because there is no autonomy on
-            # the jumphost, its ssh_config will not be used to connect to the next hop.
-            # -ERROR- proxyJump = resolve-endpoint v.parent;
-            proxyCommand = "ssh ${resolve-endpoint v.meta.parent} \"${guest-proxy-command v}\"";
-          }))
-      ];
-    in
-    physical-hosts // virtual-machines;
+  #     virtual-machines = lib.pipe others-facts [
+  #       (lib.filterAttrs (_: v: builtins.elem "virtual-machine" v.tags))
+  #       (lib.filterAttrs (_: v: v.meta.parent != null)) # Parent could be unset!
+  #       (lib.mapAttrs
+  #         (_name: v: {
+  #           # ERROR; Using proxy/jumphost means your current host controls all network steering!
+  #           # AKA your current host must instruct to switch over to VSOCK because there is no autonomy on
+  #           # the jumphost, its ssh_config will not be used to connect to the next hop.
+  #           # -ERROR- proxyJump = resolve-endpoint v.parent;
+  #           proxyCommand = "ssh ${resolve-endpoint v.meta.parent} \"${guest-proxy-command v}\"";
+  #         }))
+  #     ];
+  #   in
+  #   physical-hosts // virtual-machines;
 
   programs.atuin.enable = true;
   programs.atuin.settings = {

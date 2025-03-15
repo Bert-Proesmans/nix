@@ -14,11 +14,10 @@
   proesmans.sopsSecrets.enable = true;
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   proesmans.sopsSecrets.sshHostkeyControl.enable = true;
-
+  proesmans.home-manager.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
 
-  # proesmans.home-manager.enable = true;
 
   # This is a build host, so allow building !
   nix.settings.max-jobs = "auto";
