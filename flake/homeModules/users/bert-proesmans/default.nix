@@ -7,7 +7,6 @@
 
   home.packages = [
     pkgs.dust
-    pkgs.fd
     pkgs.mdcat
   ];
 
@@ -113,13 +112,20 @@
   };
 
   programs.bat.enable = true;
+  programs.bat.extraPackages = [ pkgs.bat-extras.batman ];
   programs.bat.config.theme = "Visual Studio Dark+";
   programs.broot.enable = true;
   programs.eza.enable = true;
   programs.eza.git = true;
   programs.fzf.enable = true;
+  programs.fd.enable = true;
+  programs.fd.ignores = [ ".git/" "*.bak" ];
+  programs.fd.extraOptions = [ "--hidden" "--ignore-case" "--absolute-path" ];
   programs.ripgrep.enable = true;
+  programs.ripgrep.package = pkgs.ripgrep-all;
   programs.ripgrep.arguments = [
+    "--hidden"
+    # NOTE; rg follows users gitignore
     "--max-columns=150" # Hard limit on line length
     "--max-columns-preview"
     "--smart-case" # Don't care about case
@@ -192,9 +198,10 @@
     };
 
     ignores = [
-      # Ignore all dotfiles except gitignore
+      # Ignore all dotfiles and dot directories except gitignore/gitkeep
       ".*"
       "!.gitignore"
+      "!.gitkeep"
       #
       "*.pdb"
       "*.qcow2"
