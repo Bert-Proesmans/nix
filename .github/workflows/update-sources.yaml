@@ -24,6 +24,7 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN_FOR_PR }} # Required for automations to run on created PR
           nix-options: --log-format raw
+          path-to-flake-dir: './flake/'
           pr-title: "Update flake.lock" # Title of PR to be created
           pr-labels: |                  # Labels to be set on the PR
             dependencies
