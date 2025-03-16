@@ -13,7 +13,6 @@ let
     # Define arguments here that must be be resolvable at module import stage.
     #
     # For everything else use the _module.args option instead (inside configuration).
-    # SEEALSO; meta-module, below
     flake = {
       inherit profiles;
       inherit (flake) inputs;
