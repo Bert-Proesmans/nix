@@ -20,13 +20,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Nix flake inputs against policy
         uses: DeterminateSystems/flake-checker-action@v5
+        with:
+          flake-lock-path: ./flake/flake.lock
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v9
-      - name: Prepare nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v3
       - name: Build default package
         run: |
-          nix build --log-format raw
+          nix build --log-format raw ./flake
       - name: Create Github release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
