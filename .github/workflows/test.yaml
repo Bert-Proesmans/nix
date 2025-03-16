@@ -28,4 +28,4 @@ jobs:
         uses: DeterminateSystems/magic-nix-cache-action@v3
       - name: Test
         run: |
-          nix flake check --log-format raw
+          nix flake check --log-format raw ./flake
