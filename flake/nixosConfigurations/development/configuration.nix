@@ -7,6 +7,7 @@
     ./wip.nix
   ];
 
+  proesmans.facts = ./facts.nix;
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.nix.registry.fat-nixpkgs.enable = true;
@@ -17,7 +18,6 @@
   proesmans.home-manager.enable = true;
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
-
 
   # This is a build host, so allow building !
   nix.settings.max-jobs = "auto";
