@@ -1,6 +1,6 @@
 { flake, lib }:
 let
-  # Deprecated, use nixpkgs.hostPlatform option instead (inside configuration)
+  # "System" is deprecated, set nixpkgs.hostPlatform option inside configuration instead
   system = null;
 
   # NixOS modules that implement partial host configuration
@@ -23,6 +23,8 @@ let
       };
     };
   };
+
+  facts = builtins.intersectAttrs flake.outputs.nixosConfigurations flake.outputs.facts;
 in
 {
   development = lib.nixosSystem {
@@ -31,7 +33,7 @@ in
       flake.inputs.nix-topology.nixosModules.default
       ({
         # This is an anonymous module and requires a marker for error messages and import deduplication.
-        _file = "${./all.nix}#development";
+        _file = __curPos.file;
 
         config = {
           # DO NOT USE `flake` TO IMPORT STUFF !
@@ -39,6 +41,9 @@ in
 
           # Nixos utils package is available as module argument, made available sorta like below.
           #_module.args.utils = import "${inputs.nixpkgs}/nixos/lib/utils.nix" { inherit lib config pkgs; };
+
+          # Exposed facts of all nixos host configurations.
+          _module.args.facts = facts;
 
           # The hostname of each configuration _must_ match their attribute name.
           # This prevent the footgun of desynchronized identifiers.

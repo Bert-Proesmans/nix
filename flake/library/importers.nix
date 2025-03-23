@@ -55,59 +55,80 @@ let
     in
     recurse { } [ ] tree;
 
-  rakeLeaves =
-    /* *
-       Synopsis: rakeLeaves _path_
+  /*
+    Synopsis: rakeLeaves _path_
 
-       Recursively collect the nix files of _path_ into attrs.
+    Recursively collect the nix files of _path_ into attrs.
 
-       Output Format:
-       An attribute set where all `.nix` files and directories with `default.nix` in them
-       are mapped to keys that are either the file with .nix stripped or the folder name.
-       All other directories are recursed further into nested attribute sets with the same format.
+    Output Format:
+    An attribute set where all `.nix` files and directories with `default.nix` in them
+    are mapped to keys that are either the file with .nix stripped or the folder name.
+    All other directories are recursed further into nested attribute sets with the same format.
 
-       Example file structure:
-       ```
-       ./core/default.nix
-       ./base.nix
-       ./main/dev.nix
-       ./main/os/default.nix
-       ```
+    Example file structure:
+    ```
+    ./core/default.nix
+    ./base.nix
+    ./main/dev.nix
+    ./main/os/default.nix
+    ```
 
-       Example output:
-       ```
-       {
-       core = ./core;
-       base = base.nix;
-       main = {
-       dev = ./main/dev.nix;
-       os = ./main/os;
-       };
-       }
-       ```
-       *
+    Example output:
+    ```
+    {
+    core = ./core;
+    base = base.nix;
+    main = {
+    dev = ./main/dev.nix;
+    os = ./main/os;
+    };
+    }
+    ```
     */
-    dirPath:
+  rakeLeaves = directory:
     let
-      seive = file: type:
-        # Only rake `.nix` files or directories
-        (type == "regular" && nixpkgs-lib.hasSuffix ".nix" file)
-        || (type == "directory");
+      inherit (builtins) readDir pathExists;
+      inherit (nixpkgs-lib) filterAttrs mapAttrs' hasSuffix removeSuffix;
+      inherit (nixpkgs-lib.path) append;
 
-      collect = file: type: {
-        name = nixpkgs-lib.removeSuffix ".nix" file;
+      seive = fileName: type:
+        (type == "regular" && hasSuffix ".nix" fileName) || (type == "directory");
+
+      collect = fileName: type: {
+        name = removeSuffix ".nix" fileName;
         value =
-          let path = dirPath + "/${file}";
-          in if (type == "regular") || (type == "directory"
-            && builtins.pathExists (path + "/default.nix")) then
-            path
-          # recurse on directories that don't contain a `default.nix`
-          else
-            rakeLeaves path;
+          let path = append directory fileName; in
+          if
+            (type == "regular") ||
+            (type == "directory" && pathExists (path + "/default.nix"))
+          then path
+          else rakeLeaves path;
       };
 
-      files = nixpkgs-lib.filterAttrs seive (builtins.readDir dirPath);
+      files = filterAttrs seive (readDir directory);
     in
-    nixpkgs-lib.filterAttrs (_n: v: v != { }) (nixpkgs-lib.mapAttrs' collect files);
+    filterAttrs (n: v: v != { }) (mapAttrs' collect files);
+
+  rakeFacts = directory:
+    let
+      inherit (builtins) readDir pathExists;
+      inherit (nixpkgs-lib) filterAttrs mapAttrs hasSuffix;
+      inherit (nixpkgs-lib.path) append;
+
+      seive = fileName: type:
+        (type == "regular" && hasSuffix ".nix" fileName) || (type == "directory");
+
+      collect = fileName: type:
+        let
+          path = append directory fileName;
+          factsPath = append path "facts.nix";
+        in
+        if type == "directory" && (pathExists factsPath) then factsPath
+        else if type == "directory" then rakeFacts path
+        else { };
+
+      files = filterAttrs seive (readDir directory);
+    in
+    filterAttrs (n: v: v != { }) (mapAttrs collect files);
 in
-{ inherit rakeLeaves flattenTree; }
+{ inherit flattenTree rakeLeaves rakeFacts; }

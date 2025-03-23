@@ -120,11 +120,17 @@
       homeModules = outputs.lib.rakeLeaves ./homeModules;
 
       # Print and externall process host information with;
-      # nix eval --json .#inventory
+      # nix eval --json .#facts
       #
       # TODO; Examples of using this data
       #
-      inventory = import ./inventory.nix;
+      facts = lib.mapAttrs
+        (_: path: (import path) {
+          # Emulate evalModules
+          inherit lib;
+          # pkgs = {};
+        })
+        (outputs.lib.rakeFacts ./nixosConfigurations);
 
       # nixosConfigurations are the full interconnected configuration data to build a host machine. This collection of data resolves
       # to an output (of any kind) depending on the attribute you ask it to build. These attributes are under the ".config" set
@@ -197,6 +203,8 @@
             directory = ./packages;
           })
       );
+
+
 
       # Execute and validate tests against this flake configuration;
       # nix-fast-build
