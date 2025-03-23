@@ -53,4 +53,20 @@ in
       ./development/configuration.nix
     ];
   };
+
+  buddy = lib.nixosSystem {
+    inherit lib system specialArgs;
+    modules = modules ++ [
+      flake.inputs.nix-topology.nixosModules.default
+      ({
+        _file = __curPos.file;
+
+        config = {
+          _module.args.facts = facts;
+          networking.hostName = lib.mkForce "buddy";
+        };
+      })
+      ./buddy/configuration.nix
+    ];
+  };
 }

@@ -151,7 +151,7 @@
   # REF; https://github.com/NixOS/nixpkgs/issues/62644 (I'm not sure if this is actually better than explicitly setting "legacy")
   #
   disko.devices = {
-    disk.slog = {
+    disk.slog-one = {
       type = "disk";
       device = "/dev/disk/by-id/ata-M4-CT128M4SSD2_00000000114708FF549B";
       preCreateHook = ''
@@ -163,9 +163,13 @@
       content = {
         type = "gpt";
         partitions = {
-          slog = {
+          zfs = {
+            type = "BF01";
             size = "4G";
-            name = "for-zstorage"; # Refer to this partition using '/dev/disk/by-partlabel/disk-slog-for-zstorage'
+            content = {
+              type = "zfs";
+              pool = "storage";
+            };
           };
         };
       };
@@ -183,11 +187,17 @@
         type = "gpt";
         partitions = {
           one = {
-            type = "BF01";
+            type = "luks";
+            name = "crypted";
             size = "200G";
+            settings = {
+              allowDiscards = true;
+              # LUKS passphrase will be prompted interactively only
+            };
+            extraOpenArgs = [ "--allow-discards" ];
             content = {
-              type = "zfs";
-              pool = "local";
+              type = "lvm_pv";
+              vg = "root";
             };
           };
         };
@@ -216,7 +226,7 @@
               mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
             };
           };
-          root = {
+          zfs = {
             type = "BF01";
             size = "3722G";
             content = {
@@ -256,7 +266,7 @@
               mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
             };
           };
-          root = {
+          zfs = {
             type = "BF01";
             size = "3722G";
             content = {
@@ -296,7 +306,7 @@
               mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
             };
           };
-          root = {
+          zfs = {
             type = "BF01";
             size = "3722G";
             content = {
@@ -316,107 +326,38 @@
       };
     };
 
-    zpool.local = {
-      type = "zpool";
-      # WARN; Intentionally left empty to not create a VDEV. No vdev explicitly creates a RAID0 pool!
-      mode = "";
-      options = {
-        # Set to 8KiB because of NVMe vdev members.
-        ashift = "13";
-        autotrim = "on";
-      };
-      # Configure the pool (aka pool-root aka dataset-parent) filesystem.
-      # WARN; These settings are automatically inherited
-      rootFsOptions = {
-        # NOTE; No mounting/auto-mounting
-        canmount = "off";
-        # NOTE; Datasets do not inherit a parent mountpoint.
-        mountpoint = "none";
-        compression = "lz4";
-        # NOTE; Disable extended access control lists and use owner/group/other!
-        # HELP; Set this parameter to `posixacl` when required, check documentation of your software!
-        acltype = "off";
-        # NOTE; Store file metadata as extensions in inode structure (for performance)
-        xattr = "sa";
-        # NOTE; Increase inode size, if ad-hoc necessary, from the default 512-byte
-        dnodesize = "auto";
-        # NOTE; Enable optimized access time writes
-        # HELP; Disable access time selectively per dataset
-        relatime = "on";
-        # NOTE; Opt out of built-in snapshotting
-        "com.sun:auto-snapshot" = "false";
-        #
-        devices = "off";
-        setuid = "off";
-        exec = "off";
-      };
+    lvm_vg = {
+      pool = {
+        type = "lvm_vg";
+        lvs = {
+          root = {
+            size = "50G";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/";
+              mountOptions = [ "defaults" ];
+            };
+          };
 
-      datasets = {
-        "root" = {
-          # Root filesystem, a catch-all
-          type = "zfs_fs";
-          mountpoint = "/";
-          postCreateHook = ''
-            # Generate empty snapshot in preparation for impermanence
-            zfs list -t snapshot -H -o name | grep -E '^local/root@empty$' || zfs snapshot 'local/root@empty'
-          '';
-          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
-          options = {
-            # ERROR; Permissions not working if the _full hierarchival path_ doesn't have acl enabled!
-            # Must enable acl from target file up to and including root.
-            acltype = "posixacl";
-            # /dev is devtmps, does not require dev = on
-            # /run/wrappers houses special binaries, does not require setuid = on
-            # /nix/store holds all binaries, does not require exec = on
+          var = {
+            size = "50G";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/var";
+              options = [ "nodev" "nosuid" "noexec" ];
+            };
           };
-        };
-        "nix" = {
-          # Nix filestore, contains no state
-          type = "zfs_fs";
-          mountpoint = "/nix";
-          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
-          options = {
-            atime = "off"; # nix store doesn't use access time
-            acltype = "posixacl"; # Required for virtio shares
-            exec = "on";
-          };
-        };
-        "nix/reserve" = {
-          # Reserved space to allow copy-on-write deletes
-          type = "zfs_fs";
-          mountpoint = null;
-          options = {
-            canmount = "off";
-            # Reserve disk space for files without incorporating snapshot and clone numbers.
-            # WARN; Storage statistics are (almost) never straight up "this is the sum size of your data"
-            # and incorporate reservations, snapshots, clones, metadata from self+child datasets.
-            refreservation = "1G";
-          };
-        };
-        "persist/logs" = {
-          # Stores systemd logs
-          type = "zfs_fs";
-          mountpoint = "/var/log";
-          options.mountpoint = "legacy"; # Filesystem at boot required, prevent duplicate mount
-        };
-        "temporary" = {
-          # Put /tmp on a separate dataset to prevent DOS'ing the root dataset
-          type = "zfs_fs";
-          # NOTE; /var/tmp (and /tmp) are subject to automated cleanup
-          mountpoint = "/tmp";
-          options = {
-            devices = "off"; # No mounting of devices
-            setuid = "off"; # No hackery with user tokens on this filesystem
-          };
-        };
-        "vartemporary" = {
-          # Put /var/tmp on a separate dataset to prevent DOS'ing the root dataset
-          type = "zfs_fs";
-          # NOTE; /var/tmp (and /tmp) are subject to automated cleanup
-          mountpoint = "/var/tmp";
-          options = {
-            devices = "off"; # No mounting of devices
-            setuid = "off"; # No hackery with user tokens on this filesystem
+
+          nix = {
+            size = "100G";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/nix";
+              options = [ "nodev" "noatime" ];
+            };
           };
         };
       };
@@ -424,34 +365,20 @@
 
     zpool.storage = {
       type = "zpool";
-      mode = "raidz"; # RAIDZ1
-      postCreateHook =
-        let
-          label-zpool = "storage";
-          device-node = "/dev/disk/by-partlabel/disk-slog-for-zstorage";
-        in
-        ''
-          # Add SLOG device manually (not yet abstracted by DISKO).
-          # Target device node is matched as zfs member, and matching zpool label.
-          #
-          # NOTE; lsblk outputs something like below when the slog is attached
-          # /dev/<moniker> zfs_member  storage
-          #
-          # ERROR; This lacks pool ID matching! But we're assuming the pools are always destroyed
-          # together with disk contents between script runs, nor do we expect the drives to move
-          # between systems (that happen to have the same pool labels) without a full wipe.
-          #
-          # ERROR; This also doesn't check the current pool state, where an SLOG could have been detached
-          # but that doesn't automatically destroy the partition data on-disk!
-          #
-          if lsblk -o FSTYPE,LABEL ${device-node} --noheadings | grep -q "^zfs_member\s\+${label-zpool}\$"; then
-            echo "Not attaching SLOG device to pool ${label-zpool} because it already belongs to a pool with the same name."
-          else
-            if ! zpool add ${label-zpool} log ${device-node}; then
-              echo "Failed to attach SLOG device '${device-node}' for ${label-zpool}." >&2
-            fi
-          fi
-        '';
+      mode.topology = {
+        type = "topology";
+        vdev = [{
+          mode = "raidz"; # RAID5
+          members = [
+            "storage-one"
+            "storage-two"
+            "storage-three"
+          ];
+        }];
+        log = [{
+          members = [ "slog-one" ];
+        }];
+      };
       options = {
         # Set to 8KiB sector sizes in preparation of NVMe vdev members.
         # There is (also) no downside to making maximum write chunksize larger than physical sector size.
