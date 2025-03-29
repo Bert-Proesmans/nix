@@ -16,7 +16,6 @@
     # ./proxy-vm.nix
   ];
 
-  proesmans.facts = ./facts.nix;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.sopsSecrets.enable = true;
   sops.defaultSopsFile = ./secrets.encrypted.yaml;

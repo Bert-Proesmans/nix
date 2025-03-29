@@ -1,5 +1,7 @@
 { flake, lib }:
 let
+  inherit (flake.outputs) facts;
+
   # "System" is deprecated, set nixpkgs.hostPlatform option inside configuration instead
   system = null;
 
@@ -23,15 +25,13 @@ let
       };
     };
   };
-
-  facts = builtins.intersectAttrs flake.outputs.nixosConfigurations flake.outputs.facts;
 in
 {
   development = lib.nixosSystem {
     inherit lib system specialArgs;
     modules = modules ++ [
       flake.inputs.nix-topology.nixosModules.default
-      ({
+      ({ lib, config, ... }: {
         # This is an anonymous module and requires a marker for error messages and import deduplication.
         _file = __curPos.file;
 
@@ -42,12 +42,12 @@ in
           # Nixos utils package is available as module argument, made available sorta like below.
           #_module.args.utils = import "${inputs.nixpkgs}/nixos/lib/utils.nix" { inherit lib config pkgs; };
 
-          # Exposed facts of all nixos host configurations.
-          _module.args.facts = facts;
-
           # The hostname of each configuration _must_ match their attribute name.
           # This prevent the footgun of desynchronized identifiers.
           networking.hostName = lib.mkForce "development";
+
+          # Communicate facts about this and other hosts.
+          proesmans.facts = facts // { self = lib.mkForce config.proesmans.facts."development"; };
         };
       })
       ./development/configuration.nix
@@ -58,12 +58,12 @@ in
     inherit lib system specialArgs;
     modules = modules ++ [
       flake.inputs.nix-topology.nixosModules.default
-      ({
+      ({ lib, config, ... }: {
         _file = __curPos.file;
 
         config = {
-          _module.args.facts = facts;
           networking.hostName = lib.mkForce "buddy";
+          proesmans.facts = facts // { self = lib.mkForce config.proesmans.facts."buddy"; };
         };
       })
       ./buddy/configuration.nix

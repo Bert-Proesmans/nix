@@ -124,13 +124,19 @@
       #
       # TODO; Examples of using this data
       #
-      facts = lib.mapAttrs
-        (_: path: (import path) {
-          # Emulate evalModules
-          inherit lib;
-          # pkgs = {};
-        })
-        (outputs.lib.rakeFacts ./nixosConfigurations);
+      facts =
+        let
+          factModules = outputs.lib.rakeFacts ./nixosConfigurations;
+          evaluation = lib.evalModules {
+            modules = [
+              ./nixosModules/facts.nix
+              ({
+                proesmans.facts = factModules;
+              })
+            ];
+          };
+        in
+        evaluation.config.proesmans.facts;
 
       # nixosConfigurations are the full interconnected configuration data to build a host machine. This collection of data resolves
       # to an output (of any kind) depending on the attribute you ask it to build. These attributes are under the ".config" set

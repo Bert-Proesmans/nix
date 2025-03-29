@@ -7,7 +7,6 @@
     ./wip.nix
   ];
 
-  proesmans.facts = ./facts.nix;
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.nix.registry.fat-nixpkgs.enable = true;

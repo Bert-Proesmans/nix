@@ -1,7 +1,7 @@
 { lib, ... }: {
   options.proesmans.facts = lib.mkOption {
     description = "Host facts.";
-    type = lib.types.submoduleWith {
+    type = lib.types.lazyAttrsOf (lib.types.submoduleWith {
       description = "Computer facts module";
       class = "proesmansFacts";
       specialArgs = { };
@@ -57,7 +57,7 @@
           };
         })
       ];
-    };
+    });
     default = { };
     # Prevent the entire submodule being included in the documentation.
     # visible = "shallow";
@@ -65,5 +65,7 @@
 
   config = {
     # Host config.
+    # WARN; Don't set system config based on facts here. This module should work for both standalone facts and nixos configurations.
+    # TODO; Figure out (option) conditional config.
   };
 }
