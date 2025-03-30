@@ -41,7 +41,8 @@ in
       owner = config.users.users.root.name;
       group = config.users.users.root.group;
       mode = "0400";
-      restartUnits = [ config.systemd.services.sshd.name ];
+      restartUnits = lib.optional (config.services.openssh.enable && !config.services.openssh.startWhenNeeded)
+        config.systemd.services.sshd.name;
     };
 
     services.openssh.hostKeys = lib.mkIf cfg.sshHostkeyControl.enable [
