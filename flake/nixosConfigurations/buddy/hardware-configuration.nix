@@ -43,6 +43,7 @@
     };
   };
 
+  # TODO; Consolidate backup and move into separate configuration file
   systemd.tmpfiles.settings."1-base-datasets" = {
     # Make a root owned landing zone for backup data
     "/persist" = {
@@ -57,28 +58,30 @@
     };
   };
 
-  # Generated with `head -c4 /dev/urandom | od -A none -t x4`
-  # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
-  # It's best practise to mark the pools as 'exported' before moving them between systems.
-  # NOTE; Force importing is possible, ofcourse.
-  networking.hostId = "525346fb";
+  networking = { inherit (config.proesmans.facts.self) hostId; };
 
-  systemd.network.links = {
-    "10-upstream" = {
-      matchConfig.MACAddress = "b4:2e:99:15:33:a6";
-      linkConfig.Alias = "Internet uplink";
-      linkConfig.AlternativeName = "main";
-    };
-  };
+  systemd.network =
+    let
+      managementMac = lib.mapAttrsToList (m: v: builtins.elem "management" v.tags) config.proesmans.facts.self.macAddresses;
+    in
+    {
+      links = {
+        "10-upstream" = {
+          matchConfig.MACAddress = managementMac;
+          linkConfig.Alias = "Internet uplink";
+          linkConfig.AlternativeName = "main";
+        };
+      };
 
-  systemd.network.networks = {
-    "30-lan" = {
-      matchConfig.MACAddress = "b4:2e:99:15:33:a6";
-      networkConfig = {
-        DHCP = "ipv4";
-        IPv6AcceptRA = false;
-        LinkLocalAddressing = "no";
+      networks = {
+        "30-lan" = {
+          matchConfig.MACAddress = managementMac;
+          networkConfig = {
+            DHCP = "ipv4";
+            IPv6AcceptRA = false;
+            LinkLocalAddressing = "no";
+          };
+        };
       };
     };
-  };
 }

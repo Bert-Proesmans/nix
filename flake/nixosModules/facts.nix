@@ -36,20 +36,36 @@
                 "dhcp"
                 "dns"
                 "webserver"
+                # TODO
               ]);
               default = [ ];
             };
 
-            management.mac-address = lib.mkOption {
-              description = ''
-                The MAC address of the network interface that should be used for SSH host management.
-            
-                NOTE; The "locally administrated"-bit must be set for generated virtual MAC addresses!
-                This makes random collisions with internationally assigned address impossible.
-                REF; https://www.hellion.org.uk/cgi-bin/randmac.pl
-              '';
-              type = lib.types.nullOr lib.net.types.mac;
-              default = null;
+            macAddresses = lib.mkOption {
+              description = "The MAC addresses that reach this host";
+              type = lib.types.attrsOf (lib.types.submodule ({ name, config, ... }: {
+                options = {
+                  address = lib.mkOption {
+                    description = ''
+                      NOTE; The "locally administrated"-bit must be set for generated virtual MAC addresses!
+                      This makes random collisions with internationally assigned address impossible.
+                      REF; https://www.hellion.org.uk/cgi-bin/randmac.pl
+                    '';
+                    type = lib.net.types.mac;
+                    default = name;
+                  };
+                  tags = lib.mkOption {
+                    description = "";
+                    type = lib.types.listOf (lib.types.enum [
+                      "management"
+                      "service"
+                      # TODO
+                    ]);
+                    apply = lib.lists.unique;
+                  };
+                };
+              }));
+              default = { };
             };
           };
           config = {
