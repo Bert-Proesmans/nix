@@ -8,6 +8,7 @@
 
   # Boot is both efi and bios compatible
   # TODO; Remove grub in favour of systemd if mirrored EFI boot install is available through SystemD (or something else)
+  # TODO; Integrate lanzaboot to sign boot stubs for EFI secure boot
   boot.loader.grub = {
     enable = true;
     efiSupport = true;
@@ -58,18 +59,29 @@
     };
   };
 
-  # @@ ZFS setup rundown @@
-  #   - pool LOCAL, not mounted
+  # @@ Disk rundown @@
+  #   - LUKS+LVM, root disk***
   #     - / (root)
   #     - /nix
   #     - /tmp + /var/tmp (reduce RAM usage when storage is plenty)
-  #   - pool STORAGE, not mounted but base-path at /storage
-  #     - media
+  #   - ZFS pool STORAGE, combination of persistent data and cache
+  #     - /persist
+  #       - **
+  #     - /var/cache
+  #       - **
+  #     - /var/log
+  #
+  # **ZFS datasets are optimized per application, but mounted into a straightforward file hierarchy. Examples of dataset 
+  # specialisation are:
+  #     - image/video
   #     - postgres
   #     - sqlite
   #     - etc
   #
-  # @@ ZFS Pools @@
+  # **There is no benefit enabling ZFS on root for these use-cases.
+  #
+  #
+  # @@ ZFS Pool @@
   # Creates a RAIDZ1 pool from 3 disks + 1 SLOG device.
   #
   # ZFS is given partitions instead of entire disks. There is nothing inherently wrong with that
@@ -80,9 +92,11 @@
   #
   # The remaining space is used for swap space.
   # Swap works in round robin, so each disk provides some amount of swap into the total swap pool.
+  # Since swap usage should be minimal and disks cannot be extended it's fine to put the swap space at the
+  # end of the disk (slowest latency).
   #
-  # Partition alignment is no problem under the circumstances below. Both start- and end alignment is
-  # provided by the software (s)gdisk.
+  # Partition alignment is no problem under the circumstances below. Optimal start- and end alignment are both
+  # automatically calculated by the software (s)gdisk.
   # - sgdisk tries to align by default on 2048 * sectors (aka flash/data pages), assuming 512-byte sectors
   #   means 1 mebibyte
   #   - if the disk reports bigger sector sizes, the 2048 sector alignment is recalculated to
@@ -107,16 +121,16 @@
   #   improvement.
   #
   # @@ ZFS Datasets @@
-  # On top of the pools is a dataset structure based on snapshot and replication policies, performance, and security.
+  # On top of the pool is a dataset structure based on snapshot and replication policies, performance, and security.
   # See disko.zpool.<pool name>.datasets.
   #
-  # Pool "local" has some datasets in preparation for impermanence, holds the host filesystem.
   # Pool "storage" is optimised for spinning hard drives, bulk storage.
   #
   #
   # @@ ZFS mountpoint "legacy" within NixOS @@
   # The paths below must be mounted to start NixOS. There is a bunch of integration work happening right now so the
-  # timing moments of stage-1/stage-2 and 'before SystemD starts' are not exactly right depending on system configuration.
+  # timing moments of stage-1/stage-2 and 'before SystemD starts' are in flux. At runtime SystemD is currently not 
+  # completely aware of the full mount hierarchy for ZFS.
   #
   # pathsNeededForBoot = [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/var/lib/nixos" "/etc" "/usr" ];
   # REF; https://github.com/NixOS/nixpkgs/blob/f7c8b09122de4faf7324c34b8df7550dde6feac0/nixos/lib/utils.nix#L56
@@ -125,7 +139,7 @@
   # Stage-1 is driven by a shell script contained within the initial RAMdisk (initrd/initramfs), it takes the declarative
   # filesystem information to figure out what needs to be mounted and in which order.
   # Stage-1 prepares a new filesystem root to load stage-2, this requires recursively re-mounting from current root to the new one.
-  # Stage-2 is then SystemD init, loaded from the mounted /nix/store, taking over boot until and after the ~interactive stage.
+  # Stage-2 is then SystemD init, loaded from the mounted /nix/store, taking over boot until (and after) the ~interactive stage.
   #
   # Moving into each stage starts with re-mounting the root filesystem recursively (all submounts too). The unmounting/remounting
   # action, in combination the zfs driver trying to automatically mount datasets, is currently not completely path ordering aware
@@ -186,18 +200,22 @@
       content = {
         type = "gpt";
         partitions = {
-          one = {
-            type = "luks";
-            name = "crypted";
+          luks = {
             size = "200G";
-            settings = {
-              allowDiscards = true;
-              # LUKS passphrase will be prompted interactively only
-            };
-            extraOpenArgs = [ "--allow-discards" ];
             content = {
-              type = "lvm_pv";
-              vg = "root";
+              type = "luks";
+              name = "crypted";
+              askPassword = true;
+              settings = {
+                allowDiscards = true;
+                bypassWorkqueues = true;
+              };
+              extraOpenArgs = [ "--allow-discards" ];
+              content = {
+                type = "lvm_pv";
+                vg = "root";
+              };
+
             };
           };
         };
@@ -346,7 +364,7 @@
               type = "filesystem";
               format = "ext4";
               mountpoint = "/var";
-              options = [ "nodev" "nosuid" "noexec" ];
+              mountOptions = [ "nodev" "nosuid" "noexec" ];
             };
           };
 
@@ -356,7 +374,7 @@
               type = "filesystem";
               format = "ext4";
               mountpoint = "/nix";
-              options = [ "nodev" "noatime" ];
+              mountOptions = [ "nodev" "noatime" ];
             };
           };
         };
@@ -391,7 +409,8 @@
         # NOTE; No mounting/auto-mounting
         canmount = "off";
         # NOTE; Datasets inherit parent mountpoint.
-        mountpoint = "/storage";
+        # HELP; Set an explicit mountpoint on the leaf datasets!
+        # mountpoint = null; # Cannot set to null, option expects string value
         # NOTE; Fletcher is by far the fastest
         # Only change checksumming algorithm if dedup is a requirement!
         # HELP; Set blake3 (cryptographic hasher) for better clash resistance and when deduplication is activated.
@@ -413,30 +432,32 @@
         # NOTE; Within hard disk pools it's better to go for bigger recordsizes to optimize away the static seek time latency. 
         # But this _only_ improves the ratio of latency to retrieval bandwidth while increasing the average latency.
         # HELP; Change record size per dataset, there are various online sources with information
-        # HELP; If application level caching is present, push the recordsize upwards
+        # HELP; If application level caching is present, increase the recordsize
         recordsize = "128K";
         # NOTE; Compare filenames after normalizing using KC unicode conversion table. This turns characters into
         # equivalent characters; fullwidth "Ａ" (U+FF21) -> "A" (U+0041) [lossy conversion!!]
+        # HELP; Do not overwrite unless good reason to
         normalization = "formKC";
         # @@ ZIL @@
         # The "ZFS intent log"(ZIL) is storage space allocated for synchronous data writes (database writes or hypervisor I/O).
-        # Under default configuration this storage space is located inside the data vdevs for persistance and redundancy reasons.
+        # Under default configuration this storage space is located inside the data vdevs for persistence and redundancy reasons.
         # But the ZIL is _not_ restricted to a specific start and end sector, ZIL data is spread over the entire disk. These ZIL blocks
         # contain both application data and its metadata. This difference becomes important for choosing a value for 'logbias'.
-        # When a synchronous application data write completes, or a continuous block of 'recordsize' is written, the ZIL data 
-        # is written a second time to the data vdevs. This second write is to the "permanent location" of the data. This second write
-        # happens on the next ZFS commit trigger, and introduces data holes (write holes) when the ZIL data is freed.
+        # When a synchronous application data write completes, or a continuous block of 'recordsize' is comitted, the ZIL data 
+        # is copied (written a second time) to the data vdevs. This second write is to the "permanent location" of the data.
+        # This second write happens on the next ZFS commit trigger and introduces write holes when the ZIL data is freed.
         #
         # @@ SLOG @@
         # A "secondary log"(SLOG) device can hold the ZIL outside of the data vdevs. This makes the SLOG a "special vdev".
         # THE SLOG IS NOT A CACHE! The SLOG is never read from, unless to recover from a crash. The SLOG exists to persist the intent log,
-        # which is a duplicate copy from RAM.
+        # which is always A DUPLICATE copy from RAM.
         # The SLOG is a tool to balance and optimize durability, application write completion latency, and "input-/output operations"(IOPS)
         # of the data vdevs (entire pool actually, they aren't linked to individual data vdevs).
         #
         # Best practises dictate that the SLOG must be attached to a pool in a redundant setup (like mirror). A loss of 
         # a SLOG device results in data loss.
-        # When the SLOG vdev dissapears, the pool will automatically fall back to a ZIL on data vdevs.
+        # When the SLOG vdev dissapears, the pool will automatically fall back to a ZIL on data vdevs. This is very much not desired
+        # because ZFS cannot defragment its data vdevs. (Rebalancing exists but requires vdev expansion to do well)
         #
         # Operations touching the ZIL are locked to a single-thread meaning read/writes are serialized. A single SLOG device could
         # lose on throughput in contrast to data vdevs containing multiple devices.
@@ -472,15 +493,15 @@
         # When writing to the ZIL, application data records (up to size defined by zfs_immediate_write_sz) are written to
         # the ZIL. This results in the "double write" described above.
         # Write latency is supposed to be lower if you have a fast SLOG device, in contrast to long hard disk seek time.
-        # HELP; Set to latency if you have a fast SLOG
+        # HELP; Set to latency if you have a fast SLOG and low IOPS pool
         #
         # @@ logbias set to 'throughput' @@
         # When writing to the ZIL, application data is directly written into the data vdevs. This eliminates the mentioned
         # above "double writes" for the data blocks only, improving the data throughput the pool can handle.
-        # HELP; Set to throughput if your SLOG device has low IOPS, or has a low lifetime writes value left.
+        # HELP; Set to throughput if have a high IOPS pool or want to balance IOPS between SLOG and pool
         #
         # @@ Pool considerations in reality @@
-        # The storage pool is a RAIDZ1 of hard disks. The burst traffic will max out at than 1 GB of data per second, and
+        # The storage pool is a RAIDZ1 of hard disks. The burst traffic will max out at 1 GB of data per second, and
         # average file size is 1-2 MiB (range 3 KiB to 5 GiB).
         # Only database and virtualisation writes will matter for latency optimization, since the bigger writes will be asynchronous.
         #
@@ -519,29 +540,15 @@
       # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will
       # be automatically created (as nomount?).
       datasets = {
-        "volumes" = {
-          # Default storage location for vm state data without requirements.
-          # NOTE; Qemu does its own application level caching on backing volume (cache=writeback by default)
-          # HELP; Create sub datasets to specialize storage behaviour to the application.
-          type = "zfs_fs";
-          options = {
-            mountpoint = "/var/cache/microvm";
-            acltype = "off";
-            # Don't cache metadata because I expect infrequent reads and large write streams.
-            # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
-            primarycache = "none";
-            # Haven't done benchmarking to change away from the default
-            recordsize = "128K";
-          };
-        };
-        "backup" = {
-          # Filesystem for backup index storage
-          # TODO; tune, since now it's considered general purpose file storage
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-          };
-        };
+        # "backup" = {
+        #   # Filesystem for backup index storage
+        #   # TODO; tune, since now it's considered general purpose file storage
+        #   type = "zfs_fs";
+        #   options = {
+        #     canmount = "off";
+        #   };
+        # };
+
         "media" = {
           type = "zfs_fs";
           options = {
@@ -569,6 +576,7 @@
             compression = "zstd-3";
           };
         };
+
         "postgres" = {
           type = "zfs_fs";
           options = {
@@ -591,22 +599,7 @@
             logbias = "latency";
           };
         };
-        "postgres/state" = {
-          # HELP; Inherit from this dataset for your application!
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "/storage/postgres/state";
-          };
-        };
-        "postgres/wal" = {
-          # HELP; Inherit from this dataset for your application!
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "/storage/postgres/wal";
-          };
-        };
+
         "sqlite" = {
           type = "zfs_fs";
           options = {
@@ -622,18 +615,26 @@
             logbias = "latency";
           };
         };
-        "sqlite/state" = {
-          # HELP; Inherit from this dataset for your application!
+
+        "qemu" = {
+          # Default storage location for vm state data without specific requirements.
+          # NOTE; Qemu does its own application level caching on backing volume (cache=writeback by default)
+          # HELP; Create sub datasets to specialize storage behaviour to the application.
           type = "zfs_fs";
           options = {
             canmount = "off";
-            mountpoint = "/storage/sqlite/state";
+            atime = "off";
+            acltype = "off";
+
+            # Haven't done benchmarking to change away from the default
+            recordsize = "128K";
+            # Don't cache metadata because I expect infrequent reads and large write streams.
+            # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
+            primarycache = "none";
           };
         };
 
         # Datasets are defined where they're used!
-        # SEEALSO; XX-vm.nix
-        # datasets = {};
       };
     };
   };
