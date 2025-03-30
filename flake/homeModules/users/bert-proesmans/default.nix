@@ -1,4 +1,4 @@
-{ lib, pkgs, osConfig, ... }:
+{ pkgs, ... }:
 {
   # Values are preset for the next attribute names;
   # - home.username

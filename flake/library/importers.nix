@@ -107,7 +107,7 @@ let
 
       files = filterAttrs seive (readDir directory);
     in
-    filterAttrs (n: v: v != { }) (mapAttrs' collect files);
+    filterAttrs (_n: v: v != { }) (mapAttrs' collect files);
 
   rakeFacts = directory:
     let
@@ -129,6 +129,6 @@ let
 
       files = filterAttrs seive (readDir directory);
     in
-    filterAttrs (n: v: v != { }) (mapAttrs collect files);
+    filterAttrs (_n: v: v != { }) (mapAttrs collect files);
 in
 { inherit flattenTree rakeLeaves rakeFacts; }

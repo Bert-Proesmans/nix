@@ -1,4 +1,4 @@
-{ lib, config, flake, ... }: {
+{ flake, ... }: {
 
   imports = [
     flake.profiles.hypervisor
