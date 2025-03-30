@@ -1,4 +1,4 @@
-{ lib, config, ... }: {
+{ lib, ... }: {
   boot.supportedFilesystems = [ "zfs" ];
   # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
   # at unexpected moments and cause kernel downgrade.
@@ -9,6 +9,9 @@
   # Boot is both efi and bios compatible
   # TODO; Remove grub in favour of systemd if mirrored EFI boot install is available through SystemD (or something else)
   # TODO; Integrate lanzaboot to sign boot stubs for EFI secure boot
+  # TODO; Integrate TPM measured boot to only release decryption keys on unchanged platform configuration registers (PCR)
+  # TODO; Encrypt root and data block storage; luks/luks+zfs/zfs native
+  #       Don't forget to enable aes acceleration modules
   boot.loader.grub = {
     enable = true;
     efiSupport = true;
@@ -45,25 +48,11 @@
   services.zfs.autoScrub.enable = true;
   services.zfs.autoScrub.interval = "weekly";
 
-  systemd.tmpfiles.settings."1-base-datasets" = {
-    # Remove world-permissions from zfs pool parent path, to prevent unauthorized reads on all data.
-    "/storage" = {
-      # Create directory owned by root  
-      d = {
-        user = config.users.users.root.name;
-        group = config.users.groups.root.name;
-        mode = "0700";
-      };
-      # Set ACL defaults
-      "A+".argument = "group::r-X,other::---,mask::r-x,default:group::r-X,default:other::---,default:mask::r-X";
-    };
-  };
-
   # @@ Disk rundown @@
-  #   - LUKS+LVM, root disk***
+  #   - Partitions, root disk***
   #     - / (root)
   #     - /nix
-  #     - /tmp + /var/tmp (reduce RAM usage when storage is plenty)
+  #     - /tmp (bindmount) + /var/tmp (reduce RAM usage when storage is plenty)
   #   - ZFS pool STORAGE, combination of persistent data and cache
   #     - /persist
   #       - **
@@ -200,22 +189,34 @@
       content = {
         type = "gpt";
         partitions = {
-          luks = {
-            size = "200G";
+          root = {
+            size = "50G";
             content = {
-              type = "luks";
-              name = "crypted";
-              askPassword = true;
-              settings = {
-                allowDiscards = true;
-                bypassWorkqueues = true;
-              };
-              extraOpenArgs = [ "--allow-discards" ];
-              content = {
-                type = "lvm_pv";
-                vg = "root";
-              };
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/";
+              mountOptions = [ "defaults" ];
+            };
+          };
 
+          var = {
+            size = "50G";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/var";
+              mountOptions = [ "rw" "noexec" "nosuid" "nodev" ];
+            };
+          };
+
+          nix = {
+            size = "100G";
+            content = {
+              type = "filesystem";
+              format = "ext4";
+              mountpoint = "/nix";
+              # NOTE; Nix boot stages and daemon remount parts of this partition at runtime!
+              mountOptions = [ "nosuid" "nodev" "noatime" ];
             };
           };
         };
@@ -241,7 +242,7 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/0"; # WARN; Unique per disk!
-              mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
             };
           };
           zfs = {
@@ -281,7 +282,7 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/1"; # WARN; Unique per disk!
-              mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
             };
           };
           zfs = {
@@ -321,7 +322,7 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/2"; # WARN; Unique per disk!
-              mountOptions = [ "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
             };
           };
           zfs = {
@@ -338,43 +339,6 @@
             content = {
               type = "swap";
               randomEncryption = true;
-            };
-          };
-        };
-      };
-    };
-
-    lvm_vg = {
-      pool = {
-        type = "lvm_vg";
-        lvs = {
-          root = {
-            size = "50G";
-            content = {
-              type = "filesystem";
-              format = "ext4";
-              mountpoint = "/";
-              mountOptions = [ "defaults" ];
-            };
-          };
-
-          var = {
-            size = "50G";
-            content = {
-              type = "filesystem";
-              format = "ext4";
-              mountpoint = "/var";
-              mountOptions = [ "nodev" "nosuid" "noexec" ];
-            };
-          };
-
-          nix = {
-            size = "100G";
-            content = {
-              type = "filesystem";
-              format = "ext4";
-              mountpoint = "/nix";
-              mountOptions = [ "nodev" "noatime" ];
             };
           };
         };
@@ -410,7 +374,7 @@
         canmount = "off";
         # NOTE; Datasets inherit parent mountpoint.
         # HELP; Set an explicit mountpoint on the leaf datasets!
-        # mountpoint = null; # Cannot set to null, option expects string value
+        mountpoint = "none";
         # NOTE; Fletcher is by far the fastest
         # Only change checksumming algorithm if dedup is a requirement!
         # HELP; Set blake3 (cryptographic hasher) for better clash resistance and when deduplication is activated.
@@ -546,6 +510,7 @@
         #   type = "zfs_fs";
         #   options = {
         #     canmount = "off";
+        #     mountpoint = "none";
         #   };
         # };
 
@@ -553,6 +518,7 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
+            mountpoint = "none";
             # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
             # Back of enveloppe calculation for recordzise 16MiB;
             #   - HDD seek time is ~10 ms, reading 16MiB is ~130ms.
@@ -581,6 +547,7 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
+            mountpoint = "none";
             atime = "off";
 
             # Performance notes for postgres itself;
@@ -604,6 +571,7 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
+            mountpoint = "none";
             atime = "off";
 
             # Performance notes for sqlite itself;
@@ -623,6 +591,7 @@
           type = "zfs_fs";
           options = {
             canmount = "off";
+            mountpoint = "none";
             atime = "off";
             acltype = "off";
 
@@ -635,6 +604,15 @@
         };
 
         # Datasets are defined where they're used!
+        #
+        # eg
+        # "postgres/forgejo" = {
+        #   type = "zfs_fs";
+        #   options.mountpoint = "/var/lib/postgres/15/forgejo";
+        #   # options = {
+        #   # Optional dataset configuration here
+        #   # };
+        # };
       };
     };
   };

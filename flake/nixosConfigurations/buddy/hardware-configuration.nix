@@ -1,4 +1,4 @@
-{ lib, ... }: {
+{ lib, config, ... }: {
   imports = [
     ./zfs.nix
   ];
@@ -20,6 +20,42 @@
   environment.variables.LD_LIBRARY_PATH = [
     "/run/opengl-driver/lib" # OpenGL shared libraries from graphics driver
   ];
+
+  # Don't setup /tmp in RAM, but backed by /var/tmp
+  fileSystems."/tmp" = {
+    depends = [ "/var/tmp" ];
+    device = "/var/tmp";
+    fsType = "none";
+    options = [ "rw" "noexec" "nosuid" "nodev" "bind" ];
+  };
+
+  disko.devices.zpool.storage.datasets = {
+    "cache" = {
+      type = "zfs_fs";
+      mountpoint = "/var/cache";
+      options.mountpoint = "legacy";
+    };
+
+    "log" = {
+      type = "zfs_fs";
+      mountpoint = "/var/log";
+      options.mountpoint = "legacy";
+    };
+  };
+
+  systemd.tmpfiles.settings."1-base-datasets" = {
+    # Make a root owned landing zone for backup data
+    "/persist" = {
+      # Create directory owned by root
+      d = {
+        user = config.users.users.root.name;
+        group = config.users.groups.root.name;
+        mode = "0700";
+      };
+      # Set ACL defaults
+      # "A+".argument = "group::r-X,other::---,mask::r-x,default:group::r-X,default:other::---,default:mask::r-X";
+    };
+  };
 
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   # NOTE; The hostId is a marker that prevents ZFS from importing pools coming from another system.
