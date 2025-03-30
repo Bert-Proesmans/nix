@@ -22,6 +22,7 @@
       # For building and introspection
       pkgs.nix-output-monitor
       pkgs.nix-fast-build
+      pkgs.jq
       # For secret material
       pkgs.sops
       pkgs.ssh-to-age

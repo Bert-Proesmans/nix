@@ -19,7 +19,7 @@ os.chdir(PROJECT_DIR)
 
 FLAKE = PROJECT_DIR / "flake"
 DOCS = PROJECT_DIR / "documentation"
-DEV_KEY = (FLAKE / "source" / "development.age").absolute()
+DEV_KEY = FLAKE / "development.age"
 
 
 def alert_finish():
@@ -148,7 +148,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
     Decrypts the secret used for sops-nix, deploys the machine, upload the secret to the host filesystem.
     """
 
-    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
 
     assert host_configuration_dir.is_dir(), f"""
@@ -294,7 +294,7 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
             "--json",
             f"{FLAKE}#host-facts",
             "--apply",
-            "builtins.mapAttrs (_: v: v.host-name)",
+           "builtins.mapAttrs (host: v: \"${host}.${v.domainName}\")",
         ],
         check=True,
         text=True,
@@ -304,9 +304,9 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
     machines = json.loads(text_machines)
     ssh_connection_string = next(
         (
-            moniker
+            host_name
             for moniker, host_name in machines.items()
-            if flake_attr == host_name or flake_attr == moniker
+            if flake_attr == moniker or host_name.startswith(flake_attr)
         ),
         None,
     )
@@ -364,9 +364,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             "nix",
             "eval",
             "--json",
-            f"{FLAKE}#host-facts",
+            f"{FLAKE}#facts",
             "--apply",
-            "builtins.mapAttrs (_: v: v.host-name)",
+            "builtins.mapAttrs (host: v: \"${host}.${v.domainName}\")",
         ],
         check=True,
         text=True,
@@ -376,9 +376,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     machines = json.loads(text_machines)
     ssh_connection_string = next(
         (
-            moniker
+            host_name
             for moniker, host_name in machines.items()
-            if flake_attr == host_name or flake_attr == moniker
+            if flake_attr == moniker or host_name.startswith(flake_attr)
         ),
         None,
     )

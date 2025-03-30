@@ -62,7 +62,8 @@
 
   systemd.network =
     let
-      managementMac = lib.mapAttrsToList (m: v: builtins.elem "management" v.tags) config.proesmans.facts.self.macAddresses;
+      managementMac = lib.mapAttrsToList (_: v: v.address)
+        (lib.filterAttrs (m: v: builtins.elem "management" v.tags) config.proesmans.facts.self.macAddresses);
     in
     {
       links = {
