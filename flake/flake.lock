@@ -1,5 +1,28 @@
 {
   "nodes": {
+    "crowdsec": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1742920128,
+        "narHash": "sha256-VPjnjtAksihLezhc+ZmnqGu18mHr4QVKa1kSZQ8rJL4=",
+        "ref": "refs/heads/main",
+        "rev": "40e937689d318ee85b1d9763189a65e6f0b4028d",
+        "revCount": 40,
+        "type": "git",
+        "url": "https://codeberg.org/kampka/nix-flake-crowdsec.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://codeberg.org/kampka/nix-flake-crowdsec.git"
+      }
+    },
     "devshell": {
       "inputs": {
         "nixpkgs": [
@@ -250,6 +273,7 @@
     },
     "root": {
       "inputs": {
+        "crowdsec": "crowdsec",
         "disko": "disko",
         "dns": "dns",
         "flake-utils": "flake-utils",

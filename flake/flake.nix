@@ -37,6 +37,9 @@
     nix-topology.url = "github:oddlama/nix-topology";
     nix-topology.inputs.nixpkgs.follows = "nixpkgs";
     nix-topology.inputs.flake-utils.follows = "flake-utils";
+    crowdsec.url = "git+https://codeberg.org/kampka/nix-flake-crowdsec.git";
+    crowdsec.inputs.nixpkgs.follows = "nixpkgs";
+    crowdsec.inputs.flake-utils.follows = "flake-utils";
   };
 
   outputs = { self, ... }:
