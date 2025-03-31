@@ -417,7 +417,7 @@ def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> 
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
     """
 
-    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / file
 
     assert host_configuration_dir.is_dir(), f"""
