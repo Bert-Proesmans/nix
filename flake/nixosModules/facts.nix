@@ -43,7 +43,7 @@
 
             macAddresses = lib.mkOption {
               description = "The MAC addresses that reach this host";
-              type = lib.types.attrsOf (lib.types.submodule ({ name, config, ... }: {
+              type = lib.types.attrsOf (lib.types.submodule ({ name, ... }: {
                 options = {
                   address = lib.mkOption {
                     description = ''
