@@ -3,7 +3,7 @@
   imports = [
     flake.profiles.hypervisor
     ./hardware-configuration.nix
-    # ./certificates.nix
+    ./certificates.nix
     # ./kanidm.nix
     # ./postgres.nix
     # ./immich.nix

@@ -8,8 +8,10 @@
     defaults = {
       email = "bproesmans@hotmail.com";
       dnsProvider = "cloudflare";
-      credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" = config.sops.secrets.cloudflare-proesmans-key.path;
+      # WARN; READ on all domains, because reasons .. cloudflare API etc
       credentialFiles."CLOUDFLARE_ZONE_API_TOKEN_FILE" = config.sops.secrets.cloudflare-zones-key.path;
+      # WARN; WRITE on proesmans.eu domain
+      credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" = config.sops.secrets.cloudflare-proesmans-key.path;
 
       # ERROR; The system resolver is very likely to implement a split-horizon DNS.
       # NOTE; Lego uses DNS requests within the certificate workflow. It must use an external DNS directly since
