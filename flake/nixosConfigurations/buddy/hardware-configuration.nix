@@ -18,6 +18,24 @@
   hardware.graphics.enable = true;
   hardware.enableRedistributableFirmware = true; # contains required amdgpu configuration blobs
 
+  systemd.tmpfiles.settings."hugepages" = {
+    "/sys/kernel/mm/transparent_hugepage/enabled".w = {
+      # Reduce random latency on defragmentation of memory pages.
+      # Only use explicit huge pages through madvice.. or
+      # Only use explicit huge pages through hugetblfs, see nr_hugepages.
+      argument = "madvise"; # enum
+    };
+
+    "/proc/sys/vm/nr_hugepages".w = {
+      # Set the amount of huge pages to use by the kernel
+      # HELP; Try to make pages available equal to the sum of your virtual machine guests, but this is not required per se
+      # and the hypervisor control should fall back to not hugepage memory.
+      #
+      # NOTE; At a default size of 2MB (unless adjusted), we're reserving 2GB of RAM.
+      argument = "1024"; # units
+    };
+  };
+
   environment.variables.LD_LIBRARY_PATH = [
     "/run/opengl-driver/lib" # OpenGL shared libraries from graphics driver
   ];

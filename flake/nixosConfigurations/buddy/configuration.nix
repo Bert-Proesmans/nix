@@ -5,6 +5,7 @@
     ./hardware-configuration.nix
     ./certificates.nix
     ./kanidm.nix
+    ./isolated-vm/configuration.nix
     # ./postgres.nix
     # ./immich.nix
     # ./nginx.nix
