@@ -1,4 +1,4 @@
-{ ... }: {
+{ flake, ... }: {
   systemd.tmpfiles.settings."hugepages" = {
     "/sys/kernel/mm/transparent_hugepage/enabled".w = {
       # Reduce random latency on defragmentation of memory pages.
@@ -24,6 +24,7 @@
       imports = [
         (modulesPath + "/profiles/minimal.nix") # Reduce closure size
         (modulesPath + "/profiles/hardened.nix") # ~~eeergh.. unsure if the ratio performance/security is worth it
+        flake.profiles.dns-server
       ];
 
       config = {
