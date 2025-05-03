@@ -1,6 +1,7 @@
 { lib, config, ... }: {
   imports = [
     ./zfs.nix
+    ./filesystems.nix
   ];
 
   # Define the platform type of the target configuration
@@ -20,43 +21,6 @@
   environment.variables.LD_LIBRARY_PATH = [
     "/run/opengl-driver/lib" # OpenGL shared libraries from graphics driver
   ];
-
-  # Don't setup /tmp in RAM, but backed by /var/tmp
-  fileSystems."/tmp" = {
-    depends = [ "/var/tmp" ];
-    device = "/var/tmp";
-    fsType = "none";
-    options = [ "rw" "noexec" "nosuid" "nodev" "bind" ];
-  };
-
-  disko.devices.zpool.storage.datasets = {
-    "cache" = {
-      type = "zfs_fs";
-      mountpoint = "/var/cache";
-      options.mountpoint = "legacy";
-    };
-
-    "log" = {
-      type = "zfs_fs";
-      mountpoint = "/var/log";
-      options.mountpoint = "legacy";
-    };
-  };
-
-  # TODO; Consolidate backup and move into separate configuration file
-  systemd.tmpfiles.settings."1-base-datasets" = {
-    # Make a root owned landing zone for backup data
-    "/persist" = {
-      # Create directory owned by root
-      d = {
-        user = config.users.users.root.name;
-        group = config.users.groups.root.name;
-        mode = "0700";
-      };
-      # Set ACL defaults
-      # "A+".argument = "group::r-X,other::---,mask::r-x,default:group::r-X,default:other::---,default:mask::r-X";
-    };
-  };
 
   networking = { inherit (config.proesmans.facts.self) hostId; };
 

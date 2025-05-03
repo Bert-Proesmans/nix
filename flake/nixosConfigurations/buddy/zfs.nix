@@ -379,8 +379,8 @@
         # Only change checksumming algorithm if dedup is a requirement!
         # HELP; Set blake3 (cryptographic hasher) for better clash resistance and when deduplication is activated.
         checksum = "fletcher4";
-        # NOTE; ZSTD-1 (minus 1, aka faster) mode, performs better compression with ballpark same throughput of LZ4.
-        # HELP; Doesn't require overwriting on sub-datasets
+        # NOTE; ZSTD-fast-1 (minus 1, aka faster) mode, performs better compression with ballpark same throughput of LZ4.
+        # HELP; Doesn't require overwriting on sub-datasets unless for specific data optimization
         compression = "zstd-fast-1";
         # NOTE; Since the storage location is central, granular access must be given to each directory within. Also virtio shares
         # require ACL enabled so just enable ACL for the entire storage set.
@@ -501,119 +501,8 @@
         exec = "off";
       };
 
-      # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will
-      # be automatically created (as nomount?).
-      datasets = {
-        # "backup" = {
-        #   # Filesystem for backup index storage
-        #   # TODO; tune, since now it's considered general purpose file storage
-        #   type = "zfs_fs";
-        #   options = {
-        #     canmount = "off";
-        #     mountpoint = "none";
-        #   };
-        # };
-
-        "media" = {
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "none";
-            # WARN; A larger maximum recordsize needs to be weighted agains acceptable latency.
-            # Back of enveloppe calculation for recordzise 16MiB;
-            #   - HDD seek time is ~10 ms, reading 16MiB is ~130ms.
-            #   - Records are split accross 2 disks (data + 1 parity (RAIDZ1)).
-            # => Each disk is held for 75ms PER record.
-            # This literally kills our IOPS (cut by factor 7) in contrast to 128kb (~11ms latency) on record miss.
-            # NOW.. an average NAS diskstation will have 150-250 ms latency, so is 700% latency difference _worst case_ really that bad?
-            #
-            # NOTE; Records are processed in full, aka full 16M in RAM, full 16M checksummed. A defect means a record is defected,
-            # meaning the full 16MB must be resilvered.
-            #
-            # NOTE; ~45ms for 10MiB aka 20-25 IOPS seems like an OK(?) situation. Thats (rounded up) about 25 media items loaded from the pool
-            # per second, or 10 media items per 400ms (target response latency of internet request).
-            # Pictures are smaller than 10MiB, up to a third, so the picture 
-            #
-            # HELP; Perform application caching as much as possible (AKA heavily virtualize into RAM).
-            # Lower the recordsize for latency, increase the recordsize for increased compression ratio.
-            #
-            # ERROR; recordsize must be power of 2 between 512B and 16M => It's not possible to pick 10, must be 8M or 16M!
-            recordsize = "8M"; # == Maximum recordsize
-            compression = "zstd-3";
-          };
-        };
-
-        "postgres" = {
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "none";
-            atime = "off";
-
-            # Performance notes for postgres itself;
-            #   - Disable database checksumming
-            #     - Checksumming is a necessity in HA clusters with timelines though (eg Patroni)
-            #   - Disable full_page_writes
-
-            # Postgres page size is fixed 8K (hardcoded). A bigger recordsize is more performant on reads, but not writes.
-            # Latency of any read under 1MiB is dominated by disk seek time (~10ms), so the choice of recordsize
-            # between 8K and 128K is basically meaningless (as long as it's a multiple of 8K).
-            recordsize = "32K";
-            # Assumes all postgres state fits in RAM, so no double caching of data files.
-            # Caches metadata for lower latency retrieval of non-cached records.
-            primarycache = "metadata";
-            # No fragmented writes from ZIL to data pool
-            logbias = "latency";
-          };
-        };
-
-        "sqlite" = {
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "none";
-            atime = "off";
-
-            # Performance notes for sqlite itself;
-            #   - Set page size to 64KiB
-            # SEEALSO; dataset options for postgres
-
-            recordsize = "64K";
-            primarycache = "metadata";
-            logbias = "latency";
-          };
-        };
-
-        "qemu" = {
-          # Default storage location for vm state data without specific requirements.
-          # NOTE; Qemu does its own application level caching on backing volume (cache=writeback by default)
-          # HELP; Create sub datasets to specialize storage behaviour to the application.
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "none";
-            atime = "off";
-            acltype = "off";
-
-            # Haven't done benchmarking to change away from the default
-            recordsize = "128K";
-            # Don't cache metadata because I expect infrequent reads and large write streams.
-            # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
-            primarycache = "none";
-          };
-        };
-
-        # Datasets are defined where they're used!
-        #
-        # eg
-        # "postgres/forgejo" = {
-        #   type = "zfs_fs";
-        #   options.mountpoint = "/var/lib/postgres/15/forgejo";
-        #   # options = {
-        #   # Optional dataset configuration here
-        #   # };
-        # };
-      };
+      # Datasets are filesystems, those are defined in ./filesystems.nix for readability.
+      datasets = { };
     };
   };
 
