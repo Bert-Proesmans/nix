@@ -4,7 +4,7 @@
     flake.profiles.hypervisor
     ./hardware-configuration.nix
     ./certificates.nix
-    # ./kanidm.nix
+    ./kanidm.nix
     # ./postgres.nix
     # ./immich.nix
     # ./nginx.nix

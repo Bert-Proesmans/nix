@@ -12,14 +12,22 @@
   };
 
   security.acme.certs."idm.proesmans.eu" = {
-    group = "kanidm";
-    reloadServices = [ config.systemd.services."kanidm".name ];
+    reloadServices = [ config.systemd.services.kanidm.name ];
+  };
+  systemd.services.kanidm.serviceConfig.SupplementaryGroups = [
+    # NOTE; ACME certs are accessible if you're part of a dedicated group!
+    config.security.acme.certs."idm.proesmans.eu".group
+  ];
+
+  disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
+    type = "zfs_fs";
+    options.mountpoint = "/var/lib/kanidm";
   };
 
   services.kanidm = {
     enableServer = true;
     enableClient = true;
-    package = pkgs.kanidm_1_4.withSecretProvisioning;
+    package = pkgs.kanidm_1_5.withSecretProvisioning;
 
     serverSettings = {
       bindaddress = "127.204.0.1:8443";
@@ -36,9 +44,9 @@
     };
 
     clientSettings = {
-      uri = config.services.kanidm.serverSettings.origin;
-      verify_hostnames = true;
-      verify_ca = true;
+      uri = "https://${config.services.kanidm.serverSettings.bindaddress}";
+      verify_hostnames = false;
+      verify_ca = false;
     };
 
     provision = {
