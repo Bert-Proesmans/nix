@@ -1,8 +1,4 @@
 { lib, ... }: {
-  imports = [
-    ./zfs.nix
-  ];
-
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 

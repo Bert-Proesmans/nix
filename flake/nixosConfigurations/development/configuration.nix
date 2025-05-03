@@ -1,10 +1,11 @@
 { pkgs, flake, ... }: {
 
   imports = [
+    ./hardware-configuration.nix
+    ./zfs.nix
+    ./wip.nix
     flake.profiles.virtual-machine
     flake.profiles.hypervisor
-    ./hardware-configuration.nix
-    ./wip.nix
   ];
 
   proesmans.filesystem.simple-disk.enable = false;

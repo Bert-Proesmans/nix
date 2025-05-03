@@ -1,8 +1,9 @@
 { flake, ... }: {
 
   imports = [
-    flake.profiles.hypervisor
     ./hardware-configuration.nix
+    ./zfs.nix
+    ./filesystems.nix
     ./certificates.nix
     ./kanidm.nix
     ./isolated-vm/configuration.nix
@@ -15,6 +16,7 @@
     # ./sso-vm.nix
     # ./photos-vm.nix
     # ./proxy-vm.nix
+    flake.profiles.hypervisor
   ];
 
   proesmans.internationalisation.be-azerty.enable = true;
