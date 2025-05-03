@@ -1,5 +1,4 @@
-{}: {
-
+{ ... }: {
   systemd.tmpfiles.settings."1-base-datasets" = {
     # "/persist" = {
     #   d = {
