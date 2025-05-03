@@ -3,6 +3,9 @@
   sops.secrets.cloudflare-proesmans-key = { };
   sops.secrets.cloudflare-zones-key = { };
 
+  users.groups.alpha-certs = { };
+  users.groups.idm-certs = { };
+
   security.acme = {
     acceptTerms = true;
     defaults = {
@@ -22,11 +25,13 @@
     certs."idm.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = "*.idm.proesmans.eu";
+      group = config.users.groups.idm-certs.name;
     };
 
     certs."alpha.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = "*.alpha.proesmans.eu";
+      group = config.users.groups.alpha-certs.name;
     };
   };
 }
