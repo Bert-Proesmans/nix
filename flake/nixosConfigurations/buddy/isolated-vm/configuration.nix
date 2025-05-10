@@ -5,7 +5,7 @@
     autostart = true;
     specialArgs = { inherit flake; };
     config = { lib, modulesPath, ... }: {
-      _file = ./default.nix;
+      _file = ./configuration.nix;
 
       imports = [
         (modulesPath + "/profiles/minimal.nix") # Reduce closure size
@@ -13,19 +13,19 @@
         ./routed-dns/configuration.nix
       ];
 
-      # Configure default root filesystem minimizing ram usage.
-      # NOTE; All required files for boot and configuration are within the /nix mount!
-      # What's left are temporary files, application logs and -artifacts, and to-persist application data.
-      fileSystems."/" = {
-        device = "rootfs";
-        fsType = "tmpfs";
-        options = [ "size=100M,mode=0755" ];
-        neededForBoot = true;
-      };
-
       config = {
         system.stateVersion = "24.11";
         nixpkgs.hostPlatform = lib.systems.examples.gnu64;
+
+        # Configure default root filesystem minimizing ram usage.
+        # NOTE; All required files for boot and configuration are within the /nix mount!
+        # What's left are temporary files, application logs and -artifacts, and to-persist application data.
+        fileSystems."/" = {
+          device = "rootfs";
+          fsType = "tmpfs";
+          options = [ "size=100M,mode=0755" ];
+          neededForBoot = true;
+        };
 
         microvm = {
           hypervisor = "cloud-hypervisor";
