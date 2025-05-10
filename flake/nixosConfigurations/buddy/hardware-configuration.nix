@@ -15,18 +15,25 @@
 
   systemd.tmpfiles.settings."hugepages" = {
     "/sys/kernel/mm/transparent_hugepage/enabled".w = {
-      # Reduce random latency on defragmentation of memory pages.
-      # Only use explicit huge pages through madvice.. or
-      # Only use explicit huge pages through hugetblfs, see nr_hugepages.
+      # [always] Always give out pages in size bigger than 4KiB.. or <= impacts latency on allocations due to dynamic compaction
+      # [madvise] Only give out explicit huge pages through madvice.. or
+      # [never] Only use explicit huge pages through hugetblfs, see nr_hugepages 
       argument = "madvise"; # enum
     };
 
+    # ERROR; CPU's can have hardware support for hugepages, so setting a custom size could reduce performance to gain less overhead
+    # losses. Only the last memory page in an allocation is _possibly_ not efficiently used, this is not worth optimizing.
+    # The default pagesize is set by the kernel to 2 mebibytes (MiB), a multiple of 4 kibibytes (KiB).
+    # SEEALSO; `cat /proc/meminfo | grep Hugepagesize`
+
     "/proc/sys/vm/nr_hugepages".w = {
-      # Set the amount of huge pages to use by the kernel
-      # HELP; Try to make pages available equal to the sum of your virtual machine guests, but this is not required per se
-      # and the hypervisor control should fall back to not hugepage memory.
+      # Set the size of static huge pages pool for the kernel to use
+      # HELP; Make pages available considering;
+      #  - The sum of RAM of your virtual machine guests
+      #     - cloud-hypervisor will fall back to non-huge pages if sufficient amount not available
+      #  - The sum of memory required for large scale data processing and memory mapped algorithms
       #
-      # NOTE; At a default size of 2MB (unless adjusted), we're reserving 2GB of RAM.
+      # NOTE; At a default size of 2MiB (unless adjusted), we're reserving 2GiB of RAM.
       argument = "1024"; # units
     };
   };
