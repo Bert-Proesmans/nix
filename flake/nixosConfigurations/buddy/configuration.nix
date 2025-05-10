@@ -7,6 +7,7 @@
     ./certificates.nix
     ./kanidm.nix
     ./isolated-vm/configuration.nix
+    ./proxy-vm/configuration.nix
     # ./postgres.nix
     # ./immich.nix
     # ./nginx.nix
