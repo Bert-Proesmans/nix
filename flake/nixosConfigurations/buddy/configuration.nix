@@ -2,7 +2,7 @@
 
   imports = [
     ./hardware-configuration.nix
-    ./zfs.nix
+    ./disks.nix
     ./filesystems.nix
     ./certificates.nix
     ./kanidm.nix
