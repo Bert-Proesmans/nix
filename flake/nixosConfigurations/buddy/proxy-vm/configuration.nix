@@ -1,7 +1,7 @@
 { flake, ... }: {
   # NOTE; Proxy here means this virtual machine is the ingress for all communication between clients and services on the hypervisor.
   microvm.vms."proxy" = {
-    autostart = true;
+    autostart = false;
     specialArgs = { inherit flake; };
     config = { lib, modulesPath, ... }: {
       _file = ./configuration.nix;
