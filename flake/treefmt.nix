@@ -14,10 +14,8 @@
   programs.mypy = {
     enable = true;
     directories = {
-      "tasks" = {
+      "flakeroot" = {
         directory = ".";
-        modules = [ ];
-        files = [ "**/tasks.py" ];
         extraPythonPackages =
           [ pkgs.python3.pkgs.deploykit pkgs.python3.pkgs.invoke ];
       };
