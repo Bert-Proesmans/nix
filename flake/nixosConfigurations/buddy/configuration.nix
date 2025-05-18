@@ -5,7 +5,9 @@
     ./disks.nix
     ./filesystems.nix
     ./certificates.nix
+    ./database.nix
     ./kanidm.nix
+    ./pictures.nix
     ./isolated-vm/configuration.nix
     ./proxy-vm/configuration.nix
     # ./postgres.nix

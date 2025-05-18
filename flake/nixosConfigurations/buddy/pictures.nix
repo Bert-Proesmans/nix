@@ -1,0 +1,182 @@
+{ lib, pkgs, config, ... }:
+let
+  immichStatePath = "/var/lib/immich";
+  # ERROR; Immich machine learning service is already using '/var/cache/immich'
+  immichCachePath = "/var/cache/immich-server";
+in
+{
+  assertions =
+    let
+      # NOTE; This is supposed to throw an error if extension pgvecto-rs is missing.
+      pgVectors = lib.findFirst (x: x.pname == "pgvecto-rs") null config.services.postgresql.finalPackage.installedExtensions;
+    in
+    [
+      {
+        assertion = (builtins.compareVersions pgVectors.version "0.4.0") == -1;
+        message = ''
+          Version of 'pgvecto-rs' must remain below 0.4.0, detected version is '${pgVectors.version}.
+        '';
+      }
+    ];
+
+  # @@ IMMICH media location @@
+  # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
+  # "library" => Originals are stored here => main dataset
+  # "profile" => Original profile images are stored here => main dataset
+  # "thumbs" => re-encoded material => cache dataset
+  # "encoded-video" => re-encoded material => cache dataset
+  # "upload" => uploaded fragments => /var/tmp
+  # "backups" => currently disabled, could mount a remote fs into this location one day
+  #
+  # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
+  # The state directory will point to the storage pool dataset, and symlink will be written to other directory locations.
+  disko.devices.zpool.storage.datasets = {
+    "media/immich/originals" = {
+      type = "zfs_fs";
+      # WARN; To be backed up !
+      options.mountpoint = immichStatePath;
+    };
+
+    "media/immich/cache" = {
+      type = "zfs_fs";
+      # NOTE; Backup not necessary, can be regenerated
+      options.mountpoint = immichCachePath;
+    };
+  };
+
+  systemd.tmpfiles.settings."immich-external-libraries" = {
+    # TODO
+  };
+
+  services.immich = {
+    enable = true;
+    host = "127.175.0.1";
+    port = 8080;
+    openFirewall = false; # Use reverse proxy
+    mediaLocation = immichStatePath;
+
+    redis.enable = true;
+    database = {
+      enable = true;
+      name = "immich";
+      createDB = true;
+    };
+
+    environment.TZ = "Europe/Brussels"; # Used for interpreting timestamps without time zone
+
+    machine-learning = {
+      enable = true;
+      environment = {
+        IMMICH_HOST = lib.mkForce "127.175.0.99"; # Upstream overwrite
+        IMMICH_PORT = lib.mkForce "3003"; # Upstream overwrite
+        # Redirect temporary files to disk-backed temporary folder.
+        TMPDIR = "/var/tmp";
+      };
+    };
+
+    settings = {
+      backup.database.enabled = false;
+      ffmpeg = {
+        accel = "disabled";
+        acceptedAudioCodecs = [ "aac" "libopus" ];
+        acceptedVideoCodecs = [ "h264" "av1" ];
+      };
+      image.preview.size = 1080;
+      library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00
+      library.scan.enabled = true;
+      logging.enabled = true;
+      logging.level = "log";
+      machineLearning.facialRecognition = {
+        enabled = true;
+        maxDistance = 0.45;
+        minFaces = 5;
+      };
+      machineLearning.urls = [ "http://127.175.0.99:3003" ];
+      map.darkStyle = "https://tiles.immich.cloud/v1/style/dark.json";
+      map.enabled = true;
+      map.lightStyle = "https://tiles.immich.cloud/v1/style/light.json";
+      newVersionCheck.enabled = false;
+      notifications.smtp.enabled = false;
+      oauth = {
+        enabled = true;
+        autoRegister = true;
+        buttonText = "Login with proesmans account";
+        clientId = "photos";
+        # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
+        clientSecret = config.sops.placeholder.immich-oauth-secret;
+        defaultStorageQuota = 500;
+        issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
+        mobileOverrideEnabled = false;
+        mobileRedirectUri = "";
+        profileSigningAlgorithm = "none";
+        scope = "openid email profile";
+        signingAlgorithm = "RS256";
+        # NOTE; Immich currently ONLY applies these claims during account creation!
+        storageLabelClaim = "immich_label";
+        storageQuotaClaim = "immich_quota";
+      };
+      passwordLogin.enabled = true;
+      reverseGeocoding.enabled = true;
+      server.externalDomain = "https://photos.alpha.proesmans.eu";
+      server.loginPageMessage = "Proesmans Photos system, proceed by clicking the button at the bottom";
+      server.publicUsers = true;
+      storageTemplate.enabled = true;
+      # 2024/2024-12[-06][ Sinterklaas]/IMG_001.jpg
+      storageTemplate.template = "{{y}}/{{y}}-{{MM}}{{#if dd}}-{{dd}}{{else}}{{/if}}{{#if album}} {{{album}}}{{else}}{{/if}}/{{{filename}}}";
+      trash.days = 200;
+      trash.enabled = true;
+      user.deleteDelay = 30;
+    };
+  };
+
+  # ERROR; Upstream did not make configuring oauth2 secrets composeable.
+  # The immich configuration settings is configured as 'SOPS template'. At system activation, the placeholders inside the template
+  # will be overwritten with secret values.
+  sops.templates."immich-config.json" = {
+    file = (pkgs.formats.json { }).generate "immich.json" config.services.immich.settings;
+    owner = "immich";
+    restartUnits = [ config.systemd.services.immich-server.name ];
+  };
+
+  systemd.services.immich-server = lib.mkIf config.services.immich.enable {
+    # Force apply the configuration with overwritten secret data
+    environment.IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
+
+    unitConfig.RequiresMountsFor = [ immichStatePath immichCachePath ];
+    serviceConfig = {
+      StateDirectory = let relativeRoot = lib.removePrefix "/var/lib/" immichStatePath; in [
+        "" # Reset
+        relativeRoot
+        "${relativeRoot}/library"
+        "${relativeRoot}/profile"
+      ];
+      CacheDirectory = let relativeRoot = lib.removePrefix "/var/cache/" immichCachePath; in [
+        "" # Reset
+        relativeRoot
+        "${relativeRoot}/thumbs:${immichStatePath}/thumbs"
+        "${relativeRoot}/encoded-video:${immichStatePath}/encoded-video"
+      ];
+      ExecStartPre =
+        let
+          # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath' 
+          # while its contents remain 100% persistent. Not all directory contents are fully persisted to optimize disk space usage.
+          setupUploadsPath = pkgs.writeShellApplication {
+            name = "setup-immich-uploads";
+            runtimeInputs = [ pkgs.coreutils ];
+            text = ''
+              # NOTE; Script must run as immich user!
+
+              SOURCE="''${TMPDIR:-/var/tmp}"
+              mkdir --parents "$SOURCE/upload"
+              # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
+              # the immich startup check.
+              touch "$SOURCE/upload/.immich"
+              ln --symbolic --force "$SOURCE/upload" "${immichStatePath}/upload"
+            '';
+          };
+        in
+        [ (lib.getExe setupUploadsPath) ];
+    };
+  };
+}
+
