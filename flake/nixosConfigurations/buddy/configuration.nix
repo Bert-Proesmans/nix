@@ -6,7 +6,7 @@
     ./filesystems.nix
     ./certificates.nix
     ./database.nix
-    ./kanidm.nix
+    ./identity.nix
     ./pictures.nix
     ./isolated-vm/configuration.nix
     ./proxy-vm/configuration.nix

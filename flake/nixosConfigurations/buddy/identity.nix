@@ -1,27 +1,35 @@
-# Setup identity management (Idm)
-{ pkgs, config, ... }: {
-  sops.secrets.idm_admin-password = {
-    owner = "kanidm";
-  };
-
-  sops.secrets.immich-oauth-secret = {
-    # ERROR; Value must be generated using command:
-    # tr --complement --delete 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkpqrstuvwxyz0123456789' < /dev/urandom | head --bytes 48
-    owner = "kanidm";
-    restartUnits = [ config.systemd.services.kanidm.name ];
+{ lib, pkgs, config, ... }:
+let
+  # WARN; kanidm database filepath is fixed and cannot be changed!
+  kanidmStatePath = builtins.dirOf config.services.kanidm.serverSettings.db_path;
+in
+{
+  sops.secrets = {
+    idm_admin-password.owner = "kanidm";
+    immich-oauth-secret = {
+      # ERROR; Immich does not properly URL-encode oauth secret value!
+      # WORKAROUND; Value must be generated using command:
+      #   tr --complement --delete 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkpqrstuvwxyz0123456789' < /dev/urandom | head --bytes 48
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
   };
 
   security.acme.certs."idm.proesmans.eu" = {
     reloadServices = [ config.systemd.services.kanidm.name ];
   };
-  systemd.services.kanidm.serviceConfig.SupplementaryGroups = [
-    # NOTE; ACME certs are accessible if you're part of a dedicated group!
-    config.security.acme.certs."idm.proesmans.eu".group
-  ];
+
+  systemd.services.kanidm = {
+    serviceConfig.SupplementaryGroups = [
+      # NOTE; ACME certs are only accessible if you're part of the dedicated group!
+      config.security.acme.certs."idm.proesmans.eu".group
+    ];
+  };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
     type = "zfs_fs";
-    options.mountpoint = "/var/lib/kanidm";
+    # WARN; To be backed up !
+    options.mountpoint = kanidmStatePath;
   };
 
   # Redirect Kanidm traffic to nginx proxy
@@ -109,7 +117,7 @@
           };
           "immich_quota" = {
             joinType = "ssv"; # Immich requires a string type
-            valuesByGroup."immich.quota.large" = [ "500" ]; # 500GB storage
+            valuesByGroup."immich.quota.large" = [ "1000" ]; # 1000GB storage
           };
         };
       };
