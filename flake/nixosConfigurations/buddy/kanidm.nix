@@ -24,6 +24,11 @@
     options.mountpoint = "/var/lib/kanidm";
   };
 
+  # Redirect Kanidm traffic to nginx proxy
+  networking.extraHosts = ''
+    127.0.0.1 ${lib.removePrefix "https://" config.services.kanidm.serverSettings.origin}
+  '';
+
   services.kanidm = {
     enableServer = true;
     enableClient = true;
@@ -44,17 +49,16 @@
     };
 
     clientSettings = {
-      uri = "https://${config.services.kanidm.serverSettings.bindaddress}";
-      verify_hostnames = false;
-      verify_ca = false;
+      uri = config.services.kanidm.serverSettings.origin;
+      verify_hostnames = true;
+      verify_ca = true;
     };
 
     provision = {
       enable = true;
-      instanceUrl = "https://${config.services.kanidm.serverSettings.bindaddress}";
+      instanceUrl = config.services.kanidm.serverSettings.origin;
       idmAdminPasswordFile = config.sops.secrets.idm_admin-password.path;
-      # ERROR; Certificate is bound to DNS name won't validate for IP address
-      acceptInvalidCerts = true;
+      acceptInvalidCerts = false;
 
       autoRemove = true;
       groups = {
