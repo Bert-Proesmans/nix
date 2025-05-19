@@ -1,5 +1,10 @@
-{ ... }: {
+{ lib, pkgs, config, ... }: {
   networking.firewall.allowedTCPPorts = [ 80 443 ];
+
+  # Must be member of cert-group to get access to the certs
+  # NOTE; root also required because that's the service user for nginx-config-reload.
+  users.groups.alpha-certs.members = [ "root" "nginx" ];
+
   services.nginx = {
     enable = true;
     recommendedOptimisation = true;
@@ -48,7 +53,7 @@
     # eg "upstreams" can be configured within http block, but also stream block etc
 
     upstreams = {
-      photos-upstream.servers."unix:/run/nginx/does-not-exist.vsock" = { };
+      photos-upstream.servers."${config.services.immich.host}:${toString config.services.immich.port}" = { };
     };
 
     defaultListen = [

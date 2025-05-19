@@ -5,20 +5,14 @@
     ./disks.nix
     ./filesystems.nix
     ./certificates.nix
+    ./tls-termination.nix
     ./database.nix
     ./identity.nix
     ./pictures.nix
     ./isolated-vm/configuration.nix
     ./proxy-vm/configuration.nix
-    # ./postgres.nix
-    # ./immich.nix
-    # ./nginx.nix
     # ./virtualgl.nix
     # ./backblaze-backup/default.nix
-    # ./dns-vm.nix
-    # ./sso-vm.nix
-    # ./photos-vm.nix
-    # ./proxy-vm.nix
     flake.profiles.hypervisor
   ];
 
