@@ -153,8 +153,8 @@ in
       CacheDirectory = let relativeRoot = lib.removePrefix "/var/cache/" immichCachePath; in [
         "" # Reset
         relativeRoot
-        "${relativeRoot}/thumbs:${immichStatePath}/thumbs"
-        "${relativeRoot}/encoded-video:${immichStatePath}/encoded-video"
+        "${relativeRoot}/thumbs"
+        "${relativeRoot}/encoded-video"
       ];
       ExecStartPre =
         let
@@ -174,8 +174,23 @@ in
               ln --symbolic --force "$SOURCE/upload" "${immichStatePath}/upload"
             '';
           };
+          setupCachePath = pkgs.writeShellApplication {
+            name = "setup-immich-cache";
+            runtimeInputs = [ pkgs.coreutils ];
+            text = ''
+              # NOTE; Script must run as immich user!
+
+              SOURCE="${immichCachePath}"
+              mkdir --parents "$SOURCE/{thumbs,encoded-video}"
+              # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
+              # the immich startup check.
+              touch "$SOURCE/{thumbs,encoded-video}/.immich"
+              ln --symbolic --force "$SOURCE/thumbs" "${immichStatePath}/thumbs"
+              ln --symbolic --force "$SOURCE/encoded-video" "${immichStatePath}/encoded-video"
+            '';
+          };
         in
-        [ (lib.getExe setupUploadsPath) ];
+        [ (lib.getExe setupUploadsPath) (lib.getExe setupCachePath) ];
     };
   };
 }
