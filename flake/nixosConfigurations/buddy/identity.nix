@@ -18,12 +18,11 @@ in
   security.acme.certs."idm.proesmans.eu" = {
     reloadServices = [ config.systemd.services.kanidm.name ];
   };
-
+  users.groups.idm-certs.members = [ "kanidm" ];
   systemd.services.kanidm = {
-    serviceConfig.SupplementaryGroups = [
-      # NOTE; ACME certs are only accessible if you're part of the dedicated group!
-      config.security.acme.certs."idm.proesmans.eu".group
-    ];
+    wants = [ "acme-finished-idm.proesmans.eu.target" ];
+    after = [ "acme-selfsigned-idm.proesmans.eu.service" "acme-idm.proesmans.eu.service" ];
+    serviceConfig.RuntimeDirectory = [ "kanidm" ];
   };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
@@ -40,7 +39,7 @@ in
   services.kanidm = {
     enableServer = true;
     enableClient = true;
-    package = pkgs.kanidm_1_5.withSecretProvisioning;
+    package = pkgs.kanidm_1_6.withSecretProvisioning;
 
     serverSettings = {
       bindaddress = "127.204.0.1:8443";
@@ -50,7 +49,8 @@ in
       db_fs_type = "zfs"; # Changes page size to 64K
       role = "WriteReplica";
       online_backup.enabled = false;
-      trust_x_forward_for = true;
+      trust_x_forward_for = false;
+      log_level = "debug";
 
       tls_chain = config.security.acme.certs."idm.proesmans.eu".directory + "/fullchain.pem";
       tls_key = config.security.acme.certs."idm.proesmans.eu".directory + "/key.pem";
