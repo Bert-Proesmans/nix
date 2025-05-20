@@ -22,7 +22,11 @@ in
   systemd.services.kanidm = {
     wants = [ "acme-finished-idm.proesmans.eu.target" ];
     after = [ "acme-selfsigned-idm.proesmans.eu.service" "acme-idm.proesmans.eu.service" ];
+
+    # FIX; https://github.com/NixOS/nixpkgs/issues/408875
     serviceConfig.RuntimeDirectory = [ "kanidm" ];
+    # FIX; https://github.com/NixOS/nixpkgs/pull/409184
+    serviceConfig.BindReadOnlyPaths = [ "/etc/ssl" "/etc/static/ssl" ];
   };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
@@ -50,7 +54,7 @@ in
       role = "WriteReplica";
       online_backup.enabled = false;
       trust_x_forward_for = false;
-      log_level = "debug";
+      # log_level = "debug";
 
       tls_chain = config.security.acme.certs."idm.proesmans.eu".directory + "/fullchain.pem";
       tls_key = config.security.acme.certs."idm.proesmans.eu".directory + "/key.pem";
