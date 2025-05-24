@@ -106,8 +106,6 @@ in
           "app.immich:///oauth-callback" # "app.immich:///" (??)
         ];
         preferShortUsername = true;
-        # PKCE is currently not supported by immich
-        allowInsecureClientDisablePkce = true;
         # RS256 is used instead of ES256 so additionally we need legacy crypto
         enableLegacyCrypto = true;
         scopeMaps."immich.access" = [ "openid" "email" "profile" ];
