@@ -132,9 +132,10 @@ def sops_files_update(c: Any) -> None:
 
     subprocess.run(
         """
-        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.yaml' \\) -print0 | \
+        find . -type f \\( -iname '*.encrypted.yaml' -o -iname '*.encrypted.json' \\) -print0 | \
         xargs -0 -n1 sops updatekeys --yes
         """,
+        cwd=FLAKE,
         env=environment,
         shell=True,
         check=True,
@@ -411,8 +412,13 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
 
 
 @task
-# USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"]
-def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> None:
+# USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"] [--forceBinary]
+def secret_edit(
+    c: Any,
+    hostname: str,
+    file: str = "secrets.encrypted.yaml",
+    forceBinary: bool = False,
+) -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
     """
@@ -425,7 +431,9 @@ def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> 
         Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    assert encrypted_file.name.endswith("encrypted.yaml"), """
+    assert encrypted_file.name.endswith(
+        "encrypted.yaml"
+    ) or encrypted_file.name.endswith("encrypted.json"), """
         The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
         Update the provided path argument to align with the convention!
     """
@@ -435,7 +443,16 @@ def secret_edit(c: Any, hostname: str, file: str = "secrets.encrypted.yaml") -> 
     environment["SOPS_AGE_KEY"] = dev_key_decrypt()
 
     result = subprocess.run(
-        ["sops", encrypted_file.as_posix()],
+        [
+            "sops",
+            *(
+                ["--input-type", "binary", "--output-type", "binary"]
+                if forceBinary
+                else []
+            ),
+            encrypted_file.as_posix(),
+        ],
+        cwd=FLAKE,
         env=environment,
         # check=True, # Only verifies exit code 0
     )

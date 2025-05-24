@@ -32,19 +32,19 @@ creation_rules:
       - age:
           - *development_key
   
-  - path_regex: nixosConfigurations/buddy/[^/]+\.encrypted\.yaml$
+  - path_regex: nixosConfigurations/buddy/[^/]+\.encrypted\.(yaml|json)$
     key_groups:
       - age:
           - *buddy_decryptor
           - *development_key
 
-  - path_regex: nixosConfigurations/development/[^/]+\.encrypted\.yaml$
+  - path_regex: nixosConfigurations/development/[^/]+\.encrypted\.(yaml|json)$
     key_groups:
       - age:
           - *development_decryptor
           - *development_key
 
-  - path_regex: nixosConfigurations/fart/[^/]+\.encrypted\.yaml$
+  - path_regex: nixosConfigurations/fart/[^/]+\.encrypted\.(yaml|json)$
     key_groups:
       - age:
           - *fart_decryptor
