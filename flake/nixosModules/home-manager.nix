@@ -18,9 +18,5 @@ in
     home-manager.useUserPackages = true;
     # Follow the system nix configuration instead of building/using a parallel index
     home-manager.useGlobalPkgs = true;
-
-    # PR; https://github.com/nix-community/home-manager/pull/6622
-    # home-manager.users = builtins.intersectAttrs (lib.filterAttrs (_: v: v.isNormalUser) config.users.users) flake.outputs.homeModules.users;
-    home-manager.users.bert-proesmans = flake.outputs.homeModules.users.bert-proesmans;
   });
 }

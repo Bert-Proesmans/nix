@@ -16,6 +16,11 @@
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   proesmans.sopsSecrets.sshHostkeyControl.enable = true;
   proesmans.home-manager.enable = true;
+  # PR; https://github.com/nix-community/home-manager/pull/6622
+  # home-manager.users = builtins.intersectAttrs (lib.filterAttrs (_: v: v.isNormalUser) config.users.users) flake.outputs.homeModules.users;
+  home-manager.users = {
+    inherit (flake.outputs.homeModules.users) bert-proesmans;
+  };
   proesmans.vscode.enable = true;
   proesmans.vscode.nix-dependencies.enable = true;
 
