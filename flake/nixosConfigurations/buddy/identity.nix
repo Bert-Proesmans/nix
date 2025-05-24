@@ -10,6 +10,28 @@ in
     # 1. kanidm login -D idm_admin
     # 2. kanidm person credential create-reset-token bert-proesmans --name idm_admin
     idm_admin-password.owner = "kanidm";
+
+    # Hold additional personal data.
+    kanidm-extra = {
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+      # WARN; The json structure leaks personal information!
+      # The whole json file is encrypted, instead of only json values.
+      format = "binary";
+      sopsFile = ./kanidm-extra.encrypted.json;
+      # EXAMPLE;
+      # {
+      #   "persons": {
+      #     "<username>": {
+      #       "displayName": "<name>",
+      #       "groups": [ "<name>" ],
+      #       "legalName": null,
+      #       "mailAddresses": [ "<email>" ],
+      #       "present": true
+      #     }
+      # }
+    };
+
     immich-oauth-secret = {
       # ERROR; Immich does not properly URL-encode oauth secret value!
       # WORKAROUND; Value must be generated using command:
@@ -73,6 +95,7 @@ in
       idmAdminPasswordFile = config.sops.secrets.idm_admin-password.path;
       acceptInvalidCerts = false;
 
+      extraJsonFile = config.sops.secrets.kanidm-extra.path;
       autoRemove = true;
       groups = {
         "idm_service_desk" = { }; # Builtin
