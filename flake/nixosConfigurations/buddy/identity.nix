@@ -22,9 +22,6 @@ in
   systemd.services.kanidm = {
     wants = [ "acme-finished-idm.proesmans.eu.target" ];
     after = [ "acme-selfsigned-idm.proesmans.eu.service" "acme-idm.proesmans.eu.service" ];
-
-    # FIX; https://github.com/NixOS/nixpkgs/issues/408875
-    serviceConfig.RuntimeDirectory = [ "kanidm" ];
     # FIX; https://github.com/NixOS/nixpkgs/pull/409184
     serviceConfig.BindReadOnlyPaths = [ "/etc/ssl" "/etc/static/ssl" ];
   };
