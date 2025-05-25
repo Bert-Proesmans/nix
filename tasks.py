@@ -293,7 +293,7 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
             "nix",
             "eval",
             "--json",
-            f"{FLAKE}#host-facts",
+            f"{FLAKE}#facts",
             "--apply",
             'builtins.mapAttrs (host: v: "${host}.${v.domainName}")',
         ],

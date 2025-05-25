@@ -3,6 +3,8 @@ let
   immichStatePath = "/var/lib/immich";
   # ERROR; Immich machine learning service is already using '/var/cache/immich'
   immichCachePath = "/var/cache/immich-server";
+  # Location for external libraries
+  immichExternalStatePath = "/var/lib/immich-external";
 in
 {
   assertions =
@@ -28,6 +30,9 @@ in
   # "upload" => uploaded fragments => /var/tmp
   # "backups" => currently disabled, could mount a remote fs into this location one day
   #
+  # NOTE; External libraries can be located anywhere, as long as the immich service user has read access. Prefer to make these location
+  # read-only.
+  #
   # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
   # The state directory will point to the storage pool dataset, and symlink will be written to other directory locations.
   disko.devices.zpool.storage.datasets = {
@@ -35,6 +40,12 @@ in
       type = "zfs_fs";
       # WARN; To be backed up !
       options.mountpoint = immichStatePath;
+    };
+
+    "media/immich/external" = {
+      type = "zfs_fs";
+      # WARN; To be backed up !
+      options.mountpoint = immichExternalStatePath;
     };
 
     "media/immich/cache" = {
@@ -142,14 +153,21 @@ in
     # Force apply the configuration with overwritten secret data
     environment.IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
 
-    unitConfig.RequiresMountsFor = [ immichStatePath immichCachePath ];
+    unitConfig.RequiresMountsFor = [ immichStatePath immichCachePath immichExternalStatePath ];
     serviceConfig = {
-      StateDirectory = let relativeRoot = lib.removePrefix "/var/lib/" immichStatePath; in [
-        "" # Reset
-        relativeRoot
-        "${relativeRoot}/library"
-        "${relativeRoot}/profile"
-      ];
+      StateDirectory =
+        let
+          relativeRoot = lib.removePrefix "/var/lib/" immichStatePath;
+          externalRoot = lib.removePrefix "/var/lib/" immichExternalStatePath;
+        in
+        [
+          "" # Reset
+          relativeRoot
+          "${relativeRoot}/library"
+          "${relativeRoot}/profile"
+          # External library location, make read-only
+          "${externalRoot}::ro"
+        ];
       CacheDirectory = let relativeRoot = lib.removePrefix "/var/cache/" immichCachePath; in [
         "" # Reset
         relativeRoot
