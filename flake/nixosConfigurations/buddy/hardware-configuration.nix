@@ -1,4 +1,4 @@
-{ lib, config, ... }: {
+{ lib, pkgs, config, ... }: {
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
@@ -12,6 +12,36 @@
   # If AMDVLK is required, see https://wiki.nixos.org/wiki/AMD_GPU
   hardware.graphics.enable = true;
   hardware.enableRedistributableFirmware = true; # contains required amdgpu configuration blobs
+  hardware.graphics.extraPackages = [
+    # All hardware acceleration packages should have been included already (delivered by MESA)
+    # sudo vainfo --display drm --device /dev/dri/renderD128
+    # Trying display: drm
+    # libva info: VA-API version 1.22.0
+    # libva info: Trying to open /run/opengl-driver/lib/dri/radeonsi_drv_video.so
+    # libva info: Found init function __vaDriverInit_1_22
+    # libva info: va_openDriver() returns 0
+    # vainfo: VA-API version: 1.22 (libva 2.22.0)
+    # vainfo: Driver version: Mesa Gallium driver 25.0.6 for AMD Radeon Vega 3 Graphics (radeonsi, raven, ACO, DRM 3.61, 6.12.29)
+    # vainfo: Supported profile and entrypoints
+    #       VAProfileMPEG2Simple            : VAEntrypointVLD
+    #       VAProfileMPEG2Main              : VAEntrypointVLD
+    #       VAProfileVC1Simple              : VAEntrypointVLD
+    #       VAProfileVC1Main                : VAEntrypointVLD
+    #       VAProfileVC1Advanced            : VAEntrypointVLD
+    #       VAProfileH264ConstrainedBaseline: VAEntrypointVLD
+    #       VAProfileH264ConstrainedBaseline: VAEntrypointEncSlice
+    #       VAProfileH264Main               : VAEntrypointVLD
+    #       VAProfileH264Main               : VAEntrypointEncSlice
+    #       VAProfileH264High               : VAEntrypointVLD
+    #       VAProfileH264High               : VAEntrypointEncSlice
+    #       VAProfileHEVCMain               : VAEntrypointVLD
+    #       VAProfileHEVCMain               : VAEntrypointEncSlice <- Can hardware accelerated encode into HEVC
+    #       VAProfileHEVCMain10             : VAEntrypointVLD
+    #       VAProfileJPEGBaseline           : VAEntrypointVLD
+    #       VAProfileVP9Profile0            : VAEntrypointVLD
+    #       VAProfileVP9Profile2            : VAEntrypointVLD
+    #       VAProfileNone                   : VAEntrypointVideoProc
+  ];
 
   systemd.tmpfiles.settings."hugepages" = {
     "/sys/kernel/mm/transparent_hugepage/enabled".w = {

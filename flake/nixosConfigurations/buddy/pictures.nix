@@ -65,6 +65,7 @@ in
     port = 8080;
     openFirewall = false; # Use reverse proxy
     mediaLocation = immichStatePath;
+    accelerationDevices = [ "/dev/dri/renderD128" ];
 
     redis.enable = true;
     database = {
@@ -88,9 +89,30 @@ in
     settings = {
       backup.database.enabled = false;
       ffmpeg = {
-        accel = "disabled";
+        accel = "vaapi";
+        accelDecode = true;
+        preferredHwDevice = "renderD128"; # /dev/dri node
+        cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
+        targetAudioCodec = "aac"; # optimized for device compatibility
+        targetResolution = "720"; # 720p, optimized for filesize
+        targetVideoCodec = "hevc"; # optimized for device compatibility
+        crf = 28; # Fidelity/Time factor, chosen for hevc, optimized for speed
+        maxBitrate = "2800"; # kb/s absolute maximum for 720p (range 2000-4000)
+        twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)
+
+        transcode = "optimal"; # Transcode above target resolution or non-accepted codec/container
         acceptedAudioCodecs = [ "aac" "libopus" ];
-        acceptedVideoCodecs = [ "h264" "av1" ];
+        acceptedVideoCodecs = [
+          "h264"
+          "hevc"
+          #"vp9" # Too new, optimized for device support
+          #"av1" # Too new, optimized for device support
+        ];
+        acceptedContainers = [
+          #"mov" # Apple specific, optimized for device support
+          #"ogg" # Too niche, optimized for device support
+          #"webm" # Too new (links to vp9/av1), optimized for device support
+        ];
       };
       image.preview.size = 1080;
       library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00
@@ -155,6 +177,10 @@ in
 
     unitConfig.RequiresMountsFor = [ immichStatePath immichCachePath immichExternalStatePath ];
     serviceConfig = {
+      SupplementaryGroups = [
+        # Required for hardware accelerated video transcoding
+        config.users.groups.render.name
+      ];
       StateDirectory =
         let
           relativeRoot = lib.removePrefix "/var/lib/" immichStatePath;
