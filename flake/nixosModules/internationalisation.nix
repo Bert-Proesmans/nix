@@ -12,7 +12,7 @@ in
 
     i18n = {
       defaultLocale = lib.mkDefault "en_GB.UTF-8";
-      supportedLocales = [
+      extraLocales = [
         "en_GB.UTF-8/UTF-8"
         "nl_BE.UTF-8/UTF-8"
       ];
