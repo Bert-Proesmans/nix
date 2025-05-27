@@ -2,7 +2,7 @@
   services.sanoid = {
     enable = true;
     # WARN; At DST transition we _still_ lose one hour worth of backup due to snapshot naming collisions!
-    interval = "*:00/1:00 UTC";
+    interval = "*:00/15:00 UTC";
 
     templates."default" = {
       autosnap = true;
