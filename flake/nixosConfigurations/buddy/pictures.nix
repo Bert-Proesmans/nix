@@ -119,10 +119,17 @@ in
       library.scan.enabled = true;
       logging.enabled = true;
       logging.level = "log";
+      machineLearning.clip = {
+        enabled = true;
+        # Model optimized for good recall/time ratio in Dutch and English
+        modelName = "ViT-B-16-SigLIP2__webli";
+      };
       machineLearning.facialRecognition = {
         enabled = true;
         maxDistance = 0.45;
         minFaces = 5;
+        # Changed model requires recognizing _all_ detected faces again (docs say restart face detection??)
+        modelName = "buffalo_l"; # Default Immich v1.132+
       };
       machineLearning.urls = [ "http://127.175.0.99:3003" ];
       map.darkStyle = "https://tiles.immich.cloud/v1/style/dark.json";
