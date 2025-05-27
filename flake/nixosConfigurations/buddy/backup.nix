@@ -7,7 +7,7 @@
     datasets = {
       "storage" = {
         autosnap = true;
-        autoprun = true;
+        autoprune = true;
         recursive = true; # NOT ATOMIC
 
         frequently = 0; # none
@@ -26,7 +26,6 @@
         hourly = 168; # 7 days @ 1 hour
         daily = 90; # 3 months @ 1 day
         # No week/month capture
-        # TODO
       };
 
       # NOTE; Full atomic snapshot for instant recovery
@@ -40,11 +39,12 @@
         hourly = 168; # 7 days @ 1 hour
         daily = 90; # 3 months @ 1 day
         # No week/month capture
-        # TODO
       };
     };
   };
 
   # WARN; At DST transition we _still_ lose one hour worth of backup due to snapshot naming collisions!
   systemd.services.sanoid.environment.TZ = "UTC";
+
+  # TODO; Actually backup these snapshots!
 }
