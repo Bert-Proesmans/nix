@@ -4,40 +4,60 @@
     # WARN; At DST transition we _still_ lose one hour worth of backup due to snapshot naming collisions!
     interval = "*:00/1:00 UTC";
 
+    templates."default" = {
+      autosnap = true;
+      autoprune = true;
+
+      frequent_period = 15; # Once every 15 mins
+      frequently = 0; # none
+      hourly = 0; # none
+      daily = 30; # 30 days @ 1 day
+      weekly = 0; # none
+      monthly = 0; # none
+      yearly = 0; # none
+    };
+
     datasets = {
       "storage" = {
-        autosnap = true;
-        autoprune = true;
         recursive = true; # NOT ATOMIC
+        process_children_only = true;
 
-        frequently = 0; # none
-        hourly = 0; # none
-        daily = 30; # 30 days @ 1 day
+        use_template = [ "default" ];
+      };
+
+      # Less important so lower retention
+      "storage/cache" = {
+        use_template = [ "default" ];
+        daily = 1; # 1 day @ 1 day rate
+      };
+
+      # Less important so lower retention
+      "storage/log" = {
+        use_template = [ "default" ];
+        daily = 1; # 1 day @ 1 day rate
       };
 
       # NOTE; Full atomic snapshot for instant recovery
       "storage/postgres" = {
-        autosnap = true;
-        autoprune = true;
-        recursive = "zfs"; # Atomic
+        recursive = "zfs"; # ATOMIC
 
+        use_template = [ "default" ];
         frequent_period = 15; # Once every 15 mins
-        frequently = 192; # 2 days @ 15 mins
-        hourly = 168; # 7 days @ 1 hour
-        daily = 90; # 3 months @ 1 day
+        frequently = 192; # 2 days @ 15 mins rate
+        hourly = 168; # 7 days @ 1 hour rate
+        daily = 90; # 3 months @ 1 day rate
         # No week/month capture
       };
 
       # NOTE; Full atomic snapshot for instant recovery
       "storage/sqlite" = {
-        autosnap = true;
-        autoprune = true;
-        recursive = "zfs"; # Atomic
+        recursive = "zfs"; # ATOMIC
 
+        use_template = [ "default" ];
         frequent_period = 15; # Once every 15 mins
-        frequently = 192; # 2 days @ 15 mins
-        hourly = 168; # 7 days @ 1 hour
-        daily = 90; # 3 months @ 1 day
+        frequently = 192; # 2 days @ 15 mins rate
+        hourly = 168; # 7 days @ 1 hour rate
+        daily = 90; # 3 months @ 1 day rate
         # No week/month capture
       };
     };
