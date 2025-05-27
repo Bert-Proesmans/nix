@@ -412,12 +412,13 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
 
 
 @task
-# USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"] [--forceBinary]
+# USAGE; invoke secret-edit development [-f "secrets.encrypted.yaml"] [--binary]
 def secret_edit(
     c: Any,
     hostname: str,
     file: str = "secrets.encrypted.yaml",
-    forceBinary: bool = False,
+    # Force interpretation of the file as "binary" type
+    binary: bool = False,
 ) -> None:
     """
     Load the decryption key from the keyserver, decrypt the development key, start sops to edit the plaintext secrets of the provided file
@@ -447,7 +448,7 @@ def secret_edit(
             "sops",
             *(
                 ["--input-type", "binary", "--output-type", "binary"]
-                if forceBinary
+                if binary
                 else []
             ),
             encrypted_file.as_posix(),
