@@ -8,7 +8,7 @@ in
     # NOTE; To initialize the idm_service_desk user (bert-proesmans), login using the idm_admin account and generate a password 
     # reset tokens using;
     # 1. kanidm login -D idm_admin
-    # 2. kanidm person credential create-reset-token bert-proesmans --name idm_admin
+    # 2. kanidm person credential create-reset-token bert.proesmans --name idm_admin
     idm_admin-password.owner = "kanidm";
 
     # Hold additional personal data.
@@ -106,7 +106,7 @@ in
         "immich.admin" = { };
         "immich.quota.large" = { };
       };
-      persons."bert-proesmans" = {
+      persons."bert.proesmans" = {
         displayName = "Bert Proesmans";
         mailAddresses = [ "bert@proesmans.eu" ];
         groups = [
