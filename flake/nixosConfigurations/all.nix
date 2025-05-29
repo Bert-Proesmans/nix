@@ -69,4 +69,36 @@ in
       ./buddy/configuration.nix
     ];
   };
+
+  "01-fart" = lib.nixosSystem {
+    inherit lib system specialArgs;
+    modules = modules ++ [
+      flake.inputs.nix-topology.nixosModules.default
+      ({ lib, config, ... }: {
+        _file = __curPos.file;
+
+        config = {
+          networking.hostName = lib.mkForce "01-fart";
+          proesmans.facts = facts // { self = lib.mkForce config.proesmans.facts."01-fart"; };
+        };
+      })
+      ./01-fart/configuration.nix
+    ];
+  };
+
+  "02-fart" = lib.nixosSystem {
+    inherit lib system specialArgs;
+    modules = modules ++ [
+      flake.inputs.nix-topology.nixosModules.default
+      ({ lib, config, ... }: {
+        _file = __curPos.file;
+
+        config = {
+          networking.hostName = lib.mkForce "02-fart";
+          proesmans.facts = facts // { self = lib.mkForce config.proesmans.facts."02-fart"; };
+        };
+      })
+      ./02-fart/configuration.nix
+    ];
+  };
 }
