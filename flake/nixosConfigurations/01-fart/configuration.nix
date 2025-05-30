@@ -50,6 +50,7 @@
   hardware.enableRedistributableFirmware = true;
   boot.initrd.availableKernelModules = [ "ata_piix" "uhci_hcd" "virtio_pci" "virtio_scsi" "sd_mod" ];
   boot.kernelModules = [ "kvm-amd" ];
+  boot.kernelParams = [ "console=ttyS0,9600" ]; # Required for OCI attached console
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
   boot.tmp.useTmpfs = false; # Only have 1G RAM
