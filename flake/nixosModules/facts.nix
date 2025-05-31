@@ -73,6 +73,12 @@
               }));
               default = { };
             };
+
+            encryptedDisks = lib.mkOption {
+              description = "Flag indicating if this host encrypts its storage";
+              type = lib.types.bool;
+              default = false;
+            };
           };
           config = {
             # Facts config.
