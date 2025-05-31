@@ -482,7 +482,7 @@ def ssh_key_create(
     Create and encrypt a new SSH private host key.
     """
 
-    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / file
 
     assert host_configuration_dir.is_dir(), f"""
@@ -550,6 +550,7 @@ def ssh_key_create(
                 # Input file
                 "/dev/stdin",
             ],
+            cwd=FLAKE,
             input=json.dumps({key: ssh_private_key}),
             text=True,
             check=True,
@@ -576,6 +577,7 @@ def ssh_key_create(
                 json.dumps([key]),  # Key name selector
                 json.dumps(ssh_private_key),  # Value as json string
             ],
+            cwd=FLAKE,
             env=environment,
             check=True,
         )
@@ -602,7 +604,7 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
     """
     Create a new AGE key for encrypting/decrypting all secrets provided to a host.
     """
-    host_configuration_dir = FLAKE / "nixosModules" / "hosts" / hostname
+    host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
 
     if not host_configuration_dir.is_dir():
@@ -632,7 +634,7 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
 
     if not key:
         key = decryptor_name_default(hostname)
-        warnings.warn(f"Defaulting to key name {key}")
+        warnings.warn(f"Defaulting to secret key-name {key}")
 
     # ERROR; File must exist for 'sops set' to work
     if not encrypted_file.is_file():
@@ -650,6 +652,7 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
                 # Input file
                 "/dev/stdin",
             ],
+            cwd=FLAKE,
             input=json.dumps({key: age_key}),
             text=True,
             check=True,
@@ -677,6 +680,7 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
             json.dumps([key]),  # Key name selector
             json.dumps(age_key),  # Value as json string
         ],
+        cwd=FLAKE,
         env=environment,
         check=True,
     )
@@ -695,13 +699,11 @@ def documentation(c: Any) -> None:
     """
     Build host and network documentation
     """
-    host_attr_path = f"{DOCS}#topology.x86_64-linux.config.output"
-
     subprocess.run(
         [
             "nix",
             "build",
-            host_attr_path,
+            f"{DOCS}#topology.x86_64-linux.config.output",
             "--override-input",
             "configuration",
             FLAKE,
