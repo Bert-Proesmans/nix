@@ -21,6 +21,9 @@ FLAKE = PROJECT_DIR / "flake"
 DOCS = PROJECT_DIR / "documentation"
 DEV_KEY = FLAKE / "development.age"
 
+# If the target host URL contains any of these values, assume a local/fast connection between build- and target host
+LOCAL_TARGETS_MARKER = ["localhost", "127.0.0.1", "192.168."]
+
 
 def alert_finish():
     # Riiiing my bell ! Ring my bell ! TINGELINGELING
@@ -229,8 +232,7 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
         # the current (buildhost) host will push the packages.
         # There are more situations where uploading from current host first is desired, as opposed to downloading from
         # the internet caches!
-        local_targets_marker = ["localhost", "127.0.0.1", "192.168."]
-        if any(x in ssh_connection_string for x in local_targets_marker):
+        if any(x in ssh_connection_string for x in LOCAL_TARGETS_MARKER):
             # Since we have a populated nix store, and this is a local install; do not let the target pull from
             # the external nix caches.
             deploy_flags.append("--no-substitute-on-destination")
@@ -367,7 +369,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             "--json",
             f"{FLAKE}#facts",
             "--apply",
-            'builtins.mapAttrs (host: v: "${host}.${v.domainName}")',
+            'builtins.mapAttrs (host: v: v.ipAddress or "${host}.${v.domainName}")',
         ],
         check=True,
         text=True,
@@ -396,6 +398,12 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         if ask != "y":
             return
 
+    additional_switches = []
+    additional_switches.append("--use-remote-sudo")
+
+    if not any(x in ssh_connection_string for x in LOCAL_TARGETS_MARKER):
+        additional_switches.append("--use-substitutes")
+
     subprocess.run(
         [
             "nixos-rebuild",
@@ -403,7 +411,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             f"{FLAKE}#{flake_attr}",
             "--target-host",
             ssh_connection_string,
-            "--use-remote-sudo",
+            *additional_switches,
             "switch",
         ],
         check=True,
@@ -446,11 +454,7 @@ def secret_edit(
     result = subprocess.run(
         [
             "sops",
-            *(
-                ["--input-type", "binary", "--output-type", "binary"]
-                if binary
-                else []
-            ),
+            *(["--input-type", "binary", "--output-type", "binary"] if binary else []),
             encrypted_file.as_posix(),
         ],
         cwd=FLAKE,

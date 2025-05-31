@@ -23,6 +23,12 @@
               default = [ ];
             };
 
+            ipAddress = lib.mkOption {
+              description = "IP address that directly reaches this host";
+              type = lib.types.nullOr lib.types.str; # TODO; IP-type
+              default = null;
+            };
+
             tags = lib.mkOption {
               description = "";
               type = lib.types.listOf lib.types.str;
