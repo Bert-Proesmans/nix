@@ -2,10 +2,12 @@ import os
 from pathlib import Path
 from typing import Any, Union
 import subprocess
+import getpass
 from tempfile import TemporaryDirectory
 import json
 import warnings
 import platform
+from contextlib import contextmanager, nullcontext
 
 # REF; https://www.pyinvoke.org/
 from invoke import task
@@ -23,6 +25,12 @@ DEV_KEY = FLAKE / "development.age"
 
 # If the target host URL contains any of these values, assume a local/fast connection between build- and target host
 LOCAL_TARGETS_MARKER = ["localhost", "127.0.0.1", "192.168."]
+
+# Generate and store a new key using;
+# tr -dc '[:alnum:]' </dev/urandom | head -c64
+#
+# WARN; Path hardcoded in DISKO configuration !
+REMOTE_LUKS_SECRET_PATH = "/tmp/deployment-luks.key"
 
 
 def alert_finish():
@@ -80,6 +88,28 @@ def dev_key_decrypt() -> str:
     """
 
     return age_key
+
+
+def get_verified_password() -> str:
+    while True:
+        first = getpass.getpass("Enter password: ")
+        second = getpass.getpass("Confirm password: ")
+        if first == second:
+            return first
+        else:
+            print("Passwords do not match. Try again.")
+
+
+@contextmanager
+def pipe_with_data(data: bytes):
+    # WARN; read_descriptor is an INTEGER !
+    read_descriptor, write_descriptor = os.pipe()
+    try:
+        os.write(write_descriptor, data)
+        os.close(write_descriptor)
+        yield read_descriptor
+    finally:
+        os.close(read_descriptor)
 
 
 @task
@@ -146,8 +176,14 @@ def sops_files_update(c: Any) -> None:
 
 
 @task
-# USAGE; invoke deploy development root@10.1.7.100 [-k "development_decrypter"]
-def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -> None:
+# USAGE; invoke deploy development root@10.1.7.100 [-k "development_decrypter"] [-p]
+def deploy(
+    c: Any,
+    hostname: str,
+    ssh_connection_string: str,
+    key: str = None,
+    password_request: bool = False,
+) -> None:
     """
     Decrypts the secret used for sops-nix, deploys the machine, upload the secret to the host filesystem.
     """
@@ -179,7 +215,15 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
 
     if not key:
         key = decryptor_name_default(hostname)
-        warnings.warn(f"Defaulting to key name {key}")
+        warnings.warn(f"Defaulting to SSH hostkey secret name: {key}")
+
+    # Request user to provide disk encryption password
+    password_generator = None
+    if password_request:
+        print("Please provide a LUKS encryption secret")
+        # Generate and store a new key using;
+        # tr -dc '[:alnum:]' </dev/urandom | head -c64
+        password_generator = pipe_with_data(get_verified_password().encode("UTF-8"))
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
@@ -215,18 +259,17 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
         with open(decrypter_file_path, "wt", opener=private_opener) as file_handle:
             file_handle.write(age_key)
 
-        deploy_flags = [
-            "--debug",
-            # "--no-substitute-on-destination",
-            # "--stop-after-disko", # DEBUG
-            # "--no-reboot",
-            # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
-            # operations on that flake execution only.
-            # These options are encoded inside the 'nixConfig' output attribute of the flake-schema.
-            # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
-            #
-            # "--option accept-flake-config true",
-        ]
+        deploy_flags = []
+        deploy_flags.append("--debug")
+        # "--no-substitute-on-destination",
+        # "--stop-after-disko", # DEBUG
+        # "--no-reboot",
+        # NOTE; Flakes can give hints to the nix CLI to change runtime behaviours, like adding a binary cache for
+        # operations on that flake execution only.
+        # These options are encoded inside the 'nixConfig' output attribute of the flake-schema.
+        # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
+        #
+        # "--option accept-flake-config true",
 
         # NOTE; The (nixos-anywhere) default is to let the target pull packages from the caches first, and if they not exist there
         # the current (buildhost) host will push the packages.
@@ -237,20 +280,34 @@ def deploy(c: Any, hostname: str, ssh_connection_string: str, key: str = None) -
             # the external nix caches.
             deploy_flags.append("--no-substitute-on-destination")
 
-        # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
-        subprocess.run(
-            [
-                "nixos-anywhere",
-                "--extra-files",
-                deploy_directory,
-                "--flake",
-                f"{FLAKE}#{hostname}",
-            ]
-            + deploy_flags
-            + [ssh_connection_string],
-            env=environment,
-            check=True,
-        )
+        with (
+            password_generator or nullcontext()
+        ) as password_descriptor:  # ->N (integer)
+            # ERROR; Cannot use sops --exec-file because we need to pass a full file structure to nixos-anywhere
+            subprocess.run(
+                [
+                    "nixos-anywhere",
+                    "--extra-files",
+                    deploy_directory,
+                    "--flake",
+                    f"{FLAKE}#{hostname}",
+                    *deploy_flags,
+                    *(
+                        [
+                            "--disk-encryption-keys",
+                            REMOTE_LUKS_SECRET_PATH,
+                            f"/proc/self/fd/{password_descriptor}",
+                        ]
+                        if password_request
+                        else []
+                    ),
+                    ssh_connection_string,
+                ],
+                env=environment,
+                pass_fds=(password_descriptor,) if password_request else (),
+                check=True,
+            )
+
         alert_finish()
 
 

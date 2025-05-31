@@ -2,12 +2,22 @@
   #
   # Boot on AMD 1OCPU
   #
+  # Automated install instructions;
+  # 1. Reduce RAM on VPS
+  #   1. sudo systemctl --no-block stop snapd snap* unattended-upgrades
+  #   2. echo 3 | sudo tee /proc/sys/vm/drop_caches
+  # 2. Kernel exec (K'exec) into nixos system
+  #   1. curl -L https://github.com/nix-community/nixos-images/releases/latest/download/nixos-kexec-installer-noninteractive-x86_64-linux.tar.gz | tar -xzf- -C /tmp && sudo /tmp/kexec/run
+  # 3. Run deploy task to prepare and install host
+  #   - invoke deploy 01-fart root@<$IP> --password-request
+  # DONE
+  # WARN; Due to limited available RAM, copying the system could seemingly hang (shared VPS resources, effects vary).
+  # Normally the host will get through everything, it just takes some time. If kswapd0 starts to use >15% CPU usage over >10seconds,
+  # cancel the deploy and retry (untested, disko will probably panic on second format).
+  #
+  #
   # NOTE; nixos-anywhere should be able to "stream-install" as well in limited RAM circumstances. The instructions below are doing 
   # the manual work for minimal RAM impact.
-  # WARN; The disko configuration will ask for a password on luks format, but interactive input during nixos-anywhere install doesn't
-  # work. The process will hang forever waiting for input. To fix;
-  #   - OR Run disko formatting interactively 
-  #   - OR configure a keypath and upload the key as deployment argument (--disk-encryption-keys)
   #
   # 1. Configure VPS
   #   1. Choose a minimal ubuntu image
@@ -175,11 +185,12 @@
                 "--key-size 256" # SPLITS IN TWO (xts) !!
                 "--use-urandom"
               ];
-              # ERROR; This configuration cannot be non-interactively deployed through nixos-anywhere !!
-              # This setting will request an encryption password during execution of format script.
               # Generate and store a new key using; 
               # tr -dc '[:alnum:]' </dev/urandom | head -c64
-              askPassword = true;
+              #
+              # WARN; Path hardcoded in tasks.py !
+              passwordFile = "/tmp/deployment-luks.key"; # Path only used when formatting !
+              # askPassword = true;
               settings.allowDiscards = true;
               settings.bypassWorkqueues = true;
               content = {
