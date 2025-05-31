@@ -19,7 +19,7 @@ keys:
   # HOST KEYS
   - &buddy_decryptor age1c27gckzuezcu4cqf7ksakksnxm4k694kjslysysas80jctjuwevsgd0ew3
   - &development_decryptor age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
-  - &fart_decryptor age1qw7ur23g0q8f36yj5sffghq28u7atx0d9m3wkjfurdyjhlhwxglqv48vus
+  - &01_fart_decryptor age1ej87pp4ec270anem2qv2zymtgqya2jtp5kww37y6nzk9u555as0qq5ymrl
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -44,10 +44,10 @@ creation_rules:
           - *development_decryptor
           - *development_key
 
-  - path_regex: nixosConfigurations/fart/[^/]+\.encrypted\.(yaml|json)$
+  - path_regex: nixosConfigurations/01-fart/[^/]+\.encrypted\.(yaml|json)$
     key_groups:
       - age:
-          - *fart_decryptor
+          - *01_fart_decryptor
           - *development_key
   
   # NOTE; No path_regex as fallback option

@@ -1,4 +1,4 @@
-{ lib, modulesPath, ... }: {
+{ lib, modulesPath, config, ... }: {
   #
   # Boot on AMD 1OCPU
   #
@@ -46,6 +46,7 @@
     (modulesPath + "/profiles/minimal.nix")
   ];
 
+  system.stateVersion = "25.05";
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
   hardware.enableRedistributableFirmware = true;
   boot.kernelModules = [ "kvm-amd" ];
@@ -221,6 +222,11 @@
     };
   };
 
+  # Setup runtime secrets and corresponding ssh host key
+  sops.defaultSopsFile = ./secrets.encrypted.yaml;
+  proesmans.sopsSecrets.enable = true;
+  proesmans.sopsSecrets.sshHostkeyControl.enable = true;
+
   # Allow for remote management
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
@@ -243,7 +249,13 @@
     ];
   };
 
-  # Ignore below
-  # Consistent defaults accross all machine configurations.
-  system.stateVersion = "25.05";
+  sops.secrets.tailscale_connect_key.owner = "root";
+  services.tailscale = {
+    enable = true;
+    disableTaildrop = true;
+    openFirewall = true;
+    useRoutingFeatures = "none";
+    authKeyFile = config.sops.secrets.tailscale_connect_key.path;
+    extraDaemonFlags = [ "--no-logs-no-support" ];
+  };
 }

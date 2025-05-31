@@ -1,0 +1,16 @@
+01-fart_decrypter: ENC[AES256_GCM,data:HyCUQpme3PZ4q+S5AT80WOgnsWtRuTTxUchyWX568WRhlhzHCHkiPhDj2C8vNAqQdGbAmyL7r2hBsZj599Zlo4ms+vL4YqaNdjF2P5K3R8HRcLkzGxyDMfuNv9lYRBHQOSVq4k3IRf0PQjlH6xlEWv3GU4V/PnHGOKKSqZte/BydQUNUNiSIxHaXxOeM7Rm1D9OfCqVxQQ166SonJh63KWFfc9FftF/z8YzOd3YvXSt3yFDBQsLu,iv:MvBZDhZDEolDqz4dPRcLHx9iXCoLzeucozdjPgEIDJ8=,tag:GcC04ByFOxkMB+sm2jyq5Q==,type:str]
+sops:
+  age:
+    - recipient: age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA5OG5XRG84SWhUd0ZnN3RU
+        emdFemNWTE1EZlhtbzNOcHQwZ1ZYTUNsUUhzCmRFSE1Vck9uakRudlBQT1hsa3BN
+        bTJjeFBmcVNycEZNYnZlNHhHa1EzcW8KLS0tIFY5TjdldWdPV1J1eStwRDZqbjFh
+        b1ArMEpMZUt2ZHdvc21LMTFZL1NMVnMKqiJvAg64O8QPxyinE0oPG+xLjqj9SPk1
+        3wQVUZ70o+e3eJv+PrzCCBEugco/3nF/RJVGlSgean5ImwRLR/sS4Q==
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2025-05-31T12:38:44Z"
+  mac: ENC[AES256_GCM,data:qfmxcSbcdh2mwhOgin28wU3b9JT/VNAPvs8lklYDZnkjurZAMgcsQHvPXWkY8LaLXNxBql/eZBUYzX4jEKOscYYfRC4BVPIhgnj8mlk2znvOW/ZyNjPMkoR3rRgnf+pDEoflkcoQHVCYxepOswNcgpYZ9yS+NogOmoljgycJA6k=,iv:GDleLCHwEPd2f8KwIoWPHdq26nMoBAgVCrQBswf+/RA=,tag:c1MpgPtKrvA2vNIiC4nPtQ==,type:str]
+  unencrypted_suffix: _unencrypted
+  version: 3.10.2
