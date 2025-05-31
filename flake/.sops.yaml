@@ -20,6 +20,7 @@ keys:
   - &buddy_decryptor age1c27gckzuezcu4cqf7ksakksnxm4k694kjslysysas80jctjuwevsgd0ew3
   - &development_decryptor age1rwl0helkcqtlx6fevquwzlw354tu87fg3tmv4gzlwsraz2ttpu0q0h2dqt
   - &01_fart_decryptor age1ej87pp4ec270anem2qv2zymtgqya2jtp5kww37y6nzk9u555as0qq5ymrl
+  - &02_fart_decryptor age1qx64rlgrly9qdnmgfn4adawuhs9q5r0fm96wqevffnr0sacl7fxq9pyhe3
 
 # NOTE; These rules are in effect when using the SOPS CLI.
 # Both creation of- and running the command updatekeys will modify the key material of files with sensitive content.
@@ -50,6 +51,12 @@ creation_rules:
           - *01_fart_decryptor
           - *development_key
   
+  - path_regex: nixosConfigurations/02-fart/[^/]+\.encrypted\.(yaml|json)$
+    key_groups:
+      - age:
+          - *02_fart_decryptor
+          - *development_key
+
   # NOTE; No path_regex as fallback option
   #
   # WARN; Use `invoke update-sops-files` after updating key assignment to secret files!
