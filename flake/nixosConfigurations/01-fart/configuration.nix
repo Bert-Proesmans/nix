@@ -54,6 +54,7 @@
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     (modulesPath + "/profiles/minimal.nix")
+    ./web-security.nix
   ];
 
   system.stateVersion = "25.05";
