@@ -12,6 +12,7 @@
     ./pictures.nix
     ./isolated-vm/configuration.nix
     ./proxy-vm/configuration.nix
+    ./web-security-controller.nix
     # ./virtualgl.nix
     # ./backblaze-backup/default.nix
     flake.profiles.hypervisor
@@ -42,6 +43,7 @@
     ];
   };
 
+  # Temporary, will be moved to proxy-vm later
   sops.secrets.tailscale_connect_key.owner = "root";
   services.tailscale = {
     enable = true;
