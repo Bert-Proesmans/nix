@@ -1,4 +1,4 @@
-{ flake, ... }: {
+{ flake, config, ... }: {
 
   imports = [
     ./hardware-configuration.nix
@@ -40,6 +40,16 @@
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
     ];
+  };
+
+  sops.secrets.tailscale_connect_key.owner = "root";
+  services.tailscale = {
+    enable = true;
+    disableTaildrop = true;
+    openFirewall = true;
+    useRoutingFeatures = "none";
+    authKeyFile = config.sops.secrets.tailscale_connect_key.path;
+    extraDaemonFlags = [ "--no-logs-no-support" ];
   };
 
   # Ignore below
