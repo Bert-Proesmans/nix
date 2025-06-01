@@ -140,7 +140,7 @@ in
       oauth = {
         enabled = true;
         autoRegister = true;
-        buttonText = "Login with proesmans account";
+        buttonText = "Login met Proesmans account";
         clientId = "photos";
         # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
         clientSecret = config.sops.placeholder.immich-oauth-secret;
@@ -158,7 +158,7 @@ in
       passwordLogin.enabled = true;
       reverseGeocoding.enabled = true;
       server.externalDomain = "https://photos.alpha.proesmans.eu";
-      server.loginPageMessage = "Proesmans Photos system, proceed by clicking the button at the bottom";
+      server.loginPageMessage = "Proesmans fotos, klik op de knop onderaan om verder te gaan";
       server.publicUsers = true;
       storageTemplate.enabled = true;
       # 2024/2024-12[-06][ Sinterklaas]/IMG_001.jpg
