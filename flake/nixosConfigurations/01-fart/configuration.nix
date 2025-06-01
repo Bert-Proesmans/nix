@@ -110,11 +110,13 @@
     enableStrictShellChecks = true;
     script = ''
       # NOTE; The zram device _does not_ automatically manage least-recently-used (LRU) eviction!
-
-      # Mark all pages older than provided seconds as idle. [ONE-TIME]
-      # = 4 hours
-      # REF; https://docs.kernel.org/admin-guide/blockdev/zram.html#writeback
-      echo 14400 > /sys/block/zram0/idle
+      # ERROR; Out-of-the-box Linux kernel in NixOS is _not configured_ with CONFIG_ZRAM_TRACK_ENTRY_ACTIME! There is no idle time
+      # tracking on zram pages, so this impacts how we handle writeback of idle pages!
+      #
+      # Without idle-marking, we'll move all pages marked idle during the previous execution of this script.
+      # 1. Writeback marked pages
+      # 2. Mark all pages currently stored as idle
+      #   - Pages' idle mark will be removed on retrieval/set
 
       # Evict pages from RAM. [ONE-TIME]
       #
@@ -127,6 +129,16 @@
       # There is no difference between incompressible and huge if the page cluster size is set to 0.
       # SEEALSO; boot.kernel.sysctl."vm.page-cluster"
       echo "huge_idle" > /sys/block/zram0/writeback
+
+      # Mark all pages as idle. [ONE-TIME]
+      # REF; https://docs.kernel.org/admin-guide/blockdev/zram.html#writeback
+      echo "all" > /sys/block/zram0/idle
+
+      # ERROR; Does NOT work without CONFIG_ZRAM_TRACK_ENTRY_ACTIME !
+      # Mark all pages older than provided seconds as idle. [ONE-TIME]
+      # = 4 hours
+      # REF; https://docs.kernel.org/admin-guide/blockdev/zram.html#writeback
+      # echo "14400" > /sys/block/zram0/idle
     '';
   };
 
