@@ -354,7 +354,9 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
             "--json",
             f"{FLAKE}#facts",
             "--apply",
-            'builtins.mapAttrs (host: v: "${host}.${v.domainName}")',
+            # ERROR; The evalModule system asserts when accessing a config value for unset option.
+            # Cannot use attrset.name [or expression] because v is a config object, not a plain attrset!
+            'builtins.mapAttrs (host: v: if (v.ipAddress != null) then v.ipAddress else "${host}.${v.domainName}")',
         ],
         check=True,
         text=True,
@@ -426,7 +428,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             "--json",
             f"{FLAKE}#facts",
             "--apply",
-            'builtins.mapAttrs (host: v: v.ipAddress or "${host}.${v.domainName}")',
+            # ERROR; The evalModule system asserts when accessing a config value for unset option.
+            # Cannot use attrset.name [or expression] because v is a config object, not a plain attrset!
+            'builtins.mapAttrs (host: v: if (v.ipAddress != null) then v.ipAddress else "${host}.${v.domainName}")',
         ],
         check=True,
         text=True,
