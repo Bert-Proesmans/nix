@@ -68,7 +68,7 @@
   programs.ssh.matchBlocks =
     let
       inherit (nixosConfig.networking) hostName;
-      other-facts = lib.filterAttrs (k: v: k != "self" && k != hostName) nixosConfig.proesmans.facts;
+      other-facts = lib.filterAttrs (k: _v: k != "self" && k != hostName) nixosConfig.proesmans.facts;
     in
     lib.mapAttrs (k: v: { hostname = v.ipAddress or "${k}.${v.domainName}"; }) other-facts;
 

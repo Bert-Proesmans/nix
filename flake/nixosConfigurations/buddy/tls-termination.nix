@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }: {
+{ lib, config, ... }: {
   networking.firewall.allowedTCPPorts = [ 80 443 ];
 
   # Must be member of cert-group to get access to the certs
