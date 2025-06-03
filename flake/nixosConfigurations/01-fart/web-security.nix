@@ -38,7 +38,7 @@ in
       config_paths = {
         # Setup a R/W path to dynamically enable/disable simulations.
         # SEEALSO; systemd.services.crowdsec.serviceConfig.ExecStartPre
-        # simulation_path = "${config-dir-crowdsec}/simulation.yaml";
+        simulation_path = "${config-dir-crowdsec}/simulation.yaml";
       };
     };
   };
@@ -46,6 +46,65 @@ in
   sops.secrets."01-fart-sensor-crowdsec-key".owner = "crowdsec";
   # sops.secrets."01-fart-bouncer-crowdsec-key".owner = "crowdsec";
   systemd.services.crowdsec.serviceConfig = {
+    ExecStartPre =
+      let
+        register = pkgs.writeShellApplication {
+          name = "register-sensor";
+          # ERROR; crowdsec cli tool is wrapped with setting arguments, we need those!
+          runtimeInputs = config.systemd.services.crowdsec.path ++ [ pkgs.coreutils ];
+          text = ''
+            # 01-fart sensor
+            if [ ! -s '${config.services.crowdsec.settings.api.client.credentials_path}' ]; then
+              # ERROR; Cannot use 'cscli lapi register ..' because that command wants a valid local_api_credentials file, which we
+              # want to created as new with that same command.. /facepalm
+              LAPI_URL='http://buddy.tailaac73.ts.net:10124'
+              HOSTNAME='01-fart'
+              PASSWORD="''$(cat '${config.sops.secrets."01-fart-sensor-crowdsec-key".path}')"
+
+              cat > '${config.services.crowdsec.settings.api.client.credentials_path}' <<EOF
+            url: $LAPI_URL
+            login: $HOSTNAME
+            password: $PASSWORD
+            EOF
+            fi
+
+            # WARN; Required to know about all published collections and other detection resources.
+            # Is normally executed by the upstream ExecStartPre script!
+            cscli hub update
+          '';
+        };
+
+        installConfigurations = pkgs.writeShellApplication {
+          name = "install-configurations";
+          # ERROR; crowdsec cli tool is wrapped with setting arguments, we need those!
+          runtimeInputs = config.systemd.services.crowdsec.path;
+          text = ''
+            ## Collections
+            cscli collections install \
+              crowdsecurity/linux              
+
+            ## Parsers
+            # Whitelists private IPs
+            # if ! cscli parsers list | grep -q "whitelists"; then
+            #     cscli parsers install crowdsecurity/whitelists
+            # fi
+
+            ## Heavy operations
+            # cscli postoverflows install \
+            #  crowdsecurity/ipv6_to_range
+            #  crowdsecurity/rdns
+
+            ## Report-only (no action taken) scenario's
+            echo 'simulation: false' >'${config.services.crowdsec.settings.config_paths.simulation_path}'
+            # cscli simulation enable crowdsecurity/http-bad-user-agent
+            # cscli simulation enable crowdsecurity/http-crawl-non_statics
+            # cscli simulation enable crowdsecurity/http-probing
+          '';
+        };
+      in
+      # WARN; Overwrite upstream pre-start script because that attempts to setup in standalone mode
+      lib.mkForce [ (lib.getExe register) (lib.getExe installConfigurations) ];
+
     ExecStartPost =
       let
         waitForStart = pkgs.writeShellApplication {
@@ -59,25 +118,7 @@ in
             done
           '';
         };
-
-        register = pkgs.writeShellApplication {
-          name = "register-sensor";
-          # ERROR; crowdsec cli tool is wrapped with setting arguments, we need those!
-          runtimeInputs = config.systemd.services.crowdsec.path ++ [ pkgs.coreutils ];
-          text = ''
-            # 01-fart sensor
-            if ! cscli lapi status; then
-              PASS="''$(cat '${config.sops.secrets."01-fart-sensor-crowdsec-key".path}')"
-              # NOTE; Command will create /var/lib/crowdsec/local_api_credentials.yaml
-              # TODO; Not hardcode controller URL
-              cscli lapi register --token "''$PASS" --url 'http://buddy.tailaac73.ts.net:10124'
-            fi
-          '';
-        };
       in
-      lib.mkMerge [
-        (lib.mkBefore [ (lib.getExe register) (lib.getExe waitForStart) ])
-        (lib.mkAfter [ ])
-      ];
+      lib.mkBefore [ (lib.getExe waitForStart) ];
   };
 }

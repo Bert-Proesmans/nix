@@ -58,7 +58,7 @@ in
           text = ''
             # WARN; Required on first run to hydrate the hub index
             # Is executed by the upstream ExecStartPre script!
-            # cscli hub upgrade
+            # cscli hub update
 
             ## Collections
             cscli collections install \
