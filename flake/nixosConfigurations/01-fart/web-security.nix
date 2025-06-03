@@ -6,14 +6,21 @@ let
   config-dir-crowdsec = "${state-dir-crowdsec}/config";
 
   # NOTE; sudo -u crowdsec cscli lapi register --url 'http://buddy.tailaac73.ts.net'
-  controller-crowdsec = "buddy.tailaac73.ts.net";
+  controller-crowdsec-url = "http://buddy.tailaac73.ts.net:10124";
 in
 {
   imports = [
     flake.inputs.crowdsec.nixosModules.crowdsec
+    flake.inputs.crowdsec.nixosModules.crowdsec-firewall-bouncer
+  ];
+
+  proesmans.nix.overlays = [
+    # NOTE; Adds package "crowdsec-firewall-bouncer"
+    flake.inputs.crowdsec.overlays.default
   ];
 
   services.crowdsec = {
+    # NOTE; This is the crowdsec log parser, aka remote agent
     enable = true;
 
     allowLocalJournalAccess = true;
@@ -57,7 +64,7 @@ in
             if [ ! -s '${config.services.crowdsec.settings.api.client.credentials_path}' ]; then
               # ERROR; Cannot use 'cscli lapi register ..' because that command wants a valid local_api_credentials file, which we
               # want to created as new with that same command.. /facepalm
-              LAPI_URL='http://buddy.tailaac73.ts.net:10124'
+              LAPI_URL='${controller-crowdsec-url}'
               HOSTNAME='01-fart'
               PASSWORD="''$(cat '${config.sops.secrets."01-fart-sensor-crowdsec-key".path}')"
 
@@ -121,4 +128,38 @@ in
       in
       lib.mkBefore [ (lib.getExe waitForStart) ];
   };
+
+  # WARN; Bouncer service is running as root !
+  sops.secrets."01-fart-bouncer-crowdsec-key".owner = "root";
+  # ERROR; Upstream did not make configuring secrets composeable.
+  sops.templates."crowdsec.yaml" = {
+    file = (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec-firewall-bouncer.settings;
+    owner = "root";
+    restartUnits = [ config.systemd.services.crowdsec-firewall-bouncer.name ];
+  };
+
+  services.crowdsec-firewall-bouncer = {
+    # NOTE; This is the crowdsec actor, aka the bouncer
+    enable = true;
+    settings = {
+      # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
+      api_key = config.sops.placeholder."01-fart-bouncer-crowdsec-key";
+      api_url = controller-crowdsec-url;
+      log_mode = "stdout";
+      update_frequency = "10s";
+    };
+  };
+
+  systemd.services.crowdsec-firewall-bouncer =
+    let
+      bouncer-package = config.services.crowdsec-firewall-bouncer.package;
+      config-file = config.sops.templates."crowdsec.yaml".path;
+    in
+    {
+      serviceConfig = {
+        # NOTE; Force overwrite upstream calls to make use of customised settings file
+        ExecStart = lib.mkForce "${bouncer-package}/bin/cs-firewall-bouncer -c ${config-file}";
+        ExecStartPre = lib.mkForce [ "${bouncer-package}/bin/cs-firewall-bouncer -t -c ${config-file}" ];
+      };
+    };
 }
