@@ -11,7 +11,8 @@ backend server1 { # Define one backend
 
   .probe = {
     #.url = "/"; # short easy way (GET /)
-    # We prefer to only do a HEAD /
+    
+    # Debug with; varnishadm backend.list
     .request =
       "GET / HTTP/1.1"
       "Host: photos.alpha.proesmans.eu"
@@ -46,6 +47,7 @@ sub vcl_init {
   # vdir.add_backend(servern);
 }
 
+# Debug with; varnishlog -g request
 sub vcl_recv {
   # Called at the beginning of a request, after the complete request has been received and parsed.
   # Its purpose is to decide whether or not to serve the request, how to do it, and, if applicable,
