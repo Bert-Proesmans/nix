@@ -41,9 +41,6 @@ in
     };
   };
 
-  # Allow sensors and bouncers to connect
-  networking.firewall.interfaces."tailscale0".allowedTCPPorts = [ 8080 ];
-
   sops.secrets."01-fart-sensor-crowdsec-key".owner = "crowdsec";
   sops.secrets."01-fart-bouncer-crowdsec-key".owner = "crowdsec";
   sops.secrets."02-fart-sensor-crowdsec-key".owner = "crowdsec";
