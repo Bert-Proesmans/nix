@@ -15,7 +15,7 @@ backend server1 { # Define one backend
     # Debug with; varnishadm backend.list
     .request =
       "GET / HTTP/1.1"
-      "Host: photos.alpha.proesmans.eu"
+      "Host: photos.proesmans.eu"
       "Connection: close"
       "User-Agent: Varnish Health Probe";
 

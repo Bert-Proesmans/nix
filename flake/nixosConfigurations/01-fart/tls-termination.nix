@@ -33,14 +33,14 @@
       }
 
       server {
-        listen 0.0.0.0:443;
+        listen 0.0.0.0:443 proxy_protocol;
 
         proxy_pass $upstream;
         ssl_preread on;
       }
 
       server {
-        listen [::]:443;
+        listen [::]:443 proxy_protocol;
 
         proxy_pass $upstream;
         ssl_preread on;
@@ -53,12 +53,12 @@
     };
 
     defaultListen = [
-      { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; }
+      { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; proxyProtocol = true; }
       { addr = "0.0.0.0"; port = 80; ssl = false; }
     ];
 
     virtualHosts = {
-      "photos.alpha.proesmans.eu" = {
+      "photos.proesmans.eu" = {
         enableACME = true;
         forceSSL = true;
         locations."/" = {
@@ -67,6 +67,10 @@
           extraConfig = ''
             # Required for larger uploads to be possible (defaults at 10M)
             client_max_body_size 500M;
+
+            # trust proxy protocol
+            set_real_ip_from unix:;
+            real_ip_header proxy_protocol;
           '';
         };
       };

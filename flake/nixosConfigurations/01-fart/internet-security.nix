@@ -30,11 +30,11 @@ in
         journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
         labels.type = "syslog";
       })
-      # ({
-      #   source = "journalctl";
-      #   journalctl_filter = [ "_SYSTEMD_UNIT=nginx.service" ];
-      #   labels.type = "syslog";
-      # })
+      ({
+        source = "journalctl";
+        journalctl_filter = [ "_SYSTEMD_UNIT=nginx.service" ];
+        labels.type = "syslog";
+      })
     ];
 
     settings = {
