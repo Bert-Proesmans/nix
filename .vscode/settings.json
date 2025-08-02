@@ -4,7 +4,7 @@
     "editor.defaultFormatter": "jnoortheen.nix-ide"
   },
   "nix.enableLanguageServer": false, // Language server integration TODO
-  "nix.formatterPath": "nixpkgs-fmt",
+  "nix.formatterPath": "nixfmt",
   "terminal.integrated.enableVisualBell": true,
   "accessibility.signals.terminalBell": {
     "sound": "on",

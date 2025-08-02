@@ -15,7 +15,7 @@ in
       services.vscode-server.enable = true;
 
       environment.systemPackages = lib.mkIf cfg.nix-dependencies.enable
-        (builtins.attrValues { inherit (pkgs) nixpkgs-fmt; });
+        (builtins.attrValues { inherit (pkgs) nixfmt; });
     })
   ];
 }
