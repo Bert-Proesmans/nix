@@ -36,21 +36,23 @@ in
 
   # It is highly recommended to share the host's nix-store
   # with the VMs to prevent building huge images.
-  microvm.shares = [{
-    source = "/nix/store";
-    mountPoint = "/nix/.ro-store";
-    tag = "ro-store";
-    proto = "virtiofs";
-    # NOTE; Hugetables backed mapping isn't enabled in microvm.nix.
-    # - The ZFS compatible kernel has compiled in support
-    # - The hugetblfs is not mounted by default
-    #   SEEALSO; `nixosModules.profiles.hypervisor`
-    # - The qemu VM's are not started making use of hugetables
-    #   REF; https://github.com/astro/microvm.nix/blob/ac28e21ac336dbe01b1f1bcab01fd31db3855e40/lib/runners/qemu.nix#L210C20-L210C40
-    #
-    # ERROR; The parameter below is only used for p9 sharing. This is _not_ the same as virtiofs' accessmode!
-    # securityModel = "mapped";
-  }];
+  microvm.shares = [
+    {
+      source = "/nix/store";
+      mountPoint = "/nix/.ro-store";
+      tag = "ro-store";
+      proto = "virtiofs";
+      # NOTE; Hugetables backed mapping isn't enabled in microvm.nix.
+      # - The ZFS compatible kernel has compiled in support
+      # - The hugetblfs is not mounted by default
+      #   SEEALSO; `nixosModules.profiles.hypervisor`
+      # - The qemu VM's are not started making use of hugetables
+      #   REF; https://github.com/astro/microvm.nix/blob/ac28e21ac336dbe01b1f1bcab01fd31db3855e40/lib/runners/qemu.nix#L210C20-L210C40
+      #
+      # ERROR; The parameter below is only used for p9 sharing. This is _not_ the same as virtiofs' accessmode!
+      # securityModel = "mapped";
+    }
+  ];
 
   microvm.virtiofsd = {
     extraArgs = [

@@ -1,4 +1,9 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 {
   networking.domain = "alpha.proesmans.eu";
 
@@ -23,11 +28,11 @@
     };
   };
 
-  systemd.services."acme-photos.alpha.proesmans.eu".serviceConfig.ExecStart = lib.mkForce "${pkgs.coreutils}/bin/true";
+  systemd.services."acme-photos.alpha.proesmans.eu".serviceConfig.ExecStart =
+    lib.mkForce "${pkgs.coreutils}/bin/true";
 
   # Override this service for fun and debug profit
   systemd.services."test".serviceConfig.ExecStart = "${pkgs.coreutils}/bin/true";
-
 
   # nixpkgs.overlays = [
   #   (final: prev:
@@ -130,14 +135,15 @@
 
   systemd.services.postgresql.serviceConfig = { };
 
-  proesmans.vsock-proxy.proxies = [{
-    description = "Connect VSOCK to AF_INET for immich service";
-    listen.vsock.cid = -1; # Binds to localhost
-    listen.port = 8080;
-    transmit.tcp.ip = config.services.immich.host;
-    transmit.port = config.services.immich.port;
-  }];
-
+  proesmans.vsock-proxy.proxies = [
+    {
+      description = "Connect VSOCK to AF_INET for immich service";
+      listen.vsock.cid = -1; # Binds to localhost
+      listen.port = 8080;
+      transmit.tcp.ip = config.services.immich.host;
+      transmit.port = config.services.immich.port;
+    }
+  ];
 
   system.stateVersion = "24.05";
 }

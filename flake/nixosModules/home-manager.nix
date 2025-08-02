@@ -1,4 +1,9 @@
-{ lib, flake, config, ... }:
+{
+  lib,
+  flake,
+  config,
+  ...
+}:
 let
   cfg = config.proesmans.home-manager;
 in
@@ -11,12 +16,14 @@ in
     };
   };
 
-  config = (lib.mkIf cfg.enable {
-    # Enable more output when switching configuration
-    home-manager.verbose = true;
-    # Home-manager manages software assigned through option users.users.<name>.packages
-    home-manager.useUserPackages = true;
-    # Follow the system nix configuration instead of building/using a parallel index
-    home-manager.useGlobalPkgs = true;
-  });
+  config = (
+    lib.mkIf cfg.enable {
+      # Enable more output when switching configuration
+      home-manager.verbose = true;
+      # Home-manager manages software assigned through option users.users.<name>.packages
+      home-manager.useUserPackages = true;
+      # Follow the system nix configuration instead of building/using a parallel index
+      home-manager.useGlobalPkgs = true;
+    }
+  );
 }

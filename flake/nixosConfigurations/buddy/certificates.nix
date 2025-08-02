@@ -1,5 +1,6 @@
 # Setup automatic (ACME) certificate renewal for proesmans domains
-{ config, ... }: {
+{ config, ... }:
+{
   sops.secrets.cloudflare-proesmans-key = { };
   sops.secrets.cloudflare-zones-key = { };
 

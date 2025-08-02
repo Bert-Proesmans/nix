@@ -8,14 +8,16 @@ rec {
     nix-topology.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, ... }:
+  outputs =
+    { self, ... }:
     let
       inherit (self) inputs;
       inherit (inputs.nixpkgs) lib;
 
       __forSystems = lib.genAttrs [ "x86_64-linux" ];
-      __forPackages = __forSystems (system: (
-        import (inputs.nixpkgs) {
+      __forPackages = __forSystems (
+        system:
+        (import (inputs.nixpkgs) {
           localSystem = { inherit system; };
           overlays = [ inputs.nix-topology.overlays.default ];
         })
@@ -29,43 +31,55 @@ rec {
       #
       # Constructs a visual topology of all the host configurations inside this flake. The code uses evalModules, which is the same
       # "platform" used by nixosSystem to process module files.
-      topology = eachSystem (pkgs: import inputs.nix-topology {
-        inherit pkgs;
-        modules = [
-          # HELP; You own file to define global topology. Works in principle like a nixos module but uses different options.
-          ({ config, ... }:
-            let
-              inherit (config.lib.topology) mkInternet mkRouter mkConnection;
-            in
-            {
-              _file = ./flake.nix;
-              config = {
-                # WARN; Provide all nixosConfigurations definitions
-                nixosConfigurations = inputs.configuration.nixosConfigurations;
+      topology = eachSystem (
+        pkgs:
+        import inputs.nix-topology {
+          inherit pkgs;
+          modules = [
+            # HELP; You own file to define global topology. Works in principle like a nixos module but uses different options.
+            (
+              { config, ... }:
+              let
+                inherit (config.lib.topology) mkInternet mkRouter mkConnection;
+              in
+              {
+                _file = ./flake.nix;
+                config = {
+                  # WARN; Provide all nixosConfigurations definitions
+                  nixosConfigurations = inputs.configuration.nixosConfigurations;
 
-                nodes.internet = mkInternet {
-                  connections = mkConnection "router" "ether1";
-                };
+                  nodes.internet = mkInternet {
+                    connections = mkConnection "router" "ether1";
+                  };
 
-                nodes.router = mkRouter "Mikrotik" {
-                  info = "RB750Gr3";
-                  image = ./assets/RB750Gr3-smol.png;
-                  interfaceGroups = [ [ "ether2" "ether3" "ether4" "ether5" ] [ "ether1" ] ];
-                  #connections.ether2 = mkConnection "buddy" "30-lan"; # TODO
-                  interfaces.ether2 = {
-                    addresses = [ "192.168.88.1" ];
-                    network = "home";
+                  nodes.router = mkRouter "Mikrotik" {
+                    info = "RB750Gr3";
+                    image = ./assets/RB750Gr3-smol.png;
+                    interfaceGroups = [
+                      [
+                        "ether2"
+                        "ether3"
+                        "ether4"
+                        "ether5"
+                      ]
+                      [ "ether1" ]
+                    ];
+                    #connections.ether2 = mkConnection "buddy" "30-lan"; # TODO
+                    interfaces.ether2 = {
+                      addresses = [ "192.168.88.1" ];
+                      network = "home";
+                    };
+                  };
+
+                  networks.home = {
+                    name = "Home Network";
+                    cidrv4 = "192.168.88.0/24";
                   };
                 };
-
-                networks.home = {
-                  name = "Home Network";
-                  cidrv4 = "192.168.88.0/24";
-                };
-              };
-            })
-        ];
-      }
+              }
+            )
+          ];
+        }
       );
     };
 }

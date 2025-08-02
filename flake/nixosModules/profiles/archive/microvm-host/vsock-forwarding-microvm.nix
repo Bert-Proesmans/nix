@@ -1,6 +1,13 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
-  forwarding-guests = lib.filterAttrs (_: v: v.config.config.microvm.vsock.forwarding.enable) config.microvm.vms;
+  forwarding-guests = lib.filterAttrs (
+    _: v: v.config.config.microvm.vsock.forwarding.enable
+  ) config.microvm.vms;
 in
 {
   config.systemd.services.microvm-vhost-device-vsock = {
@@ -24,18 +31,19 @@ in
 
       ExecStart =
         let
-          my-groups = guest:
+          my-groups =
+            guest:
             let
               cfg = guest.config.config.microvm.vsock;
               my-cid = cfg.forwarding.cid;
               i-forward-to = cfg.forwarding.allowTo;
             in
             lib.concatStringsSep "+" (
-              [ "group${toString my-cid}" ]
-              ++ (builtins.map (x: "group${toString x}") i-forward-to)
+              [ "group${toString my-cid}" ] ++ (builtins.map (x: "group${toString x}") i-forward-to)
             );
 
-          vm-args-daemon = name: guest:
+          vm-args-daemon =
+            name: guest:
             let
               cfg = guest.config.config.microvm.vsock;
               state-directory = "/var/lib/microvms";
@@ -43,15 +51,16 @@ in
               control-socket-path = "${state-directory}/${name}/${cfg.forwarding.control-socket}";
               forwarding-socket-path = "/run/microvm/vsock/${name}.vsock";
             in
-            lib.concatStringsSep "," ([
-              "--vm guest-cid=${toString my-cid}"
-              "socket=${control-socket-path}"
-              "uds-path=${forwarding-socket-path}"
-              #"forward-cid=1" # DEBUG; Forward from guest to 1 (hypervisor)
-              #"forward-listen=22+2222" # DEBUG; Forward from host to guest for ports 22+2222
-            ]
-            ++ (lib.optional cfg.forwarding.freeForAll "groups=default")
-            ++ (lib.optional (cfg.forwarding.freeForAll == false) "groups=${my-groups guest}")
+            lib.concatStringsSep "," (
+              [
+                "--vm guest-cid=${toString my-cid}"
+                "socket=${control-socket-path}"
+                "uds-path=${forwarding-socket-path}"
+                #"forward-cid=1" # DEBUG; Forward from guest to 1 (hypervisor)
+                #"forward-listen=22+2222" # DEBUG; Forward from host to guest for ports 22+2222
+              ]
+              ++ (lib.optional cfg.forwarding.freeForAll "groups=default")
+              ++ (lib.optional (cfg.forwarding.freeForAll == false) "groups=${my-groups guest}")
             );
 
           script = pkgs.writeShellApplication {
@@ -77,7 +86,7 @@ in
       #       name = "chmod-sockets";
       #       runtimeInputs = [ pkgs.findutils pkgs.coreutils ];
       #       # Allow everyone to write to the sockets created by this service.
-      #       # No other way to specifically change permissions around binding time of the actual socket.. 
+      #       # No other way to specifically change permissions around binding time of the actual socket..
       #       # One of those "yeah, this was never solved" things.
       #       text = lib.concatStringsSep "\n" (lib.mapAttrsToList (name: _: chmod-sock-script "${name}.vsock") forwarding-guests);
       #     };

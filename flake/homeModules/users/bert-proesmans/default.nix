@@ -1,4 +1,10 @@
-{ lib, pkgs, nixosConfig, config, ... }:
+{
+  lib,
+  pkgs,
+  nixosConfig,
+  config,
+  ...
+}:
 {
   # Values are preset for the next attribute names;
   # - home.username
@@ -89,8 +95,15 @@
   programs.eza.git = true;
   programs.fzf.enable = true;
   programs.fd.enable = true;
-  programs.fd.ignores = [ ".git/" "*.bak" ];
-  programs.fd.extraOptions = [ "--hidden" "--ignore-case" "--absolute-path" ];
+  programs.fd.ignores = [
+    ".git/"
+    "*.bak"
+  ];
+  programs.fd.extraOptions = [
+    "--hidden"
+    "--ignore-case"
+    "--absolute-path"
+  ];
   programs.ripgrep.enable = true;
   programs.ripgrep.package = pkgs.ripgrep-all;
   programs.ripgrep.arguments = [
@@ -153,7 +166,7 @@
       rebase.autosquash = "true";
       rebase.autostash = true;
       rebase.updateRefs = true;
-      # Remember merge conflict resolution during rebase and automatically re-apply when                                         
+      # Remember merge conflict resolution during rebase and automatically re-apply when
       # similar conflicts are detected. GODS GIFT BRUH
       rerere.enabled = true;
       #
@@ -176,7 +189,7 @@
       "*.pdb"
       "*.qcow2"
       # Normally any non-leading slash forces the match to start at the root of the repo.
-      # But result could be a directory _or file_ symlink, and is a pretty generic name too, so it's pinned 
+      # But result could be a directory _or file_ symlink, and is a pretty generic name too, so it's pinned
       # to the root explicitly.
       "/result"
       # These match directories with same name, at any level

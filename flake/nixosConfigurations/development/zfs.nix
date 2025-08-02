@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   boot.supportedFilesystems = [ "zfs" ]; # enables zfs
   # Do not force anything when pools have not been properly exported!
   boot.zfs.forceImportRoot = false;

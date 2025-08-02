@@ -1,4 +1,5 @@
-{ lib, config, ... }: {
+{ lib, config, ... }:
+{
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
@@ -47,7 +48,7 @@
     "/sys/kernel/mm/transparent_hugepage/enabled".w = {
       # [always] Always give out pages in size bigger than 4KiB.. or <= impacts latency on allocations due to dynamic compaction
       # [madvise] Only give out explicit huge pages through madvice.. or
-      # [never] Only use explicit huge pages through hugetblfs, see nr_hugepages 
+      # [never] Only use explicit huge pages through hugetblfs, see nr_hugepages
       argument = "madvise"; # enum
     };
 
@@ -76,8 +77,9 @@
 
   systemd.network =
     let
-      managementMac = lib.mapAttrsToList (_: v: v.address)
-        (lib.filterAttrs (_m: v: builtins.elem "management" v.tags) config.proesmans.facts.self.macAddresses);
+      managementMac = lib.mapAttrsToList (_: v: v.address) (
+        lib.filterAttrs (_m: v: builtins.elem "management" v.tags) config.proesmans.facts.self.macAddresses
+      );
     in
     {
       links = {

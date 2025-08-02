@@ -1,17 +1,25 @@
-{ lib, flake, pkgs, config, ... }:
+{
+  lib,
+  flake,
+  pkgs,
+  config,
+  ...
+}:
 let
   cfg = config.proesmans.nix;
 in
 {
   options.proesmans.nix = {
-    registry.fat-nixpkgs.enable = lib.mkEnableOption "adding the sources of flake references to the host" // {
-      default = true;
-      description = ''
-        Copy the unpacked source files, resolved from the same input references locked onto this flake, into the target host closure.
-        Without this setting only a reference is kept and the source archive is downloaded on first use eg, on invocation of 
-        `nix shell <>` or `nix run <>`.
-      '';
-    };
+    registry.fat-nixpkgs.enable =
+      lib.mkEnableOption "adding the sources of flake references to the host"
+      // {
+        default = true;
+        description = ''
+          Copy the unpacked source files, resolved from the same input references locked onto this flake, into the target host closure.
+          Without this setting only a reference is kept and the source archive is downloaded on first use eg, on invocation of 
+          `nix shell <>` or `nix run <>`.
+        '';
+      };
 
     overlays = lib.mkOption {
       description = ''
@@ -33,18 +41,23 @@ in
       '';
     };
 
-    garbage-collect.lower-frequency.enable = lib.mkEnableOption "lower frequency executions of nix store garbage collection" // {
-      description = ''
-        Lower the frequency of garbage collection and adjust the amount of data to cleanup each time.
-      '';
-    };
+    garbage-collect.lower-frequency.enable =
+      lib.mkEnableOption "lower frequency executions of nix store garbage collection"
+      // {
+        description = ''
+          Lower the frequency of garbage collection and adjust the amount of data to cleanup each time.
+        '';
+      };
   };
 
   config = lib.mkMerge [
     ({
       ## Section about nix command line interactions ##
       # Enable flakes
-      nix.settings.experimental-features = [ "nix-command" "flakes" ];
+      nix.settings.experimental-features = [
+        "nix-command"
+        "flakes"
+      ];
       # No building by default!
       # ERROR; You **must** override this setting on builder hosts!
       nix.settings.max-jobs = lib.mkDefault 0;
@@ -75,7 +88,7 @@ in
       # A store object must be signed by any of these keys otherwise it's not added to /nix/store.
       #
       # WARN; Yes, this means it's possible to block users from downloading objects from online caches on a user/cache-url
-      # basis, but does not block importing blocks downloaded manually from those same caches ... 
+      # basis, but does not block importing blocks downloaded manually from those same caches ...
       # There is no other option than allowing these keys, because in that situation only "output-addressed" objects
       # are allowed into /nix/store. Basically only derivations from "fetchers" (the pkgs functions that require a hash
       # of their on-disk contents) are "output-addressed" and that implies we could only _build_ from verified source. At
@@ -90,7 +103,7 @@ in
       ];
 
       # Trusted users can manage and ad-hoc use substituters, also maintain the nix/store without limits (import and cleanup)
-      # 
+      #
       # ERROR; Executing nixos-rebuild for a remote target performs store manipulations on that target! This is because
       # the system derivation is (normally built locally on build host) not signed with any trusted binary cache key.
       users.groups.nix-wheel = { };
@@ -118,9 +131,15 @@ in
       nix.registry = lib.mkMerge [
         (lib.mkIf (cfg.registry.fat-nixpkgs.enable == false) {
           # eg; {type = "github", "owner" = "NixOS", repo = "nixpkgs" ... }
-          nixpkgs.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // { ref = flake.inputs.nixpkgs.rev; };
-          nixpkgs-unstable.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // { ref = flake.inputs.nixpkgs-unstable.rev; };
-          nixpkgs-stable.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // { ref = flake.inputs.nixpkgs-stable.rev; };
+          nixpkgs.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // {
+            ref = flake.inputs.nixpkgs.rev;
+          };
+          nixpkgs-unstable.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // {
+            ref = flake.inputs.nixpkgs-unstable.rev;
+          };
+          nixpkgs-stable.to = builtins.parseFlakeRef "github:NixOS/nixpkgs" // {
+            ref = flake.inputs.nixpkgs-stable.rev;
+          };
           # Add more interesting references here!
         })
 
@@ -159,7 +178,7 @@ in
       nixpkgs.overlays =
         let
           # ERROR; There lies a footgun within incorectly defining nixpkgs overlays, leading to inifinite evaluation
-          # recursion! The import is pulled outside the overlay body to be calculated at most once 
+          # recursion! The import is pulled outside the overlay body to be calculated at most once
           # per modules evaluation (evalModule). See below for more information.
           stable-nixpkgs = (import flake.inputs.nixpkgs-stable) {
             # WARN; passing "overlays" here creates a high likelihood of _eval explosion_ AKA nix uses lots of RAM and
@@ -182,9 +201,9 @@ in
             # lib = super.lib // self.outputs.lib;
 
             # Inject stable packages, initialised with the same configuration as nixpkgs, as pkgs.stable.
-            # WARN; This code assumes nixpkgs follows nixpkgs-*un*stable, so the pkgs.stable package set is a way to 
+            # WARN; This code assumes nixpkgs follows nixpkgs-*un*stable, so the pkgs.stable package set is a way to
             # (temporarily) stabilise changes.
-            # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same 
+            # WARN; 'import <flake-input>' will import the '<flake>/default.nix' file. This is _not_ the same
             # as loading from '<flake>/flake.nix'! flake.nix includes nixos library functions, the old default.nix doesn't.
             #   - '(import nixpkgs).lib' will not have the nixos library function
             #   - 'inputs.nixpkgs.lib' has the nixos library functions
@@ -235,7 +254,9 @@ in
       # can be removed based on age.
       #
       # SEEALSO; Run `nix-store --gc --print-roots` to view the gcroots nix currently knows about.
-      nix.gc.options = lib.mkDefault "--delete-older-than 30d --max-freed ${toString (20 * 1024 * 1024 * 1024)}"; # 20GB
+      nix.gc.options = lib.mkDefault "--delete-older-than 30d --max-freed ${
+        toString (20 * 1024 * 1024 * 1024)
+      }"; # 20GB
     })
     (lib.mkIf cfg.garbage-collect.lower-frequency.enable {
       # Keep roots for longer, and remove maximum x data each time

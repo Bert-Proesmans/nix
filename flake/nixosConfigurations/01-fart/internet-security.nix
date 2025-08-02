@@ -1,4 +1,10 @@
-{ lib, flake, pkgs, config, ... }:
+{
+  lib,
+  flake,
+  pkgs,
+  config,
+  ...
+}:
 let
   # TODO; Check connection to upstream controller engine (Local API [LAPI])
   # WARN; Hardcoded upstream
@@ -110,7 +116,10 @@ in
         };
       in
       # WARN; Overwrite upstream pre-start script because that attempts to setup in standalone mode
-      lib.mkForce [ (lib.getExe register) (lib.getExe installConfigurations) ];
+      lib.mkForce [
+        (lib.getExe register)
+        (lib.getExe installConfigurations)
+      ];
 
     ExecStartPost =
       let
@@ -133,7 +142,9 @@ in
   sops.secrets."01-fart-bouncer-crowdsec-key".owner = "root";
   # ERROR; Upstream did not make configuring secrets composeable.
   sops.templates."crowdsec.yaml" = {
-    file = (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec-firewall-bouncer.settings;
+    file =
+      (pkgs.formats.yaml { }).generate "crowdsec.yaml"
+        config.services.crowdsec-firewall-bouncer.settings;
     owner = "root";
     restartUnits = [ config.systemd.services.crowdsec-firewall-bouncer.name ];
   };

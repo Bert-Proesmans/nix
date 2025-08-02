@@ -18,68 +18,75 @@ in
     };
     securityModel = lib.mkOption {
       description = "What security model to use for the shared directory";
-      type = lib.types.enum [ "passthrough" "none" "mapped" "mapped-file" ];
+      type = lib.types.enum [
+        "passthrough"
+        "none"
+        "mapped"
+        "mapped-file"
+      ];
       default = "none";
     };
     socket = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default =
-        if cfg.proto == "virtiofs"
-        then "${hostName}-virtiofs-${cfg.tag}.sock"
-        else null;
+      default = if cfg.proto == "virtiofs" then "${hostName}-virtiofs-${cfg.tag}.sock" else null;
       description = "Socket for communication with virtiofs daemon";
     };
     shares = lib.mkOption {
       description = "Shared directory trees passed through a single guest mount";
       default = [ ];
-      type = lib.types.listOf (lib.types.submodule ({ ... }: {
-        options = {
-          tag = lib.mkOption {
-            type = lib.types.str;
-            description = "Unique virtiofs daemon tag";
-          };
-          source = lib.mkOption {
-            type = lib.types.nonEmptyStr;
-            description = "Path to shared directory tree";
-          };
-          mountPoint = lib.mkOption {
-            type = lib.types.path;
-            description = "Where to mount the shared directory tree inside the virtual machine";
-          };
-          read-only = lib.mkOption {
-            description = "Bind mount the source as read-only";
-            type = lib.types.bool;
-            default = false;
-          };
-        };
-      }));
+      type = lib.types.listOf (
+        lib.types.submodule (
+          { ... }:
+          {
+            options = {
+              tag = lib.mkOption {
+                type = lib.types.str;
+                description = "Unique virtiofs daemon tag";
+              };
+              source = lib.mkOption {
+                type = lib.types.nonEmptyStr;
+                description = "Path to shared directory tree";
+              };
+              mountPoint = lib.mkOption {
+                type = lib.types.path;
+                description = "Where to mount the shared directory tree inside the virtual machine";
+              };
+              read-only = lib.mkOption {
+                description = "Bind mount the source as read-only";
+                type = lib.types.bool;
+                default = false;
+              };
+            };
+          }
+        )
+      );
     };
   };
 
   config = lib.mkIf enable-central-share {
-    assertions = builtins.map
-      (shares: {
-        assertion = builtins.length shares == 1;
-        message = ''
-          MicroVM ${hostName}: share tag "${(builtins.head shares).tag}" is used ${toString (builtins.length shares)} > 1 times.
-        '';
-      })
-      (builtins.attrValues (builtins.groupBy ({ tag, ... }: tag) cfg.shares));
+    assertions = builtins.map (shares: {
+      assertion = builtins.length shares == 1;
+      message = ''
+        MicroVM ${hostName}: share tag "${(builtins.head shares).tag}" is used ${toString (builtins.length shares)} > 1 times.
+      '';
+    }) (builtins.attrValues (builtins.groupBy ({ tag, ... }: tag) cfg.shares));
 
-    microvm.shares = [{
-      # INFO; Use standard microvm.share options to mount the base directory into the guest
+    microvm.shares = [
+      {
+        # INFO; Use standard microvm.share options to mount the base directory into the guest
 
-      source = "/run/central-microvm/${hostName}";
-      # WARN; Different name for incoming mounts, so stacking becomes possible
-      mountPoint = "/run/in-central-microvm/${hostName}";
-      tag = cfg.tag;
-      proto = cfg.proto;
-      securityModel = cfg.securityModel;
-      socket = cfg.socket;
-    }];
+        source = "/run/central-microvm/${hostName}";
+        # WARN; Different name for incoming mounts, so stacking becomes possible
+        mountPoint = "/run/in-central-microvm/${hostName}";
+        tag = cfg.tag;
+        proto = cfg.proto;
+        securityModel = cfg.securityModel;
+        socket = cfg.socket;
+      }
+    ];
 
-    systemd.mounts = (lib.flip builtins.map config.microvm.central.shares (
-      share: {
+    systemd.mounts = (
+      lib.flip builtins.map config.microvm.central.shares (share: {
         # INFO; Mount each tag into the desired location
 
         what = "/run/in-central-microvm/${hostName}/${share.tag}";
@@ -95,7 +102,7 @@ in
         # NOTE; We _do_ need to _want_ the mount though, otherwise systemd will not mount the directory
         # until explicitly needed!
         wantedBy = [ "multi-user.target" ];
-      }
-    ));
+      })
+    );
   };
 }

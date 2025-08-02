@@ -7,7 +7,10 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf cfg.enable-all {
-      services.resolved.fallbackDns = [ "127.0.0.1" "::1" ];
+      services.resolved.fallbackDns = [
+        "127.0.0.1"
+        "::1"
+      ];
       services.resolved.llmnr = "false";
       services.resolved.dnsovertls = "true";
       services.resolved.domains = [

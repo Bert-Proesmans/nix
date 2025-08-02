@@ -1,5 +1,5 @@
-{ flake, config, ... }: {
-
+{ flake, config, ... }:
+{
   imports = [
     ./hardware-configuration.nix
     ./disks.nix
@@ -58,4 +58,3 @@
   # Consistent defaults accross all machine configurations.
   system.stateVersion = "24.05";
 }
-

@@ -1,4 +1,5 @@
-{ pkgs, config, ... }: {
+{ pkgs, config, ... }:
+{
 
   imports = [
     ./provision.nix # Setup users/groups/applications
@@ -23,13 +24,15 @@
 
     # NOTE; kanidm-provision uses hardcoded curl that we cannot individually wrap into unsock.
     # So the second best approach is a dedicated VSOCK proxy service.
-    proesmans.vsock-proxy.proxies = [{
-      description = "Connect VSOCK to AF_INET for kanidm service";
-      listen.vsock.cid = -1; # Binds to guest localhost
-      listen.port = 8443;
-      transmit.tcp.ip = "127.175.0.0";
-      transmit.port = 8443;
-    }];
+    proesmans.vsock-proxy.proxies = [
+      {
+        description = "Connect VSOCK to AF_INET for kanidm service";
+        listen.vsock.cid = -1; # Binds to guest localhost
+        listen.port = 8443;
+        transmit.tcp.ip = "127.175.0.0";
+        transmit.port = 8443;
+      }
+    ];
 
     nixpkgs.overlays = [
       (_: prev: {

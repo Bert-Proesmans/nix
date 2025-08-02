@@ -1,4 +1,10 @@
-{ lib, pkgs, config, ... }: {
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+{
   imports = [ ./WIP.nix ];
 
   networking.domain = "alpha.proesmans.eu";
@@ -13,13 +19,15 @@
   # REF; https://github.com/kohlschutter/unsock/issues/3
   #
   # The code itself doesn't support binding to other types of sockets.
-  proesmans.vsock-proxy.proxies = [{
-    description = "Connect VSOCK to AF_INET for immich service";
-    listen.vsock.cid = -1; # Binds to localhost
-    listen.port = 8080;
-    transmit.tcp.ip = config.services.immich.host;
-    transmit.port = config.services.immich.port;
-  }];
+  proesmans.vsock-proxy.proxies = [
+    {
+      description = "Connect VSOCK to AF_INET for immich service";
+      listen.vsock.cid = -1; # Binds to localhost
+      listen.port = 8080;
+      transmit.tcp.ip = config.services.immich.host;
+      transmit.port = config.services.immich.port;
+    }
+  ];
 
   # nixpkgs.overlays = [
   #   (final: prev:
@@ -164,7 +172,9 @@
   };
 
   systemd.services.postgresql.serviceConfig = {
-    StateDirectory = [ "wal-postgresql wal-postgresql/${config.services.postgresql.package.psqlSchema}" ];
+    StateDirectory = [
+      "wal-postgresql wal-postgresql/${config.services.postgresql.package.psqlSchema}"
+    ];
   };
 
   # Ignore below

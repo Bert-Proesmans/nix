@@ -1,5 +1,6 @@
 # Setup a secure bridge between virtualgl wrapped surfaces and the x-display attached to the graphics hardware
-{ lib, pkgs, ... }: {
+{ lib, pkgs, ... }:
+{
   # Setup virtual display(s) for headless accelerated desktops (for vnc/sunshine)
   # WARN; The amdgpu driver does not support a combination of physical and virtual displays as of writing. The screen will blank after
   # loading the driver module. To see boot logs, do not add the amdgpu driver to initrd with this config!
@@ -69,10 +70,21 @@
         # REF; https://nixos.org/manual/nixpkgs/stable/#sec-stdenv-phases @paragraph-2
         buildCommand = old.buildCommand + ''
           wrapProgram $out/bin/vglrun \
-            --prefix PATH : "${lib.makeBinPath [ final.coreutils final.nettools final.gnused ]}"
+            --prefix PATH : "${
+              lib.makeBinPath [
+                final.coreutils
+                final.nettools
+                final.gnused
+              ]
+            }"
 
           wrapProgram $out/bin/vglgenkey \
-            --prefix PATH : "${lib.makeBinPath [ final.xorg.xauth final.gawk ]}"
+            --prefix PATH : "${
+              lib.makeBinPath [
+                final.xorg.xauth
+                final.gawk
+              ]
+            }"
         '';
       });
     })

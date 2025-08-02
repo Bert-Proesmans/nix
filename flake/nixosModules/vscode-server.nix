@@ -1,4 +1,10 @@
-{ lib, pkgs, flake, config, ... }:
+{
+  lib,
+  pkgs,
+  flake,
+  config,
+  ...
+}:
 let
   cfg = config.proesmans.vscode;
 in
@@ -14,8 +20,9 @@ in
     (lib.mkIf (cfg.enable || cfg.nix-dependencies.enable) {
       services.vscode-server.enable = true;
 
-      environment.systemPackages = lib.mkIf cfg.nix-dependencies.enable
-        (builtins.attrValues { inherit (pkgs) nixfmt; });
+      environment.systemPackages = lib.mkIf cfg.nix-dependencies.enable (
+        builtins.attrValues { inherit (pkgs) nixfmt; }
+      );
     })
   ];
 }

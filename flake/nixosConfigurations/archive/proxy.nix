@@ -1,4 +1,5 @@
-{ pkgs, config, ... }: {
+{ pkgs, config, ... }:
+{
   networking.domain = "alpha.proesmans.eu";
 
   # DEBUG
@@ -7,7 +8,10 @@
   users.users.bert-proesmans.extraGroups = [ "wheel" ];
   # DEBUG
 
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+  networking.firewall.allowedTCPPorts = [
+    80
+    443
+  ];
 
   # WARN; Customisations to make NGINX compatible with UNSOCK
   proesmans.fixes.unsock-nginx.enable = true;
@@ -58,9 +62,16 @@
           # WARN; Need a special listen setup because the default listen fallback adds ports
           # to the unix sockets, due to incomplete filtering.
           listen = [
-            { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; }
+            {
+              addr = "unix:/run/nginx/https-frontend.sock";
+              ssl = true;
+            }
             # NOTE; Attribute set below is used for the non-ssl redirect stanza
-            { addr = "0.0.0.0"; port = 80; ssl = false; }
+            {
+              addr = "0.0.0.0";
+              port = 80;
+              ssl = false;
+            }
           ];
 
           forceSSL = true;

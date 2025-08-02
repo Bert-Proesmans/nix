@@ -1,3 +1,1 @@
-{ lib }: { }
-  // (import ./importers.nix lib)
-  // (import ./network.nix lib)
+{ lib }: { } // (import ./importers.nix lib) // (import ./network.nix lib)

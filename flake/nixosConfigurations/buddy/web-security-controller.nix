@@ -1,4 +1,10 @@
-{ lib, flake, pkgs, config, ... }:
+{
+  lib,
+  flake,
+  pkgs,
+  config,
+  ...
+}:
 let
   api-url-crowdsec = "0.0.0.0:10124";
   # WARN; Hardcoded upstream

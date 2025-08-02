@@ -1,4 +1,9 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   postgresStatePath = "/var/lib/postgresql";
   postgresWalPath = "/var/lib/postgresql-wal";
@@ -60,7 +65,10 @@ in
   systemd.services.postgresql = lib.mkIf config.services.postgresql.enable {
     environment.TZ = "Etc/UTC"; # Force native timezone aware data into UTC
 
-    unitConfig.RequiresMountsFor = [ postgresStatePath postgresWalPath ];
+    unitConfig.RequiresMountsFor = [
+      postgresStatePath
+      postgresWalPath
+    ];
     serviceConfig = {
       StateDirectory = [
         "" # Reset

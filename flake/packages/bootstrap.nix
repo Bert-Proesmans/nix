@@ -1,25 +1,28 @@
-{ lib
-, system
-, nixosLib
-, flake
-}: (
-  nixosLib.nixosSystem {
-    lib = nixosLib;
-    specialArgs = {
-      # Define arguments here that must be be resolvable at module import stage.
-      #
-      # For everything else use the _module.args option instead (inside configuration).
-      flake = {
-        inherit (flake) inputs;
-        outputs = {
-          # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
-          # anyway. Their evaluation could change depending on introduced overlays!
-          inherit (flake.outputs) overlays homeModules;
-        };
+{
+  lib,
+  system,
+  nixosLib,
+  flake,
+}:
+(nixosLib.nixosSystem {
+  lib = nixosLib;
+  specialArgs = {
+    # Define arguments here that must be be resolvable at module import stage.
+    #
+    # For everything else use the _module.args option instead (inside configuration).
+    flake = {
+      inherit (flake) inputs;
+      outputs = {
+        # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
+        # anyway. Their evaluation could change depending on introduced overlays!
+        inherit (flake.outputs) overlays homeModules;
       };
     };
-    modules = [
-      ({ config, modulesPath, ... }: {
+  };
+  modules = [
+    (
+      { config, modulesPath, ... }:
+      {
         _file = ./bootstrap.nix;
 
         imports = [
@@ -53,7 +56,10 @@
 
           isoImage.storeContents = [ ];
 
-          nix.settings.experimental-features = [ "nix-command" "flakes" ];
+          nix.settings.experimental-features = [
+            "nix-command"
+            "flakes"
+          ];
           nix.settings.connect-timeout = lib.mkForce 5;
           nix.settings.log-lines = lib.mkForce 25;
 
@@ -83,7 +89,7 @@
 
           environment.ldso32 = null;
         };
-      })
-    ];
-  }
-).config.system.build.isoImage
+      }
+    )
+  ];
+}).config.system.build.isoImage

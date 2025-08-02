@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   # Disable resolved (systemd) to free up the DNS port on loopback.
   services.resolved.enable = false;
   services.routedns.enable = true;

@@ -1,5 +1,6 @@
-{ pkgs, ... }: {
-  programs.nixpkgs-fmt.enable = true;
+{ pkgs, ... }:
+{
+  programs.nixfmt.enable = true;
   programs.deadnix.enable = true;
   programs.shellcheck.enable = true;
   programs.shfmt = {
@@ -16,8 +17,10 @@
     directories = {
       "flakeroot" = {
         directory = ".";
-        extraPythonPackages =
-          [ pkgs.python3.pkgs.deploykit pkgs.python3.pkgs.invoke ];
+        extraPythonPackages = [
+          pkgs.python3.pkgs.deploykit
+          pkgs.python3.pkgs.invoke
+        ];
       };
     };
   };

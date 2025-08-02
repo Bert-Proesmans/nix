@@ -1,10 +1,14 @@
-{ lib, ... }: {
+{ lib, ... }:
+{
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.
-  boot.kernelModules = [ "kvm-amd" "kvm-intel" ];
+  boot.kernelModules = [
+    "kvm-amd"
+    "kvm-intel"
+  ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
 
@@ -62,7 +66,10 @@
     "30-hypervisor-connect" = {
       matchConfig.Name = "eth1";
       networkConfig = {
-        Address = [ "169.254.245.139/24" "fe80::139/64" ];
+        Address = [
+          "169.254.245.139/24"
+          "fe80::139/64"
+        ];
         LinkLocalAddressing = "no";
       };
     };

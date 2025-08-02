@@ -1,6 +1,15 @@
 # Provide external endpoint that reverse proxies local services
-{ lib, pkgs, config, ... }: {
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+{
+  networking.firewall.allowedTCPPorts = [
+    80
+    443
+  ];
 
   security.acme.certs."alpha.proesmans.eu" = {
     group = config.services.nginx.group;
@@ -35,9 +44,21 @@
         # REF; https://github.com/NixOS/nixpkgs/issues/370905
         defaultListen = {
           listen = [
-            { addr = "unix:/run/nginx/virtualhosts.sock"; port = null; ssl = true; }
-            { addr = "0.0.0.0"; port = 80; ssl = false; }
-            { addr = "[::0]"; port = 80; ssl = false; }
+            {
+              addr = "unix:/run/nginx/virtualhosts.sock";
+              port = null;
+              ssl = true;
+            }
+            {
+              addr = "0.0.0.0";
+              port = 80;
+              ssl = false;
+            }
+            {
+              addr = "[::0]";
+              port = 80;
+              ssl = false;
+            }
           ];
         };
       in
@@ -46,14 +67,23 @@
           default = true;
           rejectSSL = true;
           locations."/".return = "404";
-        } // defaultListen;
+        }
+        // defaultListen;
 
         "alpha.idm.proesmans.eu" = {
           # Redirect to https without configuring https
           locations."/".return = "301 https://$host$request_uri";
           listen = [
-            { addr = "0.0.0.0"; port = 80; ssl = false; }
-            { addr = "[::0]"; port = 80; ssl = false; }
+            {
+              addr = "0.0.0.0";
+              port = 80;
+              ssl = false;
+            }
+            {
+              addr = "[::0]";
+              port = 80;
+              ssl = false;
+            }
           ];
         };
 
@@ -69,7 +99,8 @@
               client_max_body_size 500M;
             '';
           };
-        } // defaultListen;
+        }
+        // defaultListen;
 
         "backup.alpha.proesmans.eu" = {
           useACMEHost = "alpha.proesmans.eu";
@@ -92,7 +123,8 @@
               proxy_buffering off;
             '';
           };
-        } // defaultListen;
+        }
+        // defaultListen;
       };
 
     # Redirect the Idm traffic into kanidm for end-to-end encryption using the stream module

@@ -1,4 +1,10 @@
-{ lib, modulesPath, config, ... }: {
+{
+  lib,
+  modulesPath,
+  config,
+  ...
+}:
+{
   #
   # Boot on AMD 1OCPU
   #
@@ -16,7 +22,7 @@
   # cancel the deploy and retry (untested, disko will probably panic on second format).
   #
   #
-  # NOTE; nixos-anywhere should be able to "stream-install" as well in limited RAM circumstances. The instructions below are doing 
+  # NOTE; nixos-anywhere should be able to "stream-install" as well in limited RAM circumstances. The instructions below are doing
   # the manual work for minimal RAM impact.
   #
   # 1. Configure VPS
@@ -80,7 +86,13 @@
     "vm.watermark_boost_factor" = 0;
     "vm.watermark_scale_factor" = 125;
   };
-  boot.initrd.availableKernelModules = [ "ata_piix" "uhci_hcd" "virtio_pci" "virtio_scsi" "sd_mod" ];
+  boot.initrd.availableKernelModules = [
+    "ata_piix"
+    "uhci_hcd"
+    "virtio_pci"
+    "virtio_scsi"
+    "sd_mod"
+  ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
   boot.tmp.useTmpfs = false; # Only have 1G RAM
@@ -90,7 +102,7 @@
     # NOTE; Using ZRAM; in-memory swap device with compressed pages, backed by block device to hold incompressible and memory overflow.
     # ERROR; The default kernel page controller does not manage evictions between swap devices of different priority! Devices are
     # filled in priority order until they cannot hold more data. This means that a full zram device with stale data causes next evictions
-    # to be written to the next swap device with lower priority. 
+    # to be written to the next swap device with lower priority.
     # ERROR; Managing least-recently-used (LRU) inside ZRAM will improve latency, but this isn't how the mechanism exactly works either.
     # The writeback device will receive _randomly_ chosen 'idle' pages, causing high variance in latency! There is a configurable access
     # timer, however, that marks pages as idle automatically.
@@ -195,12 +207,12 @@
                 "--iter-time 10000" # 10 seconds before key-unlock
                 # Best performance according to cryptsetup benchmark
                 "--cipher aes-xts-plain64" # [cipher]-[mode]-[iv] format
-                # NOTE; I'm considering AES-128 (~126 bit randomness) secure with global (world) hashrate being less than 
+                # NOTE; I'm considering AES-128 (~126 bit randomness) secure with global (world) hashrate being less than
                 # 2^81 hashes per second.
                 "--key-size 256" # SPLITS IN TWO (xts) !!
                 "--use-urandom"
               ];
-              # Generate and store a new key using; 
+              # Generate and store a new key using;
               # tr -dc '[:alnum:]' </dev/urandom | head -c64
               #
               # WARN; Path hardcoded in tasks.py !
@@ -210,12 +222,12 @@
               settings.bypassWorkqueues = true;
               content = {
                 # NOTE; We're following the example here with LVM on top of LUKS.
-                # THE REASON IS BECAUSE OF SECTOR ALIGNMENT AND EXPECTATIONS ! LVM provides flexible sector sizes detached from 
+                # THE REASON IS BECAUSE OF SECTOR ALIGNMENT AND EXPECTATIONS ! LVM provides flexible sector sizes detached from
                 # underlying systems.
                 # Using GPT inside the LUKS container makes the situation complicated, I'm not grasping this entirely myself, but
                 # default sector sizes for GPT partition layouts is 512B and LUKS by default has a minimum sector size of 4096B (4K)
                 # and you cannot go below that sector size on top (sector size is the minimum addressable unit).
-                # For some reason the stage-1 environment doesn't like GPT sectors of 4096 bytes (in the current setup) and fails 
+                # For some reason the stage-1 environment doesn't like GPT sectors of 4096 bytes (in the current setup) and fails
                 # to load its partitions. There are no issues with 4K sectors on physical hard disks though.. /shrug
                 type = "lvm_pv";
                 vg = "pool";

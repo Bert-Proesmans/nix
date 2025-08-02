@@ -1,4 +1,10 @@
-{ lib, flake, pkgs, config, ... }:
+{
+  lib,
+  flake,
+  pkgs,
+  config,
+  ...
+}:
 let
   # ERROR; Upstream does not handle deviating from the default URI !!
   crowdsecAPI = "127.0.0.1:8080";
@@ -195,19 +201,19 @@ in
 
         chain input {
           type filter hook input priority filter; policy drop;
-        
+
           iifname { lo } accept
           ct state {established, related} accept
           ct state invalid drop
-        
+
           # Internet control messages (ICMP) (minimal set for a server)
           # routers may also want: mld-listener-query, nd-router-solicit
           ip6 nexthdr icmpv6 icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert } accept comment "allow ICMP"
           ip protocol icmp icmp type { destination-unreachable, router-advertisement, time-exceeded, parameter-problem } accept comment "allow ICMP"
-        
+
           ip6 nexthdr icmpv6 icmpv6 type echo-request accept comment "allow ping"
           ip protocol icmp icmp type echo-request accept comment "allow ping"
-        
+
           tcp dport { ${toString (lib.head config.services.openssh.ports)} } accept comment "allow ssh"
 
           # <=> (tcp_flags & (fin | syn | rst | ack)) == syn, only match on exactly "SYN"
@@ -225,17 +231,25 @@ in
         chain input-accept {
           # Fixed and dynamic rules for accepting incoming traffic
 
-          tcp dport { ${lib.concatMapStringsSep "," toString (config.networking.firewall.allowedTCPPorts ++ config.networking.firewall.allowedTCPPortRanges)} } accept
-          # udp dport { ${lib.concatMapStringsSep "," toString (config.networking.firewall.allowedUDPPorts ++ config.networking.firewall.allowedUDPPortRanges)} } accept
+          tcp dport { ${
+            lib.concatMapStringsSep "," toString (
+              config.networking.firewall.allowedTCPPorts ++ config.networking.firewall.allowedTCPPortRanges
+            )
+          } } accept
+          # udp dport { ${
+            lib.concatMapStringsSep "," toString (
+              config.networking.firewall.allowedUDPPorts ++ config.networking.firewall.allowedUDPPortRanges
+            )
+          } } accept
           meta l4proto . th dport @temp-ports accept comment "temporary ports, use nft add element inet filter temp-ports { tcp . 12345, udp . 23456 }"
         }
-        
+
         chain output {
           type filter hook output priority filter; policy drop;
           
           accept comment "allow all outgoing connections"
         }
-        
+
         chain forward {
           type filter hook forward priority filter; policy drop;
           

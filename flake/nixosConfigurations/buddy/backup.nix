@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   services.sanoid = {
     enable = true;
     # WARN; At DST transition we _still_ lose one hour worth of backup due to snapshot naming collisions!

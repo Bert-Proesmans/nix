@@ -1,4 +1,5 @@
-{ lib, pkgs, }: {
+{ lib, pkgs }:
+{
   default = pkgs.mkShellNoCC {
     name = "b-NIX development";
 

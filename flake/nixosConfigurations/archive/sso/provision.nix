@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   services.kanidm.provision = {
     enable = true;
     autoRemove = true;
@@ -34,7 +35,11 @@
         #"app.immich:///oauth-callback"
         "app.immich:///"
       ];
-      scopeMaps."immich.access" = [ "openid" "email" "profile" ];
+      scopeMaps."immich.access" = [
+        "openid"
+        "email"
+        "profile"
+      ];
       preferShortUsername = true;
       # PKCE is currently not supported by immich
       allowInsecureClientDisablePkce = true;

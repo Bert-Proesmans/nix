@@ -1,4 +1,5 @@
-{ lib, modulesPath, ... }: {
+{ lib, modulesPath, ... }:
+{
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     ./disk.nix
@@ -11,7 +12,13 @@
   #   intel.updateMicrocode = lib.mkForce false;
   # };
 
-  boot.initrd.availableKernelModules = [ "ata_piix" "uhci_hcd" "virtio_pci" "virtio_scsi" "sd_mod" ];
+  boot.initrd.availableKernelModules = [
+    "ata_piix"
+    "uhci_hcd"
+    "virtio_pci"
+    "virtio_scsi"
+    "sd_mod"
+  ];
   boot.initrd.kernelModules = [ "dm-snapshot" ];
   boot.kernelModules = [ "kvm-amd" ];
   boot.extraModulePackages = [ ];

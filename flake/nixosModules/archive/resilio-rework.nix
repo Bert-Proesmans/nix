@@ -1,12 +1,31 @@
-{ config
-, lib
-, pkgs
-, ...
+{
+  config,
+  lib,
+  pkgs,
+  ...
 }:
 
 let
-  inherit (lib) mkOption mkPackageOption mkIf literalExpression optional;
-  inherit (lib.types) submodule listOf attrsOf nullOr oneOf bool path str int singleLineStr anything;
+  inherit (lib)
+    mkOption
+    mkPackageOption
+    mkIf
+    literalExpression
+    optional
+    ;
+  inherit (lib.types)
+    submodule
+    listOf
+    attrsOf
+    nullOr
+    oneOf
+    bool
+    path
+    str
+    int
+    singleLineStr
+    anything
+    ;
 
   cfg = config.services.proesmans.resilio;
 

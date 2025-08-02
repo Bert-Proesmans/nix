@@ -1,4 +1,9 @@
-{ lib, flake, config, ... }:
+{
+  lib,
+  flake,
+  config,
+  ...
+}:
 let
   cfg = config.proesmans.sopsSecrets;
 in
@@ -13,13 +18,15 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    assertions = [{
-      assertion = builtins.stringLength config.sops.defaultSopsFile > 0;
-      message = ''
-        Must set a default sops file to retrieve secrets from!
-        Set one at 'sops.defaultSopsFile'.
-      '';
-    }];
+    assertions = [
+      {
+        assertion = builtins.stringLength config.sops.defaultSopsFile > 0;
+        message = ''
+          Must set a default sops file to retrieve secrets from!
+          Set one at 'sops.defaultSopsFile'.
+        '';
+      }
+    ];
 
     sops = {
       # ERROR; Each host must set its own secrets file, like below
@@ -41,8 +48,9 @@ in
       owner = config.users.users.root.name;
       group = config.users.users.root.group;
       mode = "0400";
-      restartUnits = lib.optional (config.services.openssh.enable && !config.services.openssh.startWhenNeeded)
-        config.systemd.services.sshd.name;
+      restartUnits = lib.optional (
+        config.services.openssh.enable && !config.services.openssh.startWhenNeeded
+      ) config.systemd.services.sshd.name;
     };
 
     services.openssh.enable = lib.mkIf cfg.sshHostkeyControl.enable (lib.mkDefault true);

@@ -1,4 +1,5 @@
-{ lib, flake, ... }: {
+{ lib, flake, ... }:
+{
   imports = [
     flake.inputs.microvm.nixosModules.host
   ];

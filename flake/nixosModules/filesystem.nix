@@ -1,5 +1,11 @@
 # Simple hardware and disk configuration for physicl/virtual machines
-{ lib, flake, config, options, ... }:
+{
+  lib,
+  flake,
+  config,
+  options,
+  ...
+}:
 let
   cfg = config.proesmans.filesystem;
 in
@@ -16,13 +22,15 @@ in
   };
 
   config = lib.mkIf cfg.simple-disk.enable {
-    assertions = [{
-      assertion = builtins.stringLength cfg.simple-disk.device > 0;
-      message = ''
-        A device path must be provided for formatting to work!
-        Set one at 'proesmans.filesystem.simple-disk.device'.
-      '';
-    }];
+    assertions = [
+      {
+        assertion = builtins.stringLength cfg.simple-disk.device > 0;
+        message = ''
+          A device path must be provided for formatting to work!
+          Set one at 'proesmans.filesystem.simple-disk.device'.
+        '';
+      }
+    ];
 
     disko.devices = {
       disk.root = {

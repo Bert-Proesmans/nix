@@ -1,9 +1,16 @@
-{ lib, config, ... }: {
-  networking.firewall.allowedTCPPorts = [ 80 443 ];
+{ lib, config, ... }:
+{
+  networking.firewall.allowedTCPPorts = [
+    80
+    443
+  ];
 
   # Must be member of cert-group to get access to the certs
   # NOTE; root also required because that's the service user for nginx-config-reload.
-  users.groups.alpha-certs.members = [ "root" "nginx" ];
+  users.groups.alpha-certs.members = [
+    "root"
+    "nginx"
+  ];
 
   services.nginx = {
     enable = true;
@@ -53,12 +60,20 @@
     # eg "upstreams" can be configured within http block, but also stream block etc
 
     upstreams = {
-      photos-upstream.servers."${config.services.immich.host}:${toString config.services.immich.port}" = { };
+      photos-upstream.servers."${config.services.immich.host}:${toString config.services.immich.port}" =
+        { };
     };
 
     defaultListen = [
-      { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; }
-      { addr = "0.0.0.0"; port = 80; ssl = false; }
+      {
+        addr = "unix:/run/nginx/https-frontend.sock";
+        ssl = true;
+      }
+      {
+        addr = "0.0.0.0";
+        port = 80;
+        ssl = false;
+      }
     ];
 
     virtualHosts = {

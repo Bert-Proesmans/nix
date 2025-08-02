@@ -13,7 +13,7 @@ in
   config = lib.mkIf cfg.enable {
     nixpkgs.overlays = [
       (_final: prev: {
-        # Do this for all nginx packages, why are there so many .. 
+        # Do this for all nginx packages, why are there so many ..
         nginxStable = prev.nginxStable.overrideAttrs (old: {
           # Forcefully add poll module for event handling. This method can be used with UNSOCK
           configureFlags = old.configureFlags ++ [ "--with-poll_module" ];

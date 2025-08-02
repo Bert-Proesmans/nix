@@ -1,4 +1,9 @@
-{ lib, config, options, ... }:
+{
+  lib,
+  config,
+  options,
+  ...
+}:
 {
   options.proesmans.facts = lib.mkOption {
     type = lib.types.submodule {
@@ -11,11 +16,13 @@
           description = ''
             Collection of data to help filtering down records.
           '';
-          type = lib.types.listOf (lib.types.enum [
-            "bare-metal"
-            "hypervisor"
-            "virtual-machine"
-          ]);
+          type = lib.types.listOf (
+            lib.types.enum [
+              "bare-metal"
+              "hypervisor"
+              "virtual-machine"
+            ]
+          );
           apply = lib.lists.unique;
           default = [ ];
         };
@@ -23,7 +30,7 @@
         management.mac-address = lib.mkOption {
           description = ''
             The MAC address of the network interface that should be used for SSH host management.
-            
+
             NOTE; The "locally administrated"-bit must be set for generated MAC addresses to make the change of random collision impossible!
             REF; https://www.hellion.org.uk/cgi-bin/randmac.pl
           '';
@@ -79,7 +86,9 @@
   # Setup some defaults that apply to all machines
   config.proesmans.facts = {
     host-name = lib.mkIf (config.networking.hostName != null) config.networking.hostName;
-    management.domain-name = lib.mkIf (config.networking.hostName != null && config.networking.domain != null) "${config.networking.hostName}.${config.networking.domain}";
+    management.domain-name = lib.mkIf (
+      config.networking.hostName != null && config.networking.domain != null
+    ) "${config.networking.hostName}.${config.networking.domain}";
 
     meta.vsock-id =
       let

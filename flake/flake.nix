@@ -14,7 +14,6 @@
     # It's imported to simplify/merge the input chain, but unused in this flake.
     flake-utils.url = "github:numtide/flake-utils";
 
-
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
     disko.url = "github:nix-community/disko";
@@ -42,7 +41,8 @@
     crowdsec.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, ... }:
+  outputs =
+    { self, ... }:
     let
       inherit (self) inputs outputs;
 
@@ -55,10 +55,12 @@
       # eg; inputs.nixpkgs.lib.nixosSystem => exists
       # eg; pkgs.lib.nixosSystem => does _not_ exist
       # eg; nixpkgs.legacyPackages.<system>.lib.nixosSystem => does _not_ exist
-      lib = inputs.nixpkgs.lib.extend (inputs.nixpkgs.lib.composeManyExtensions [
-        (_: _: { dns = inputs.dns.lib; }) # lib from dns.nix
-        (_: _: outputs.lib) # Our own lib
-      ]);
+      lib = inputs.nixpkgs.lib.extend (
+        inputs.nixpkgs.lib.composeManyExtensions [
+          (_: _: { dns = inputs.dns.lib; }) # lib from dns.nix
+          (_: _: outputs.lib) # Our own lib
+        ]
+      );
 
       __forSystems = lib.genAttrs [ "x86_64-linux" ];
       __forPackages = __forSystems (system: inputs.nixpkgs.legacyPackages.${system});
@@ -70,7 +72,7 @@
       lib = import ./library/all.nix { inherit lib; };
 
       # Format entire flake with;
-      # nix fmt 
+      # nix fmt
       #
       formatter = eachSystem (pkgs: inputs.treefmt-nix.lib.mkWrapper pkgs ./treefmt.nix);
 
@@ -83,7 +85,7 @@
 
       # Overwrite (aka patch) declarative configuration, most often build recipes from nixpkgs.
       #
-      # These attributes are lambda's that don't do anything on their own. Use the `overlay` options to incorporate them into 
+      # These attributes are lambda's that don't do anything on their own. Use the `overlay` options to incorporate them into
       # your configuration.
       # eg; (nixos options) nixpkgs.overlays = builtins.attrValues self.outputs.overlays;
       # eg; (nix extensible attr set) _ = lib.extends (lib.composeManyExtensions (builtins.attrValues self.outputs.overlays));
@@ -101,8 +103,8 @@
       # NixOS modules are anonymous lambda functions with an attribute set as the first argument (arity of all nix functions is
       # always one). NixOS modules on their own do nothing, but need to be composed into a nixosConfiguration.
       #
-      # Refer to the filepath ./nixosConfigurations for the definition/configuration of each host machine. Starting from 
-      # the configuration.nix file, other nixos module files are imported. The collective set of all imported modules is 
+      # Refer to the filepath ./nixosConfigurations for the definition/configuration of each host machine. Starting from
+      # the configuration.nix file, other nixos module files are imported. The collective set of all imported modules is
       # turned into the host configuration.
       # Because the configuration.nix file is typically imported first, it's called the toplevel (nixos) module.
       #
@@ -154,26 +156,29 @@
       # SEEALSO; ./tasks.py file
       #
       #
-      # Deploy with nixos-anywhere; 
+      # Deploy with nixos-anywhere;
       # nix run github:nix-community/nixos-anywhere -- --flake .#<hostname (attribute-name within nixosConfigurations)> <user>@<ip address>
-      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name, 
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name,
       # "nixosConfigurations" can thus be omitted from the command line invocation.
       # NOTE; <user> must be root or have passwordless sudo on the target host machine, most often the target is booted from the installer iso.
       # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine.
       #
       #
       # Update with; nixos-rebuild switch --flake .#<hostname> --target-host <user>@<ip address>
-      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name, 
+      # NOTE; nixos-anywhere will automatically look under #nixosConfigurations for the provided attribute name,
       # "nixosConfigurations" can thus be omitted from the command line invocation.
       # NOTE; <user> must be root or have passwordless sudo on the target host machine, most often the target is booted from the installer iso.
       # NOTE; <ip address> of anything SSH-able, ssh config preferably has a configuration stanza for this machine.
       #
       #
-      # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process. 
+      # NOTE; Optimizations like --use-substituters and caching can be used to speed up the building/install/update process.
       # Using this optimization depends on properties of the build-host and the target-host.
       # eg use it when the upload speed of the build-host is slower than the download speed of the target-host.
       #
-      nixosConfigurations = import ./nixosConfigurations/all.nix { inherit lib; flake = self; };
+      nixosConfigurations = import ./nixosConfigurations/all.nix {
+        inherit lib;
+        flake = self;
+      };
       # no homeConfigurations
 
       # Build a bootstrap image using;
@@ -186,34 +191,38 @@
       # All attributes this flake defines lead to creating some concrete file. The semantics for "packages" is binaries, but could
       # be anything really.
       #
-      packages = eachSystem (pkgs:
+      packages = eachSystem (
+        pkgs:
         # NOTE; lib.fix creates a recursive scope, sort of like let in {} with nix lazy evaluation.
         # ERROR; Don't use lib.{new,create}Scope because those inject additional attributes that 'nix flake check'
         # doesn't like!
-        lib.fix (final:
+        lib.fix (
+          final:
           let
             # NOTE; Create our own callPackage function with our recursive scope, this function
             # will apply the necessary arguments to each package recipe.
-            callPackage = pkgs.newScope (final // {
-              # HERE; Add more custom package arguments. Only items that are _NOT_ derivations!
+            callPackage = pkgs.newScope (
+              final
+              // {
+                # HERE; Add more custom package arguments. Only items that are _NOT_ derivations!
 
-              flake = self;
-              nixosLib = lib;
-            });
+                flake = self;
+                nixosLib = lib;
+              }
+            );
           in
           {
             # HERE; Add aliasses and/or overrides.
 
             default = final.bootstrap;
-          } //
-          lib.packagesFromDirectoryRecursive {
+          }
+          // lib.packagesFromDirectoryRecursive {
             inherit callPackage;
             # NOTE; Imports and processes files named "package.nix".
             directory = ./packages;
-          })
+          }
+        )
       );
-
-
 
       # Execute and validate tests against this flake configuration;
       # nix-fast-build
@@ -237,19 +246,22 @@
       # (interactive) nix-fast-build --flake .#hydraJobs
       # (noninteractive/CI] nix-fast-build --no-nom --skip-cached --flake ".#hydraJobs.$(nix eval --raw --impure --expr builtins.currentSystem)"
       #
-      # NOTE; There is no schema for the hydraJobs attribute set, but the trend of "packages"/"checks" is followed for easy 
+      # NOTE; There is no schema for the hydraJobs attribute set, but the trend of "packages"/"checks" is followed for easy
       # filtering on target host system type.
       #
-      hydraJobs = eachSystem
-        (pkgs: {
+      hydraJobs =
+        eachSystem (pkgs: {
           recurseForDerivations = true;
           formatter = outputs.formatter.${pkgs.system};
           devShells = outputs.devShells.${pkgs.system};
           packages = outputs.packages.${pkgs.system};
           checks = outputs.checks.${pkgs.system};
-        }) // {
-        no-system.recurseForDerivations = true;
-        no-system.nixosConfigurations = lib.mapAttrs (_: v: v.config.system.build.toplevel) outputs.nixosConfigurations;
-      };
+        })
+        // {
+          no-system.recurseForDerivations = true;
+          no-system.nixosConfigurations = lib.mapAttrs (
+            _: v: v.config.system.build.toplevel
+          ) outputs.nixosConfigurations;
+        };
     };
 }

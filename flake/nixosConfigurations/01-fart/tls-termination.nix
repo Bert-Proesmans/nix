@@ -1,5 +1,9 @@
-{ lib, config, ... }: {
-  networking.firewall.allowedTCPPorts = [ 443 80 ];
+{ config, ... }:
+{
+  networking.firewall.allowedTCPPorts = [
+    443
+    80
+  ];
 
   security.dhparams = {
     enable = true;
@@ -53,8 +57,16 @@
     };
 
     defaultListen = [
-      { addr = "unix:/run/nginx/https-frontend.sock"; ssl = true; proxyProtocol = true; }
-      { addr = "0.0.0.0"; port = 80; ssl = false; }
+      {
+        addr = "unix:/run/nginx/https-frontend.sock";
+        ssl = true;
+        proxyProtocol = true;
+      }
+      {
+        addr = "0.0.0.0";
+        port = 80;
+        ssl = false;
+      }
     ];
 
     virtualHosts = {

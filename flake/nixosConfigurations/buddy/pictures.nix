@@ -1,4 +1,9 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   immichStatePath = "/var/lib/immich";
   # ERROR; Immich machine learning service is already using '/var/cache/immich'
@@ -10,7 +15,9 @@ in
   assertions =
     let
       # NOTE; This is supposed to throw an error if extension pgvecto-rs is missing.
-      pgVectors = lib.findFirst (x: x.pname == "pgvecto-rs") null config.services.postgresql.finalPackage.installedExtensions;
+      pgVectors = lib.findFirst (
+        x: x.pname == "pgvecto-rs"
+      ) null config.services.postgresql.finalPackage.installedExtensions;
     in
     [
       {
@@ -101,7 +108,10 @@ in
         twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)
 
         transcode = "optimal"; # Transcode above target resolution or non-accepted codec/container
-        acceptedAudioCodecs = [ "aac" "libopus" ];
+        acceptedAudioCodecs = [
+          "aac"
+          "libopus"
+        ];
         acceptedVideoCodecs = [
           "h264"
           "hevc"
@@ -182,7 +192,11 @@ in
     # Force apply the configuration with overwritten secret data
     environment.IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
 
-    unitConfig.RequiresMountsFor = [ immichStatePath immichCachePath immichExternalStatePath ];
+    unitConfig.RequiresMountsFor = [
+      immichStatePath
+      immichCachePath
+      immichExternalStatePath
+    ];
     serviceConfig = {
       SupplementaryGroups = [
         # Required for hardware accelerated video transcoding
@@ -201,15 +215,19 @@ in
           # External library location, make read-only
           "${externalRoot}::ro"
         ];
-      CacheDirectory = let relativeRoot = lib.removePrefix "/var/cache/" immichCachePath; in [
-        "" # Reset
-        relativeRoot
-        "${relativeRoot}/thumbs"
-        "${relativeRoot}/encoded-video"
-      ];
+      CacheDirectory =
+        let
+          relativeRoot = lib.removePrefix "/var/cache/" immichCachePath;
+        in
+        [
+          "" # Reset
+          relativeRoot
+          "${relativeRoot}/thumbs"
+          "${relativeRoot}/encoded-video"
+        ];
       ExecStartPre =
         let
-          # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath' 
+          # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath'
           # while its contents remain 100% persistent. Not all directory contents are fully persisted to optimize disk space usage.
           setupUploadsPath = pkgs.writeShellApplication {
             name = "setup-immich-uploads";
@@ -241,8 +259,10 @@ in
             '';
           };
         in
-        [ (lib.getExe setupUploadsPath) (lib.getExe setupCachePath) ];
+        [
+          (lib.getExe setupUploadsPath)
+          (lib.getExe setupCachePath)
+        ];
     };
   };
 }
-

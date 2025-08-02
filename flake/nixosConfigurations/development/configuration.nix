@@ -1,4 +1,10 @@
-{ pkgs, flake, config, ... }: {
+{
+  pkgs,
+  flake,
+  config,
+  ...
+}:
+{
 
   imports = [
     ./hardware-configuration.nix
@@ -41,7 +47,7 @@
   programs.direnv.enable = true;
   programs.direnv.nix-direnv.enable = true;
   # Retain all outputs and derivations. This assists nix-direnv, retaining devshell outputs.
-  # Devshells are constructed from the local user context. Those outputs are rooted inside the project directories, and 
+  # Devshells are constructed from the local user context. Those outputs are rooted inside the project directories, and
   # nix gc doesn't/cannot know those.
   nix.settings.keep-outputs = true;
   nix.settings.keep-derivations = true;

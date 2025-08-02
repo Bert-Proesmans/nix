@@ -1,11 +1,16 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   # WARN; kanidm database filepath is fixed and cannot be changed!
   kanidmStatePath = builtins.dirOf config.services.kanidm.serverSettings.db_path;
 in
 {
   sops.secrets = {
-    # NOTE; To initialize the idm_service_desk user (bert-proesmans), login using the idm_admin account and generate a password 
+    # NOTE; To initialize the idm_service_desk user (bert-proesmans), login using the idm_admin account and generate a password
     # reset tokens using;
     # 1. kanidm login -D idm_admin
     # 2. kanidm person credential create-reset-token bert.proesmans --name idm_admin
@@ -47,9 +52,15 @@ in
   users.groups.idm-certs.members = [ "kanidm" ];
   systemd.services.kanidm = {
     wants = [ "acme-finished-idm.proesmans.eu.target" ];
-    after = [ "acme-selfsigned-idm.proesmans.eu.service" "acme-idm.proesmans.eu.service" ];
+    after = [
+      "acme-selfsigned-idm.proesmans.eu.service"
+      "acme-idm.proesmans.eu.service"
+    ];
     # FIX; https://github.com/NixOS/nixpkgs/pull/409184
-    serviceConfig.BindReadOnlyPaths = [ "/etc/ssl" "/etc/static/ssl" ];
+    serviceConfig.BindReadOnlyPaths = [
+      "/etc/ssl"
+      "/etc/static/ssl"
+    ];
   };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
@@ -131,7 +142,11 @@ in
         preferShortUsername = true;
         # RS256 is used instead of ES256 so additionally we need legacy crypto
         enableLegacyCrypto = true;
-        scopeMaps."immich.access" = [ "openid" "email" "profile" ];
+        scopeMaps."immich.access" = [
+          "openid"
+          "email"
+          "profile"
+        ];
         claimMaps = {
           # NOTE; Immich currently ONLY applies these claims during account creation!
           "immich_label" = {

@@ -1,4 +1,5 @@
-{ config, special, ... }: {
+{ config, special, ... }:
+{
 
   imports = [
     special.profiles.server

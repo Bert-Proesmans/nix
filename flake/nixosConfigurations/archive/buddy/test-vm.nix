@@ -1,4 +1,12 @@
-{ lib, flake, special, meta-module, config, ... }: {
+{
+  lib,
+  flake,
+  special,
+  meta-module,
+  config,
+  ...
+}:
+{
   disko.devices.zpool.storage.datasets = {
     "postgres/state/test" = {
       type = "zfs_fs";
@@ -29,32 +37,36 @@
     {
       autostart = true;
       specialArgs = { inherit lib flake special; };
-      config = { lib, ... }: {
-        _file = ./test-vm.nix;
+      config =
+        { lib, ... }:
+        {
+          _file = ./test-vm.nix;
 
-        imports = [
-          special.profiles.qemu-guest-vm
-          (meta-module "test")
-        ];
+          imports = [
+            special.profiles.qemu-guest-vm
+            (meta-module "test")
+          ];
 
-        config = {
-          nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-          microvm.vsock.cid = 666;
+          config = {
+            nixpkgs.hostPlatform = lib.systems.examples.gnu64;
+            microvm.vsock.cid = 666;
 
-          proesmans.facts.tags = [ "virtual-machine" ];
-          proesmans.facts.meta.parent = parent-hostname;
+            proesmans.facts.tags = [ "virtual-machine" ];
+            proesmans.facts.meta.parent = parent-hostname;
 
-          microvm.shares = [{
-            source = "/storage/postgres/state/test";
-            #source = "/shared/test";
-            #mountPoint = "/persist/data";
-            mountPoint = "/data";
-            tag = "state";
-            proto = "virtiofs";
-          }];
+            microvm.shares = [
+              {
+                source = "/storage/postgres/state/test";
+                #source = "/shared/test";
+                #mountPoint = "/persist/data";
+                mountPoint = "/data";
+                tag = "state";
+                proto = "virtiofs";
+              }
+            ];
 
-          system.stateVersion = "24.05";
+            system.stateVersion = "24.05";
+          };
         };
-      };
     };
 }

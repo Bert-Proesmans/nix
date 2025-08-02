@@ -1,4 +1,11 @@
-{ lib, pkgs, flake, config, ... }: {
+{
+  lib,
+  pkgs,
+  flake,
+  config,
+  ...
+}:
+{
   # WARN; Using this installer is not recommended, but required to bootstrap at least a development machine.
   # You should use the development host to provision new hosts!
   #
@@ -15,15 +22,18 @@
       #
       # WARN; To ensure the development shell exists, its full attribute path is evaluated. Afterwards
       # the interactive string reference is returned that points to the same derivation.
-      devShells = shell-attribute: (
-        builtins.seq
-          flake.outputs.devShells."${system}"."${shell-attribute}"
+      devShells =
+        shell-attribute:
+        (builtins.seq flake.outputs.devShells."${system}"."${shell-attribute}"
           "${flake}#${shell-attribute}"
-      );
+        );
 
       deployment-script = pkgs.writeShellApplication {
         name = "develop-host-install";
-        runtimeInputs = [ pkgs.nix pkgs.openssh ];
+        runtimeInputs = [
+          pkgs.nix
+          pkgs.openssh
+        ];
         # ERROR; The host-deploy task must know how to deploy the hostconfiguration
         # by name "development" !
         text = ''

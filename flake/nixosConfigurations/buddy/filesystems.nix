@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   systemd.tmpfiles.settings."1-base-datasets" = {
     # "/persist" = {
     #   d = {
@@ -41,7 +42,13 @@
     depends = [ "/var/tmp" ];
     device = "/var/tmp";
     fsType = "none";
-    options = [ "rw" "noexec" "nosuid" "nodev" "bind" ];
+    options = [
+      "rw"
+      "noexec"
+      "nosuid"
+      "nodev"
+      "bind"
+    ];
   };
 
   # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will

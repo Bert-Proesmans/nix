@@ -1,4 +1,5 @@
-{ lib, ... }: {
+{ lib, ... }:
+{
   boot.supportedFilesystems = [ "zfs" ];
   # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
   # at unexpected moments and cause kernel downgrade.
@@ -60,7 +61,7 @@
   #       - **
   #     - /var/log
   #
-  # **ZFS datasets are optimized per application, but mounted into a straightforward file hierarchy. Examples of dataset 
+  # **ZFS datasets are optimized per application, but mounted into a straightforward file hierarchy. Examples of dataset
   # specialisation are:
   #     - image/video
   #     - postgres
@@ -118,7 +119,7 @@
   #
   # @@ ZFS mountpoint "legacy" within NixOS @@
   # The paths below must be mounted to start NixOS. There is a bunch of integration work happening right now so the
-  # timing moments of stage-1/stage-2 and 'before SystemD starts' are in flux. At runtime SystemD is currently not 
+  # timing moments of stage-1/stage-2 and 'before SystemD starts' are in flux. At runtime SystemD is currently not
   # completely aware of the full mount hierarchy for ZFS.
   #
   # pathsNeededForBoot = [ "/" "/nix" "/nix/store" "/var" "/var/log" "/var/lib" "/var/lib/nixos" "/etc" "/usr" ];
@@ -147,7 +148,7 @@
   # soon-to-be switched into root.
   # An error will occur if that dataset was (already) auto-mounted by pool import on the current filesystem root.
   #
-  # There is a (supposed) upstream solution called ZFS automount generator (like FSTAB mount generator). This would(?) solve 
+  # There is a (supposed) upstream solution called ZFS automount generator (like FSTAB mount generator). This would(?) solve
   # the requirement for explicitly setting mountpoint "legacy" on declaratively defined filesystem datasets.
   # This generator creates dynamic SystemD unit files for each dataset, and explicitly controls mounting and mount ordering.
   # The ZFS automount generator script hasn't been turned into nixos options yet, but it is accessible through the ZFS upstream package.
@@ -205,7 +206,12 @@
               type = "filesystem";
               format = "ext4";
               mountpoint = "/var";
-              mountOptions = [ "rw" "noexec" "nosuid" "nodev" ];
+              mountOptions = [
+                "rw"
+                "noexec"
+                "nosuid"
+                "nodev"
+              ];
             };
           };
 
@@ -216,7 +222,11 @@
               format = "ext4";
               mountpoint = "/nix";
               # NOTE; Nix boot stages and daemon remount parts of this partition at runtime!
-              mountOptions = [ "nosuid" "nodev" "noatime" ];
+              mountOptions = [
+                "nosuid"
+                "nodev"
+                "noatime"
+              ];
             };
           };
         };
@@ -242,7 +252,11 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/0"; # WARN; Unique per disk!
-              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [
+                "umask=0077"
+                "nofail"
+                "x-systemd.device-timeout=5"
+              ];
             };
           };
           zfs = {
@@ -282,7 +296,11 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/1"; # WARN; Unique per disk!
-              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [
+                "umask=0077"
+                "nofail"
+                "x-systemd.device-timeout=5"
+              ];
             };
           };
           zfs = {
@@ -322,7 +340,11 @@
               type = "filesystem";
               format = "vfat";
               mountpoint = "/boot/2"; # WARN; Unique per disk!
-              mountOptions = [ "umask=0077" "nofail" "x-systemd.device-timeout=5" ];
+              mountOptions = [
+                "umask=0077"
+                "nofail"
+                "x-systemd.device-timeout=5"
+              ];
             };
           };
           zfs = {
@@ -349,17 +371,21 @@
       type = "zpool";
       mode.topology = {
         type = "topology";
-        vdev = [{
-          mode = "raidz"; # RAID5
-          members = [
-            "storage-one"
-            "storage-two"
-            "storage-three"
-          ];
-        }];
-        log = [{
-          members = [ "slog-one" ];
-        }];
+        vdev = [
+          {
+            mode = "raidz"; # RAID5
+            members = [
+              "storage-one"
+              "storage-two"
+              "storage-three"
+            ];
+          }
+        ];
+        log = [
+          {
+            members = [ "slog-one" ];
+          }
+        ];
       };
       options = {
         # Set to 8KiB sector sizes in preparation of NVMe vdev members.
@@ -393,7 +419,7 @@
         # HELP; Disable access time selectively per dataset
         relatime = "on";
         # NOTE; Make standard record size explicit
-        # NOTE; Within hard disk pools it's better to go for bigger recordsizes to optimize away the static seek time latency. 
+        # NOTE; Within hard disk pools it's better to go for bigger recordsizes to optimize away the static seek time latency.
         # But this _only_ improves the ratio of latency to retrieval bandwidth while increasing the average latency.
         # HELP; Change record size per dataset, there are various online sources with information
         # HELP; If application level caching is present, increase the recordsize
@@ -407,7 +433,7 @@
         # Under default configuration this storage space is located inside the data vdevs for persistence and redundancy reasons.
         # But the ZIL is _not_ restricted to a specific start and end sector, ZIL data is spread over the entire disk. These ZIL blocks
         # contain both application data and its metadata. This difference becomes important for choosing a value for 'logbias'.
-        # When a synchronous application data write completes, or a continuous block of 'recordsize' is comitted, the ZIL data 
+        # When a synchronous application data write completes, or a continuous block of 'recordsize' is comitted, the ZIL data
         # is copied (written a second time) to the data vdevs. This second write is to the "permanent location" of the data.
         # This second write happens on the next ZFS commit trigger and introduces write holes when the ZIL data is freed.
         #
@@ -418,7 +444,7 @@
         # The SLOG is a tool to balance and optimize durability, application write completion latency, and "input-/output operations"(IOPS)
         # of the data vdevs (entire pool actually, they aren't linked to individual data vdevs).
         #
-        # Best practises dictate that the SLOG must be attached to a pool in a redundant setup (like mirror). A loss of 
+        # Best practises dictate that the SLOG must be attached to a pool in a redundant setup (like mirror). A loss of
         # a SLOG device results in data loss.
         # When the SLOG vdev dissapears, the pool will automatically fall back to a ZIL on data vdevs. This is very much not desired
         # because ZFS cannot defragment its data vdevs. (Rebalancing exists but requires vdev expansion to do well)
@@ -449,7 +475,7 @@
         # sync=disabled => never use ZIL. this option will effectively lie to your applications about data persistance.
         # HELP; Use when write latency is important, and host can not crash, and disks cannot fail
         #
-        # sync=always => use ZIL for asynchronous writes too. this option forces ZFS to always utilize the ZIL, but write 
+        # sync=always => use ZIL for asynchronous writes too. this option forces ZFS to always utilize the ZIL, but write
         # to the ZIL asynchronously. This is _not_ the same as the synchronous write procedure!
         # HELP; Use when you want to persist all data to ZIL and use it as a write-ahead log.
         #
@@ -479,7 +505,7 @@
         # alignment, but probably best to keep it at default.
         #
         # HELP; Consider using an SLOG to keep ZIL from fragmenting your data vdevs.
-        # An indirect sync (happens on big file size writes), or setting logbias to throughput, will cause fragmentation between data 
+        # An indirect sync (happens on big file size writes), or setting logbias to throughput, will cause fragmentation between data
         # and related metadata. A steady state pool will encounter double/triple read overhead due to this fragmentation.
         # Consider burning away old SSD's for this purpose, only ~4GiB is necessary and keep the rest overprovisioned. Erase first;
         # use 'blkdiscard' to trim all sectors of the SSD before reinitializing into ZFS!
@@ -510,11 +536,11 @@
   #
   # NOTE; This configuration is _not_ tackling limited free space performance impact.
   # Due to the usage of AVL trees to track free space, a highly fragmented or otherwise a full pool results in
-  # more overhead to find free space. There is actually no robust solution for this problem, there is 
+  # more overhead to find free space. There is actually no robust solution for this problem, there is
   # no quick or slow fix (defragmentation) at this moment in time.
   # ZFS pools should be physically sized at maximum required storage +- ~10% from the beginning.
   # * If your pool is full => expand it by a large amount.
-  # * If your pool is fragmented => create a new dataset and move your data out of the old dataset + 
+  # * If your pool is fragmented => create a new dataset and move your data out of the old dataset +
   # purge old dataset + move back into the new dataset.
   #
   # HELP; A way to solve used space performance impact is to set dataset quota's to limit space usage to ~90%.

@@ -1,9 +1,20 @@
-{ lib, pkgs, config, ... }: {
-  networking.firewall.allowedTCPPorts = [ 9000 9200 ];
-
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-    "resilio-sync"
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+{
+  networking.firewall.allowedTCPPorts = [
+    9000
+    9200
   ];
+
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (lib.getName pkg) [
+      "resilio-sync"
+    ];
 
   environment.systemPackages = [ pkgs.resilio-sync ];
 
@@ -39,7 +50,6 @@
       }
     ];
   };
-
 
   services.opencloud = {
     enable = false;

@@ -1,4 +1,9 @@
-{ lib, pkgs, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   # Use this path to store the wine state data
   winePrefix = "/storage/backup/backblaze/wineprefix";
@@ -24,8 +29,8 @@ in
 
   # Configure session file that's being called by turbovnc
   # Use session filename "none+ratpoison" (none = desktop manager, ratpoison = window manager)
-  # ERROR; The package is configured with another 
-  # Ratpoison finds its system-wide configuration file at {prefix}/etc, this must be changed with build flags, see 
+  # ERROR; The package is configured with another
+  # Ratpoison finds its system-wide configuration file at {prefix}/etc, this must be changed with build flags, see
   # `nixpkgs.overlays` below.
   services.xserver.windowManager.ratpoison.enable = true;
 
@@ -60,8 +65,14 @@ in
     upholds = [ config.systemd.services.display-manager.name ];
     restartTriggers = [ (config.environment.etc."ratpoisonrc".source or null) ];
 
-    path = [ pkgs.turbovnc pkgs.coreutils pkgs.mount pkgs.umount pkgs.gocryptfs ];
-    # WARN; Various helper scripts try to be helpful by purging LD_LIBRARY_PATH/LD_PRELOAD_PATH etc, 
+    path = [
+      pkgs.turbovnc
+      pkgs.coreutils
+      pkgs.mount
+      pkgs.umount
+      pkgs.gocryptfs
+    ];
+    # WARN; Various helper scripts try to be helpful by purging LD_LIBRARY_PATH/LD_PRELOAD_PATH etc,
     # some environment variables from bigger scopes do not trickle down! Only set necessary variables
     # in scope closest to where they're needed!
     environment.XSESSIONSDIR = "${config.services.displayManager.sessionData.desktops}/share/xsessions";
@@ -78,18 +89,26 @@ in
       # NOTE; No security on the vnc server + only accept connections from localhost.
       # Use openId security instead at the proxy level!
       "-securitytypes none -localhost"
-      "-xstartup ${lib.getExe (pkgs.writeShellApplication {
-                  name = "xstartup.turbovnc";
-                  runtimeInputs = [ pkgs.gnugrep pkgs.gnused pkgs.virtualgl ];
-                  text = builtins.readFile ./xstartup-turbovnc.sh;
-                })}"
+      "-xstartup ${
+        lib.getExe (
+          pkgs.writeShellApplication {
+            name = "xstartup.turbovnc";
+            runtimeInputs = [
+              pkgs.gnugrep
+              pkgs.gnused
+              pkgs.virtualgl
+            ];
+            text = builtins.readFile ./xstartup-turbovnc.sh;
+          }
+        )
+      }"
       # IMPORTANT; Set this to the desktopManager+windoManager combo configured through the xserver options.
       # SEEALSO; `services.xserver.windowManager.<name>.enable` above
       "-wm 'none+ratpoison'"
       "-depth 24"
       # NOTE; Only one active connection active at a time and force disconnect the other
       "-nevershared -disconnect"
-      # -nointerframe disables calculating interframe distances 
+      # -nointerframe disables calculating interframe distances
       # NOTE; Saves cpu but increases bandwidth usage in case client applications performs runaway amount of draws
       "-nointerframe"
     ];
@@ -113,7 +132,7 @@ in
       # NOTE; $VAULT should already be created, would be stupid otherwise. But still attempting to create if not exists to keep the show running
       mkdir -p "$VAULT" "$DRIVE" "$ENCRYPT_MIDDLE" "$OVERLAY_WORK" "$OVERLAY_UPPER"
 
-      
+
       # 2. Setup encrypted overlay
       # TODO; Extrapolate init to only work once
       # TODO; Set password
@@ -124,7 +143,7 @@ in
 
       # 3. Setup rw-overlay
       mount -t overlay overlay -o lowerdir="$ENCRYPT_MIDDLE",upperdir="$OVERLAY_UPPER",workdir="$OVERLAY_WORK" none "$DRIVE"
-      
+
       # RESULT: VAULT => [encryption] => ENCRYPT_MIDDLE => [overlayed with r/w directory at OVERLAY_UPPER] => DRIVE
       # Now symlink DRIVE into wine
     '';

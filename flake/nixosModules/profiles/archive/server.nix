@@ -1,4 +1,5 @@
-{ ... }: {
+{ ... }:
+{
   # NOTE; Path below is fixed in tasks.py
   sops.age.keyFile = "/etc/secrets/decrypter.age";
 
