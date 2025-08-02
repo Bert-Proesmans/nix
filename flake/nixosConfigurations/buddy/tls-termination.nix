@@ -62,17 +62,17 @@
     ];
 
     virtualHosts = {
-      "photos.proesmans.eu" = {
-        listen = [{ addr = "100.81.84.22"; port = 8080; ssl = false; }];
-        locations."/" = {
-          proxyPass = "http://photos-upstream";
-          proxyWebsockets = true;
-          extraConfig = ''
-            # Required for larger uploads to be possible (defaults at 10M)
-            client_max_body_size 500M;
-          '';
-        };
-      };
+      # "photos.proesmans.eu" = {
+      #   listen = [{ addr = "100.81.84.22"; port = 8080; ssl = false; }];
+      #   locations."/" = {
+      #     proxyPass = "http://photos-upstream";
+      #     proxyWebsockets = true;
+      #     extraConfig = ''
+      #       # Required for larger uploads to be possible (defaults at 10M)
+      #       client_max_body_size 500M;
+      #     '';
+      #   };
+      # };
 
       "photos.alpha.proesmans.eu" = {
         # Use the generated wildcard certificate, see security.acme.certs.<name>

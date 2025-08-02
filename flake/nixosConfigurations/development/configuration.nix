@@ -1,4 +1,4 @@
-{ pkgs, flake, ... }: {
+{ pkgs, flake, config, ... }: {
 
   imports = [
     ./hardware-configuration.nix
@@ -8,6 +8,7 @@
     flake.profiles.hypervisor
   ];
 
+  networking.domain = config.proesmans.facts.self.domainName;
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
   proesmans.nix.registry.fat-nixpkgs.enable = true;
