@@ -4,7 +4,6 @@
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
   # Enables (nested) virtualization through hardware acceleration.
-  # There is no harm in having both modules loaded at the same time, also no real overhead.
   boot.kernelModules = [ "kvm-amd" ];
   hardware.cpu.amd.updateMicrocode = true;
 
