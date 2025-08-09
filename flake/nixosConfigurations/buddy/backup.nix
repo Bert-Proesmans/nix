@@ -18,6 +18,15 @@
       yearly = 0; # none
     };
 
+    templates."ignore" = {
+      # NOTE; Use this to ignore an instantiated child dataset.
+      # Instantiated (child) datasets exist when the parent dataset is configured with `recursive = true;`, aka
+      # non-atomic recursive handling.
+      autosnap = false;
+      autoprune = false;
+      monitor = false;
+    };
+
     datasets = {
       "storage" = {
         # NOTE; Make sure to catch all datasets.

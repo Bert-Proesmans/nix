@@ -41,7 +41,7 @@ in
   # read-only.
   #
   # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
-  # The state directory will point to the storage pool dataset, and symlink will be written to other directory locations.
+  # The state directory will point to the storage pool dataset, and symlinks will point to the other datasets.
   disko.devices.zpool.storage.datasets = {
     "media/immich/originals" = {
       type = "zfs_fs";
@@ -61,6 +61,9 @@ in
       options.mountpoint = immichCachePath;
     };
   };
+
+  # Disable snapshots on the cache dataset
+  services.sanoid.datasets."storage/media/immich/cache".use_template = [ "ignore" ];
 
   systemd.tmpfiles.settings."immich-external-libraries" = {
     # TODO
@@ -107,7 +110,7 @@ in
         maxBitrate = "2800"; # kb/s absolute maximum for 720p (range 2000-4000)
         twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)
 
-        transcode = "optimal"; # Transcode above target resolution or non-accepted codec/container
+        transcode = "optimal"; # Transcode if above target resolution or non-accepted codec/container
         acceptedAudioCodecs = [
           "aac"
           "libopus"
@@ -119,13 +122,14 @@ in
           #"av1" # Too new, optimized for device support
         ];
         acceptedContainers = [
-          #"mov" # Apple specific, optimized for device support
-          #"ogg" # Too niche, optimized for device support
-          #"webm" # Too new (links to vp9/av1), optimized for device support
+          "mp4"
+          "mov"
+          #"ogg" # Apple support too recent, optimized for device support
+          #"webm" # Too new (related to vp8/vp9/av1), optimized for device support
         ];
       };
       image.preview.size = 1080;
-      library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00
+      library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00 (@configured timezone)
       library.scan.enabled = true;
       logging.enabled = true;
       logging.level = "log";
@@ -203,27 +207,23 @@ in
         config.users.groups.render.name
       ];
       StateDirectory =
-        let
-          relativeRoot = lib.removePrefix "/var/lib/" immichStatePath;
-          externalRoot = lib.removePrefix "/var/lib/" immichExternalStatePath;
-        in
+        assert immichStatePath == "/var/lib/immich";
+        assert immichExternalStatePath == "/var/lib/immich-external";
         [
           "" # Reset
-          relativeRoot
-          "${relativeRoot}/library"
-          "${relativeRoot}/profile"
+          "immich"
+          "immich/library"
+          "immich/profile"
           # External library location, make read-only
-          "${externalRoot}::ro"
+          "immich-external::ro"
         ];
       CacheDirectory =
-        let
-          relativeRoot = lib.removePrefix "/var/cache/" immichCachePath;
-        in
+        assert immichCachePath == "/var/cache/immich-server";
         [
           "" # Reset
-          relativeRoot
-          "${relativeRoot}/thumbs"
-          "${relativeRoot}/encoded-video"
+          "immich-server"
+          "immich-server/thumbs"
+          "immich-server/encoded-video"
         ];
       ExecStartPre =
         let
