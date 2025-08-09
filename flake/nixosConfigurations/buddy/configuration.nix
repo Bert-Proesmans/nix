@@ -45,15 +45,15 @@
   };
 
   # Temporary, will be moved to proxy-vm later
-  sops.secrets.tailscale_connect_key.owner = "root";
-  services.tailscale = {
-    enable = true;
-    disableTaildrop = true;
-    openFirewall = true;
-    useRoutingFeatures = "none";
-    authKeyFile = config.sops.secrets.tailscale_connect_key.path;
-    extraDaemonFlags = [ "--no-logs-no-support" ];
-  };
+  # sops.secrets.tailscale_connect_key.owner = "root";
+  # services.tailscale = {
+  #   enable = true;
+  #   disableTaildrop = true;
+  #   openFirewall = true;
+  #   useRoutingFeatures = "none";
+  #   authKeyFile = config.sops.secrets.tailscale_connect_key.path;
+  #   extraDaemonFlags = [ "--no-logs-no-support" ];
+  # };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.
