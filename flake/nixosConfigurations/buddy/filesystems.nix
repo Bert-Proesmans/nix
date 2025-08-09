@@ -1,42 +1,5 @@
 { ... }:
 {
-  systemd.tmpfiles.settings."1-base-datasets" = {
-    # "/persist" = {
-    #   d = {
-    #     # Directory with live mounts for persistent data
-    #     user = config.users.users.root.name;
-    #     group = config.users.groups.root.name;
-    #     mode = "0700";
-    #   };
-    #   # Set ACL defaults
-    #   # "A+".argument = "group::r-X,other::---,mask::r-x,default:group::r-X,default:other::---,default:mask::r-X";
-    # };
-
-    # "/volatile" = {
-    #   d = {
-    #     # Directory with cached and/or generated data.
-    #     # This data is _not_ backed up!
-    #     user = config.users.users.root.name;
-    #     group = config.users.groups.root.name;
-    #     mode = "0700";
-    #   };
-    # };
-
-    # "/backup" = {
-    #   d = {
-    #     # Directory with staging hierarchy for backup
-    #     #
-    #     # eg /backup/20250502/{postgresql/..,qemu/...} <- 1*
-    #     # eg /backup/encrypted/20250502/... <- 2*
-    #     #
-    #     # 1* Is hierarchical recursive mounting of persisted datasets
-    #     user = config.users.users.root.name;
-    #     group = config.users.groups.root.name;
-    #     mode = "0700";
-    #   };
-    # };
-  };
-
   # Don't setup /tmp in RAM to make more of it available for software runtime
   fileSystems."/tmp" = {
     depends = [ "/var/tmp" ];
