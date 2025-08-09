@@ -254,7 +254,7 @@
               mountpoint = "/boot/0"; # WARN; Unique per disk!
               mountOptions = [
                 "umask=0077"
-                "nofail"
+                "nofail" # ERROR; If timeout, cannot rebuild because grub install hangs
                 "x-systemd.device-timeout=5"
               ];
             };
@@ -298,7 +298,7 @@
               mountpoint = "/boot/1"; # WARN; Unique per disk!
               mountOptions = [
                 "umask=0077"
-                "nofail"
+                "nofail" # ERROR; If timeout, cannot rebuild because grub install hangs
                 "x-systemd.device-timeout=5"
               ];
             };
@@ -342,7 +342,7 @@
               mountpoint = "/boot/2"; # WARN; Unique per disk!
               mountOptions = [
                 "umask=0077"
-                "nofail"
+                "nofail" # ERROR; If timeout, cannot rebuild because grub install hangs
                 "x-systemd.device-timeout=5"
               ];
             };

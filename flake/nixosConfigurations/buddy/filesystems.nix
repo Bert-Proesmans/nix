@@ -54,7 +54,20 @@
   # NOTE; You can create nested datasets without explicitly defining any of the parents. The parent datasets will
   # be automatically created (as nomount?).
   disko.devices.zpool.storage.datasets = {
+    "documents" = {
+      # NOTE; Base dataset for computer backups, generally documents and various forms of important stuff.
+      type = "zfs_fs";
+      options = {
+        canmount = "off";
+        mountpoint = "none";
+        recordsize = "128k"; # Default
+        # Should compress really well
+        compression = "zstd-5";
+      };
+    };
+
     "media" = {
+      # NOTE; Base dataset for multimedia files.
       type = "zfs_fs";
       options = {
         canmount = "off";
@@ -86,7 +99,19 @@
       };
     };
 
+    # Datasets could also be defined where they're used!
+    #
+    # eg
+    # "media/immich/pictures" = {
+    #   type = "zfs_fs";
+    #   options.mountpoint = "/var/lib/immich";
+    #   #   # options = {
+    #   # Optional dataset configuration here
+    #   # };
+    # };
+
     "postgres" = {
+      # NOTE; Base dataset for storage data managed by a postgres database server.
       type = "zfs_fs";
       options = {
         canmount = "off";
@@ -110,7 +135,19 @@
       };
     };
 
+    # Datasets could also be defined where they're used!
+    #
+    # eg
+    # "postgres/forgejo/state" = {
+    #   type = "zfs_fs";
+    #   options.mountpoint = "/var/lib/postgres";
+    #   # options = {
+    #   # Optional dataset configuration here
+    #   # };
+    # };
+
     "sqlite" = {
+      # NOTE; Base dataset for storage data managed by a sqlite database program.
       type = "zfs_fs";
       options = {
         canmount = "off";
@@ -128,8 +165,9 @@
     };
 
     "qemu" = {
-      # Default storage location for vm state data without specific requirements.
-      # NOTE; Qemu does its own application level caching on backing volume (cache=writeback by default)
+      # NOTE; Default storage location for vm state data without specific requirements.
+      #
+      # NOTE; Qemu does its own application level caching on backing volume (by default, option cache=writeback)
       # HELP; Create sub datasets to specialize storage behaviour to the application.
       type = "zfs_fs";
       options = {
@@ -143,32 +181,17 @@
         # Don't cache metadata because I expect infrequent reads and large write streams.
         # HELP; Set to metadata if you're not storing raw- or qcow backed volumes, or use specific cache control.
         primarycache = "none";
-        # Should compress really well though
+        # Should compress really well
         compression = "zstd-5";
       };
     };
 
-    "cache" = {
-      type = "zfs_fs";
-      mountpoint = "/var/cache";
-      options.mountpoint = "legacy";
-    };
-
     "log" = {
+      # NOTE; Separate dataset to prevent denial-of-service (DOS) through cache-writes, and making important log data
+      # storage redundant.
       type = "zfs_fs";
       mountpoint = "/var/log";
       options.mountpoint = "legacy";
     };
-
-    # Datasets could also be defined where they're used!
-    #
-    # eg
-    # "postgres/forgejo/state" = {
-    #   type = "zfs_fs";
-    #   options.mountpoint = "/var/lib/postgres";
-    #   # options = {
-    #   # Optional dataset configuration here
-    #   # };
-    # };
   };
 }
