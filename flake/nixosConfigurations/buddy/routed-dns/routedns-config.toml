@@ -64,27 +64,27 @@ blocklist-refresh = 86400 # 24 hours
 [[groups.blocklist.blocklist-source]]
     name = "recent-domains"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
     format = "domain"
     source = "https://shreshtait.com/newly-registered-domains/nrd-1m"
 [[groups.blocklist.blocklist-source]]
     name = "steven-black-malware-fakenews-blocklist"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
 	format = "hosts"
     source = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews/hosts"
 [[groups.blocklist.blocklist-source]]
     # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
     name = "cbuijs-abused-tlds"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
     format = "domain"
     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/tlds/plain.black.domain.list"
 [[groups.blocklist.blocklist-source]]
     # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
     name = "cbuijs-easylist-adblock"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
     format = "domain"
     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/easylist/plain.black.domain.list"
 
@@ -96,7 +96,7 @@ blocklist-refresh = 86400 # 24 hours
 [[groups.blocklist-response.blocklist-source]]
     name = "cbuijs-dynamic-content-malicious"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
     format = "domain"
     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/cloak/plain.black.domain.list"
 
@@ -108,7 +108,7 @@ blocklist-refresh = 86400 # 24 hours
 [[groups.blocklist-ip.blocklist-source]]
     name = "cbuijs-bogon-ips"
     cache-dir = "/var/cache/routedns"
-    allow-failure = true # Keep running the show if downloading the blocklists fail
+    allow-failure = false
     format = "cidr"
     source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/bogons/plain.black.ip4cidr.list"
 # ERROR; This list of IPs blocks the cache.nixos.org website! This blocks nixos-rebuild from using the main file caches!

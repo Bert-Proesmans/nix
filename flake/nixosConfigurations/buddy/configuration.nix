@@ -9,6 +9,7 @@
     ./hardware-configuration.nix
     ./identity.nix
     ./pictures.nix
+    ./routed-dns/configuration.nix
     ./tls-termination.nix
     #./isolated-vm/configuration.nix
     #./proxy-vm/configuration.nix
