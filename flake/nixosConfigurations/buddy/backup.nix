@@ -20,26 +20,40 @@
 
     datasets = {
       "storage" = {
+        # NOTE; Make sure to catch all datasets.
+        #
+        # WARN; Datasets with non-atomic settings could have a slight offset between point in time when backups are taken.
+        # This is because sanoid executes the operations outside of zfs, possibly across multiple zfs transactions.
         recursive = true; # NOT ATOMIC
         process_children_only = true;
 
         use_template = [ "default" ];
       };
 
-      # Less important so lower retention
-      "storage/cache" = {
+      "storage/documents" = {
+        # NOTE; Retain recent changes with high frequency, but not older changes.
+        recursive = true; # NOT ATOMIC
+        process_children_only = true;
+
         use_template = [ "default" ];
-        daily = 1; # 1 day @ 1 day rate
+        frequent_period = 15; # Once every 15 mins
+        frequently = 672; # 7 days @ 15 mins rate
+        hourly = 720; # 30 days @ 1 hour rate
+        daily = 30; # 30 days @ 1 day rate
+        weekly = 24; # 6 months @ 1 week rate
+        monthly = 84; # 7 years @ 1 month rate
       };
 
-      # Less important so lower retention
       "storage/log" = {
+        # NOTE; Less important so lower retention
+        recursive = "zfs"; # ATOMIC
+
         use_template = [ "default" ];
-        daily = 1; # 1 day @ 1 day rate
+        daily = 7; # 7 days @ 1 day rate
       };
 
-      # NOTE; Full atomic snapshot for instant recovery
       "storage/postgres" = {
+        # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
         recursive = "zfs"; # ATOMIC
 
         use_template = [ "default" ];
@@ -50,8 +64,8 @@
         # No week/month capture
       };
 
-      # NOTE; Full atomic snapshot for instant recovery
       "storage/sqlite" = {
+        # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
         recursive = "zfs"; # ATOMIC
 
         use_template = [ "default" ];
