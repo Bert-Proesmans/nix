@@ -581,6 +581,25 @@
   #
   # This makes sure that units are properly ordered if filesystem paths inside unitconfig "RequiresMountsFor" are pointing
   # to ZFS datasets.
+  #
+  # REF; https://openzfs.github.io/openzfs-docs/man/master/8/zfs-mount-generator.8.html#EXAMPLES
+  # REF; https://github.com/NixOS/nixpkgs/issues/62644#issuecomment-1479523469
+
+  systemd.tmpfiles.settings."00-zfs-pre-fs" = {
+    # WARN; The systemd generator phase is early in the boot process, and should add units that order before local-fs!
+    # To properly work it should see all mounted pools, but those could not exist.
+    # Imperatively discovered, the pool import during stage-1 and stage-2 are not enough for the generator to work due to unknown
+    # reason.
+
+    # According to the referenced resource, event caching must be enabled on a per pool basis. Caching is enabled when a file exists
+    # at a hardcoded path.
+    "/etc/zfs/zfs-list.cache/storage".f = {
+      user = "root";
+      group = "root";
+      mode = "0644";
+    };
+  };
+
   systemd.generators."zfs-mount-generator" =
     "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
   environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source =
