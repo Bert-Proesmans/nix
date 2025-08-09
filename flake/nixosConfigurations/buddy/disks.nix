@@ -571,4 +571,28 @@
     # HELP; Re-enable prefetch on system with fast pools (like full ssd-array)
     options zfs zfs_prefetch_disable=1
   '';
+
+  # ## Enable the ZFS mount generator ##
+  #
+  # This makes sure that units are properly ordered if filesystem paths inside unitconfig "RequiresMountsFor" are pointing
+  # to ZFS datasets.
+  systemd.generators."zfs-mount-generator" =
+    "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
+  environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source =
+    "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
+  systemd.services.zfs-mount.enable = false;
+
+  services.zfs.zed.settings.PATH = lib.mkForce (
+    lib.makeBinPath [
+      pkgs.diffutils
+      config.boot.zfs.package
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.gawk
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.nettools
+      pkgs.util-linux
+    ]
+  );
 }
