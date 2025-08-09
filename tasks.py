@@ -24,7 +24,7 @@ DOCS = PROJECT_DIR / "documentation"
 DEV_KEY = FLAKE / "development.age"
 
 # If the target host URL contains any of these values, assume a local/fast connection between build- and target host
-LOCAL_TARGETS_MARKER = ["localhost", "127.0.0.1", "192.168."]
+LOCAL_TARGETS_MARKER = ["localhost", "127.0.0.1", "192.168.", ".internal.proesmans.eu"]
 
 # Generate and store a new key using;
 # tr -dc '[:alnum:]' </dev/urandom | head -c64
@@ -460,7 +460,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             return
 
     additional_switches = []
-    additional_switches.append("--use-remote-sudo")
+    additional_switches.append("--sudo")
 
     if not any(x in ssh_connection_string for x in LOCAL_TARGETS_MARKER):
         additional_switches.append("--use-substitutes")
