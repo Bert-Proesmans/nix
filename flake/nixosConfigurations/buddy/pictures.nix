@@ -65,10 +65,6 @@ in
   # Disable snapshots on the cache dataset
   services.sanoid.datasets."storage/media/immich/cache".use_template = [ "ignore" ];
 
-  systemd.tmpfiles.settings."immich-external-libraries" = {
-    # TODO
-  };
-
   services.immich = {
     enable = true;
     host = "127.175.0.1";
@@ -105,7 +101,7 @@ in
         cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
         targetAudioCodec = "aac"; # optimized for device compatibility
         targetResolution = "720"; # 720p, optimized for filesize
-        targetVideoCodec = "hevc"; # optimized for device compatibility
+        targetVideoCodec = "hevc"; # optimized for device compatibility and size
         crf = 28; # Fidelity/Time factor, chosen for hevc, optimized for speed
         maxBitrate = "2800"; # kb/s absolute maximum for 720p (range 2000-4000)
         twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)

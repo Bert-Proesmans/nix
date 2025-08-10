@@ -16,7 +16,8 @@ in
 
   ## Postgres
   #
-  # Single database instance per host.
+  # Dedicated dataset(s) per database inside host+virtual machines. This configuration module only concerns itself with the
+  # database server on the host.
   # Locally accessible through unix sockets.
   # Split storage and write-ahead log (WAL) into separate datasets.
 
@@ -25,13 +26,13 @@ in
   disko.devices.zpool.storage.datasets = {
     "postgres/host/state" = {
       type = "zfs_fs";
-      # WARN; To be backed up ! Make single snapshot with "postgres/host/wal" !
+      # WARN; To be backed up ! Make atomic snapshot with "postgres/host/wal" !
       options.mountpoint = postgresStatePath;
     };
 
     "postgres/host/wal" = {
       type = "zfs_fs";
-      # WARN; To be backed up ! Make single snapshot with "postgres/host/state" !
+      # WARN; To be backed up ! Make atomic snapshot with "postgres/host/state" !
       options.mountpoint = postgresWalPath;
     };
   };
@@ -70,14 +71,16 @@ in
       postgresWalPath
     ];
     serviceConfig = {
-      StateDirectory = [
-        "" # Reset
-        (lib.removePrefix "/var/lib/" postgresStatePath)
-        (lib.removePrefix "/var/lib/" config.services.postgresql.dataDir)
-        #
-        (lib.removePrefix "/var/lib/" postgresWalPath)
-        (lib.removePrefix "/var/lib/" "${postgresWalPath}/${postgresSchemaVersion}")
-      ];
+      StateDirectory =
+        assert postgresStatePath == "/var/lib/postgresql";
+        assert postgresWalPath == "/var/lib/postgresql-wal";
+        [
+          "" # Reset
+          "postgresql"
+          "postgresql/${postgresSchemaVersion}"
+          "postgresql-wal"
+          "postgresql-wal/${postgresSchemaVersion}"
+        ];
     };
   };
 }
