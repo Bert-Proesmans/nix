@@ -156,5 +156,20 @@
       mountpoint = "/var/log";
       options.mountpoint = "legacy";
     };
+
+    "maintenance" = {
+      # Reserved space to allow copy-on-write deletes.
+      # WARN; When the storage is full-full it's impossible to impose new limits because every property write is written to the pool.
+      # Empty space is necessary to delete files too!
+      type = "zfs_fs";
+      mountpoint = null;
+      options = {
+        canmount = "off";
+        # Reserve disk space (without counting sub-datasets; snapshots, clones, child datasets).
+        # WARN; Storage statistics are (almost) never straight up "this is the sum size of your data"
+        # and incorporate reservations, snapshots, clones, metadata from self+child datasets.
+        refreservation = "1G";
+      };
+    };
   };
 }

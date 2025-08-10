@@ -1,8 +1,9 @@
 {
-  config,
   lib,
+  utils,
   pkgs,
   modulesPath,
+  config,
   ...
 }:
 
@@ -11,82 +12,50 @@ with lib;
 let
   cfg = config.services.resilio;
 
-  sharedFoldersRecord = map (entry: {
-    dir = entry.directory;
-
-    use_relay_server = entry.useRelayServer;
-    use_tracker = entry.useTracker;
-    use_dht = entry.useDHT;
-
-    search_lan = entry.searchLAN;
-    use_sync_trash = entry.useSyncTrash;
-    known_hosts = entry.knownHosts;
-  }) cfg.sharedFolders;
-
-  configFile = pkgs.writeText "config.json" (
-    builtins.toJSON (
-      {
-        device_name = cfg.deviceName;
-        storage_path = cfg.storagePath;
-        listening_port = cfg.listeningPort;
-        use_gui = false;
-        check_for_updates = cfg.checkForUpdates;
-        use_upnp = cfg.useUpnp;
-        download_limit = cfg.downloadLimit;
-        upload_limit = cfg.uploadLimit;
-        lan_encrypt_data = cfg.encryptLAN;
-      }
-      // optionalAttrs (cfg.directoryRoot != "") { directory_root = cfg.directoryRoot; }
-      // optionalAttrs cfg.enableWebUI {
-        webui = {
-          listen = "${cfg.httpListenAddr}:${toString cfg.httpListenPort}";
-        }
-        // (optionalAttrs (cfg.httpLogin != "") { login = cfg.httpLogin; })
-        // (optionalAttrs (cfg.httpPass != "") { password = cfg.httpPass; })
-        // (optionalAttrs (cfg.apiKey != "") { api_key = cfg.apiKey; });
-      }
-      // optionalAttrs (sharedFoldersRecord != [ ]) {
-        shared_folders = sharedFoldersRecord;
-      }
-    )
-  );
-
-  sharedFoldersSecretFiles = map (entry: {
-    dir = entry.directory;
-    secretFile =
-      if builtins.hasAttr "secret" entry then
-        toString (
-          pkgs.writeTextFile {
-            name = "secret-file";
-            text = entry.secret;
-          }
-        )
-      else
-        entry.secretFile;
-  }) cfg.sharedFolders;
-
   runConfigPath = "/run/rslsync/config.json";
-
-  createConfig = pkgs.writeShellScriptBin "create-resilio-config" (
-    if cfg.sharedFolders != [ ] then
-      ''
-        ${pkgs.jq}/bin/jq \
-          '.shared_folders |= map(.secret = $ARGS.named[.dir])' \
-          ${
-            lib.concatMapStringsSep " \\\n  " (
-              entry: ''--arg '${entry.dir}' "$(cat '${entry.secretFile}')"''
-            ) sharedFoldersSecretFiles
-          } \
-          <${configFile} \
-          >${runConfigPath}
-      ''
-    else
-      ''
-        # no secrets, passing through config
-        cp ${configFile} ${runConfigPath};
-      ''
+  settingsFormat = pkgs.formats.json { };
+  # Replaces all instances of { _secret = "<path>" } with the file contents.
+  # WARN; Run the generator at preStart!
+  settingsFileGenerator = pkgs.writeShellScriptBin "create-resilio-config" (
+    utils.genJqSecretsReplacementSnippet runtimeSettings runConfigPath
   );
 
+  runtimeSettings = {
+    device_name = cfg.deviceName;
+    storage_path = cfg.storagePath;
+    listening_port = cfg.listeningPort;
+    use_gui = false;
+    check_for_updates = cfg.checkForUpdates;
+    use_upnp = cfg.useUpnp;
+    download_limit = cfg.downloadLimit;
+    upload_limit = cfg.uploadLimit;
+    lan_encrypt_data = cfg.encryptLAN;
+  }
+  // optionalAttrs (cfg.directoryRoot != "") { directory_root = cfg.directoryRoot; }
+  // optionalAttrs cfg.enableWebUI {
+    webui = {
+      listen = "${cfg.httpListenAddr}:${toString cfg.httpListenPort}";
+    }
+    // (optionalAttrs (cfg.httpLogin != "") { login = cfg.httpLogin; })
+    // (optionalAttrs (cfg.httpPass != "") { password = cfg.httpPass; })
+    // (optionalAttrs (cfg.apiKey != "") { api_key = cfg.apiKey; });
+  }
+  // optionalAttrs (cfg.sharedFolders != [ ]) {
+    shared_folders = (
+      map (entry: {
+        dir = entry.directory;
+        secret = entry.secret;
+
+        use_relay_server = entry.useRelayServer;
+        use_tracker = entry.useTracker;
+        use_dht = entry.useDHT;
+
+        search_lan = entry.searchLAN;
+        use_sync_trash = entry.useSyncTrash;
+        known_hosts = entry.knownHosts;
+      }) cfg.sharedFolders
+    );
+  };
 in
 {
   disabledModules = [
@@ -250,7 +219,9 @@ in
         type = types.listOf (types.attrsOf types.anything);
         example = [
           {
-            secretFile = "/run/resilio-secret";
+            secret = {
+              _secret = "/run/resilio-secret";
+            };
             directory = "/home/user/sync_test";
             useRelayServer = true;
             useTracker = true;
@@ -312,24 +283,25 @@ in
 
     users.groups.rslsync.gid = config.ids.gids.rslsync;
 
-    systemd.services.resilio = with pkgs; {
+    systemd.services.resilio = {
       description = "Resilio Sync Service";
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
+
+      restartTriggers = [ settingsFileGenerator ];
+
       serviceConfig = {
         Restart = "on-abort";
         UMask = "0002";
         User = "rslsync";
-        RuntimeDirectory = "rslsync";
-
-        # TODO; Verify if <state>/Licenses/<X> exists, otherwise load license file
+        RuntimeDirectory = [ "rslsync" ];
 
         LoadCredential =
           [ ]
           # ERROR; License filename must end with ".btskey"!
           ++ lib.optional (cfg.licenseFile != null) "LICENSE.btskey:${cfg.licenseFile}";
         ExecStartPre = [
-          "${createConfig}/bin/create-resilio-config"
+          (lib.getExe settingsFileGenerator)
 
           "${(pkgs.writeShellScriptBin "init-license" ''
             SYNC_USER_PATH=$(find "${cfg.storagePath}" -maxdepth 1 -name ".SyncUser*" -print -quit)
@@ -343,9 +315,9 @@ in
               SYNC_LICENSE_PATH=$(find "$SYNC_USER_PATH/licenses" -maxdepth 1 -type f -print -quit)
               if [[ -z "$SYNC_LICENSE_PATH" ]]; then
                 echo "Installing license"
-                ${lib.getExe cfg.package} --nodaemon --storage "${cfg.storagePath}" --license ''${CREDENTIALS_DIRECTORY}/LICENCE.btskey
+                ${lib.getExe cfg.package} --nodaemon --storage "${cfg.storagePath}" --license ''${CREDENTIALS_DIRECTORY}/LICENSE.btskey
+              fi
             ''}
-            fi
           '')}/bin/init-license"
         ];
         ExecStart = ''

@@ -3,6 +3,7 @@
   imports = [
     ./backup.nix
     ./certificates.nix
+    ./computer-backup.nix
     ./database.nix
     ./disks.nix
     ./dns.nix
