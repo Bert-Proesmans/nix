@@ -46,22 +46,11 @@ in
     };
   };
 
+  # Allow kanidm user access to the idm certificate managed by the host
   security.acme.certs."idm.proesmans.eu" = {
     reloadServices = [ config.systemd.services.kanidm.name ];
   };
   users.groups.idm-certs.members = [ "kanidm" ];
-  systemd.services.kanidm = {
-    wants = [ "acme-finished-idm.proesmans.eu.target" ];
-    after = [
-      "acme-selfsigned-idm.proesmans.eu.service"
-      "acme-idm.proesmans.eu.service"
-    ];
-    # FIX; https://github.com/NixOS/nixpkgs/pull/409184
-    serviceConfig.BindReadOnlyPaths = [
-      "/etc/ssl"
-      "/etc/static/ssl"
-    ];
-  };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
     type = "zfs_fs";
@@ -69,16 +58,18 @@ in
     options.mountpoint = kanidmStatePath;
   };
 
-  # Redirect Kanidm traffic to nginx proxy
-  networking.extraHosts = ''
-    127.0.0.1 ${lib.removePrefix "https://" config.services.kanidm.serverSettings.origin}
-  '';
+  networking.hosts = {
+    # Redirect Kanidm traffic to nginx proxy
+    "127.0.0.1" = [ (lib.removePrefix "https://" config.services.kanidm.serverSettings.origin) ];
+  };
 
   services.kanidm = {
     enableServer = true;
     enableClient = true;
-    package = pkgs.kanidm_1_6.withSecretProvisioning;
+    package = pkgs.kanidm_1_7.withSecretProvisioning;
 
+    # WARN; Setting http_client_address_info requires settings format version 2+
+    serverSettings.version = "2";
     serverSettings = {
       bindaddress = "127.204.0.1:8443";
       # HostName; alpha.idm.proesmans.eu
@@ -86,9 +77,13 @@ in
       domain = "idm.proesmans.eu";
       db_fs_type = "zfs"; # Changes page size to 64K
       role = "WriteReplica";
-      online_backup.enabled = false;
-      trust_x_forward_for = false;
       # log_level = "debug";
+      online_backup.enabled = false;
+      # Accept proxy protocol from nginx stream handler
+      # ERROR; Nginx stream module cannot forward proxy protocol V2 (yet)!
+      # WORKAROUND; Proxy protocol is stripped, but kanidm does not see real client IP.
+      # NOTE; Should probably switch to HAProxy as frontend, nginx is too meh in advanced use cases.
+      # http_client_address_info.proxy-v2 = [ "127.0.0.0/8" ];
 
       tls_chain = config.security.acme.certs."idm.proesmans.eu".directory + "/fullchain.pem";
       tls_key = config.security.acme.certs."idm.proesmans.eu".directory + "/key.pem";
@@ -163,5 +158,17 @@ in
         };
       };
     };
+  };
+
+  systemd.services.kanidm = {
+    wants = [ "acme-finished-idm.proesmans.eu.target" ];
+    after = [
+      "acme-selfsigned-idm.proesmans.eu.service"
+      "acme-idm.proesmans.eu.service"
+    ];
+
+    unitConfig.RequiresMountsFor = [
+      kanidmStatePath
+    ];
   };
 }

@@ -38,8 +38,22 @@
           default unix:/run/nginx/https-frontend.sock;
           
           # Kanidm performs its own TLS termination
-          ${kanidmName} ${kanidmUpstream};
+          # ERROR; Kanidm expects proxy_protocol V2, but nginx can currently only send V1 !
+          # ERROR; proxy_protocol can _not_ be dynamically toggled. Workaround by sending to ourselves.
+          #         client -> <stream listener> -[with proxy]-> <stream listener> -[stripped proxy]-> kanidm
+          #
+          # REF; https://trac.nginx.org/nginx/ticket/1639
+          # REF; https://github.com/dedok/nginx-stream-proxy-protocol-v2
+          # NOTE; Maybe switch to HAProxy?
+          ${kanidmName} 127.0.0.111:8443;
         }
+
+        server {
+          # Server for stripping proxy protocol towards Kanidm
+          listen 127.0.0.111:8443 proxy_protocol;
+          proxy_pass ${kanidmUpstream};
+        }
+
 
         server {
           listen 0.0.0.0:443;
@@ -67,7 +81,7 @@
       # The value for `$remote_addr` will always be pointing to 127.0.0.1 (localhost equivalent) under default configuration.
       #
       # $remota_addr is set from the proxy protocol globally. Uses overrides per server block to restore functionality.
-      set_real_ip_from unix:/run/nginx/https-frontend.sock;
+      set_real_ip_from unix:;
       real_ip_header proxy_protocol;
     '';
 
