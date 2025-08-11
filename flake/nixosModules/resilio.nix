@@ -11,14 +11,7 @@ with lib;
 
 let
   cfg = config.services.resilio;
-
   runConfigPath = "/run/rslsync/config.json";
-  settingsFormat = pkgs.formats.json { };
-  # Replaces all instances of { _secret = "<path>" } with the file contents.
-  # WARN; Run the generator at preStart!
-  settingsFileGenerator = pkgs.writeShellScriptBin "create-resilio-config" (
-    utils.genJqSecretsReplacementSnippet runtimeSettings runConfigPath
-  );
 
   runtimeSettings = {
     device_name = cfg.deviceName;
@@ -216,7 +209,29 @@ in
 
       sharedFolders = mkOption {
         default = [ ];
-        type = types.listOf (types.attrsOf types.anything);
+        type = types.listOf (
+          types.attrsOf (
+            types.either
+              (types.oneOf [
+                types.bool
+                types.str
+                (types.listOf types.str)
+              ])
+              (
+                types.submodule {
+                  options = {
+                    _secret = lib.mkOption {
+                      type = types.nullOr types.str;
+                      description = ''
+                        The path to a file containing the value the option should be set to in the final
+                        configuration file.
+                      '';
+                    };
+                  };
+                }
+              )
+          )
+        );
         example = [
           {
             secret = {
@@ -254,6 +269,16 @@ in
           the group.
         '';
       };
+
+      extraJsonFile = lib.mkOption {
+        description = ''
+          Options set in this file take precedence over values set using the other options.
+          The files get deeply merged, and deduplicated.
+          An example of the accepted JSON schema is returned using `rslsync --dump-sample-config`.
+        '';
+        type = types.nullOr types.path;
+        default = null;
+      };
     };
   };
 
@@ -288,22 +313,40 @@ in
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
 
-      restartTriggers = [ settingsFileGenerator ];
-
       serviceConfig = {
         Restart = "on-abort";
         UMask = "0002";
         User = "rslsync";
         RuntimeDirectory = [ "rslsync" ];
+        RuntimeDirectoryMode = "0700";
+
+        BindReadOnlyPaths = [ ] ++ lib.optional (cfg.extraJsonFile != null) cfg.extraJsonFile;
 
         LoadCredential =
           [ ]
           # ERROR; License filename must end with ".btskey"!
           ++ lib.optional (cfg.licenseFile != null) "LICENSE.btskey:${cfg.licenseFile}";
-        ExecStartPre = [
-          (lib.getExe settingsFileGenerator)
 
-          "${(pkgs.writeShellScriptBin "init-license" ''
+        ExecStartPre = [
+          # Replaces all instances of { _secret = "<path>" } with the file contents.
+          # WARN; Run the generator at preStart!
+          "${pkgs.writeShellScriptBin "create-resilio-config" ''
+            umask u=rwx,g=,o=
+
+            ${utils.genJqSecretsReplacementSnippet runtimeSettings runConfigPath}
+
+            ${
+              if cfg.extraJsonFile != null then
+                ''
+                  ${lib.getExe pkgs.yq-go} '. *+ load("${cfg.extraJsonFile}") | (.. | select(type == "!!seq")) |= unique' '${runConfigPath}' >'${runConfigPath}.tmp' \
+                    && mv '${runConfigPath}.tmp' '${runConfigPath}'
+                ''
+              else
+                ""
+            }
+          ''}/bin/create-resilio-config"
+
+          "${pkgs.writeShellScriptBin "init-license" ''
             SYNC_USER_PATH=$(find "${cfg.storagePath}" -maxdepth 1 -name ".SyncUser*" -print -quit)
             if [[ -z "$SYNC_USER_PATH" ]]; then
               echo "Bootstrapping identity"
@@ -318,8 +361,9 @@ in
                 ${lib.getExe cfg.package} --nodaemon --storage "${cfg.storagePath}" --license ''${CREDENTIALS_DIRECTORY}/LICENSE.btskey
               fi
             ''}
-          '')}/bin/init-license"
+          ''}/bin/init-license"
         ];
+
         ExecStart = ''
           ${lib.getExe cfg.package} --nodaemon --config ${runConfigPath}
         '';

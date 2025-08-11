@@ -4,6 +4,15 @@
   config,
   ...
 }:
+let
+  backupFolders = {
+    # Generate key identifiers with; head -c4 /dev/urandom | od -A none -t x4
+    # Generate new RW keys with; rslsync --generate-secret
+
+    # Bert Proesmans
+    "3985f5a5".secret = config.sops.secrets.sync-key-3985f5a5.path;
+  };
+in
 {
   nixpkgs.config.allowUnfreePredicate =
     pkg:
@@ -22,8 +31,6 @@
       ];
     };
 
-    # Generate key identifiers with; head -c4 /dev/urandom | od -A none -t x4
-    # Generate new keys with; rslsync --generate-secret
     sync-key-3985f5a5 = {
       owner = "rslsync";
       restartUnits = [
@@ -32,15 +39,16 @@
     };
   };
 
-  disko.devices.zpool.storage.datasets = {
-    "documents/3985f5a5" = {
+  disko.devices.zpool.storage.datasets = lib.mapAttrs' (
+    name: value:
+    (lib.nameValuePair ("documents/" + name) ({
       type = "zfs_fs";
       # WARN; To be backed up !
-      options.mountpoint = "${config.services.resilio.directoryRoot}/3985f5a5";
+      options.mountpoint = "${config.services.resilio.directoryRoot}/" + name;
       # NOTE; Refquota is the property matching the intuitive thinking "how much storage space do I have".
       options.refquota = "50G";
-    };
-  };
+    }))
+  ) backupFolders;
 
   services.resilio = {
     # Use `rslsync --dump-sample-config´ to view an example configuration
@@ -54,21 +62,18 @@
     enableWebUI = false;
     storagePath = "/var/lib/resilio-sync";
     directoryRoot = "/var/lib/backup-roots";
-    sharedFolders = [
-      {
-        directory = "${config.services.resilio.directoryRoot}/3985f5a5";
-        knownHosts = [ ];
-        searchLAN = true;
-        # Use `rslsync --generate-secret` to generate a read-write key for a shared folder
-        secret = {
-          _secret = config.sops.secrets.sync-key-3985f5a5.path;
-        };
-        useDHT = true;
-        useRelayServer = true;
-        useSyncTrash = true;
-        useTracker = true;
-      }
-    ];
+    sharedFolders = lib.mapAttrsToList (name: value: {
+      directory = "${config.services.resilio.directoryRoot}/" + name;
+      secret._secret = value.secret;
+      #
+      knownHosts = [ ];
+      searchLAN = true;
+      useDHT = true;
+      useRelayServer = true;
+      useSyncTrash = true;
+      useTracker = true;
+    }) backupFolders;
+    # extraJsonFile = "/tmp/test.json";
   };
 
   systemd.services.resilio = {
@@ -77,8 +82,11 @@
         assert config.services.resilio.directoryRoot == "/var/lib/backup-roots";
         [
           "backup-roots"
-          "backup-roots/3985f5a5"
-        ];
+        ]
+        ++ (lib.mapAttrsToList (name: _: "backup-roots/" + name) backupFolders);
+      # ERROR; Resilio requires group write permissions on the sync-directories!
+      # NOTE; Includes sticky bit (GUID), octal value 2, so all created files are for sure owned by the rslsync group.
+      StateDirectoryMode = "2770";
     };
   };
 }
