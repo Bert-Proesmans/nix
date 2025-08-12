@@ -87,8 +87,12 @@ in
       environment = {
         IMMICH_HOST = lib.mkForce "127.175.0.99"; # Upstream overwrite
         IMMICH_PORT = lib.mkForce "3003"; # Upstream overwrite
-        # Redirect temporary files to disk-backed temporary folder.
-        TMPDIR = "/var/tmp";
+
+        # ERROR; Huggingface library doing something fucky wucky producing the following error message
+        # RuntimeError: Data processing error: I/O error: Operation not permitted (os error 1)
+        #
+        # Put all relevant filepaths together on the same filesystem so atomic move operations won't fail.
+        HF_HOME = "/var/cache/immich/hf";
       };
     };
 
@@ -189,8 +193,16 @@ in
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
-    # Force apply the configuration with overwritten secret data
-    environment.IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
+    environment = {
+      # Force apply the configuration with overwritten secret data
+      IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
+      # Force overwrite custom URL for the machine learning service
+      IMMICH_MACHINE_LEARNING_URL =
+        let
+          inherit (config.services.immich.machine-learning.environment) IMMICH_HOST IMMICH_PORT;
+        in
+        lib.mkForce "http://${IMMICH_HOST}:${IMMICH_PORT}";
+    };
 
     unitConfig.RequiresMountsFor = [
       immichStatePath
