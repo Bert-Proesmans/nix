@@ -1,4 +1,4 @@
-{ flake, config, ... }:
+{ flake, ... }:
 {
   imports = [
     ./backup.nix
@@ -12,11 +12,6 @@
     ./identity.nix
     ./pictures.nix
     ./tls-termination.nix
-    #./isolated-vm/configuration.nix
-    #./proxy-vm/configuration.nix
-    # ./web-security-controller.nix
-    # ./virtualgl.nix
-    # ./backblaze-backup/default.nix
     flake.profiles.hypervisor
   ];
 

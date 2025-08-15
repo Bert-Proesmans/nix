@@ -40,7 +40,7 @@ in
   };
 
   disko.devices.zpool.storage.datasets = lib.mapAttrs' (
-    name: value:
+    name: _value:
     (lib.nameValuePair ("documents/" + name) ({
       type = "zfs_fs";
       # WARN; To be backed up !
