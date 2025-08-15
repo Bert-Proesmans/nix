@@ -1,4 +1,5 @@
 {
+  lib,
   pkgs,
   flake,
   config,
@@ -61,7 +62,14 @@
     pkgs.traceroute
     pkgs.socat
     pkgs.nmap # ncat
+    pkgs.resilio-sync # rslsync
   ];
+
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (lib.getName pkg) [
+      "resilio-sync"
+    ];
 
   # Note; default firewall package is IPTables
   networking.firewall.allowedTCPPorts = [
