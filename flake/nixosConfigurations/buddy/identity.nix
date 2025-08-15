@@ -59,7 +59,7 @@ in
   };
 
   networking.hosts = {
-    # Redirect Kanidm traffic to nginx proxy
+    # Redirect Kanidm traffic to frontend proxy for provisioning
     "127.0.0.1" = [ (lib.removePrefix "https://" config.services.kanidm.serverSettings.origin) ];
   };
 
@@ -79,11 +79,8 @@ in
       role = "WriteReplica";
       # log_level = "debug";
       online_backup.enabled = false;
-      # Accept proxy protocol from nginx stream handler
-      # ERROR; Nginx stream module cannot forward proxy protocol V2 (yet)!
-      # WORKAROUND; Proxy protocol is stripped, but kanidm does not see real client IP.
-      # NOTE; Should probably switch to HAProxy as frontend, nginx is too meh in advanced use cases.
-      # http_client_address_info.proxy-v2 = [ "127.0.0.0/8" ];
+      # Accept proxy protocol from frontend stream handler
+      http_client_address_info.proxy-v2 = [ "127.0.0.0/8" ];
 
       tls_chain = config.security.acme.certs."idm.proesmans.eu".directory + "/fullchain.pem";
       tls_key = config.security.acme.certs."idm.proesmans.eu".directory + "/key.pem";
