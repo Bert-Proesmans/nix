@@ -11,6 +11,8 @@ let
 
     # Bert Proesmans
     "3985f5a5".secret = config.sops.secrets.sync-key-3985f5a5.path;
+    # <redacted>
+    "0128d08b".secret = config.sops.secrets.sync-key-0128d08b.path;
   };
 in
 {
@@ -32,6 +34,13 @@ in
     };
 
     sync-key-3985f5a5 = {
+      owner = "rslsync";
+      restartUnits = [
+        config.systemd.services.resilio.name
+      ];
+    };
+
+    sync-key-0128d08b = {
       owner = "rslsync";
       restartUnits = [
         config.systemd.services.resilio.name
