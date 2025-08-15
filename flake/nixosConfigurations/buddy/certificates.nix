@@ -6,6 +6,7 @@
 
   users.groups.alpha-certs = { };
   users.groups.idm-certs = { };
+  users.groups.passwords-certs = { };
 
   security.acme = {
     acceptTerms = true;
@@ -27,6 +28,12 @@
       # This block requests a wildcard certificate.
       domain = "*.idm.proesmans.eu";
       group = config.users.groups.idm-certs.name;
+    };
+
+    certs."passwords.proesmans.eu" = {
+      # This block requests a wildcard certificate.
+      domain = "*.passwords.proesmans.eu";
+      group = config.users.groups.passwords-certs.name;
     };
 
     certs."alpha.proesmans.eu" = {

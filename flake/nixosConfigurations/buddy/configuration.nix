@@ -10,6 +10,7 @@
     ./filesystems.nix
     ./hardware-configuration.nix
     ./identity.nix
+    ./passwords.nix
     ./pictures.nix
     ./tls-termination.nix
     flake.profiles.hypervisor
