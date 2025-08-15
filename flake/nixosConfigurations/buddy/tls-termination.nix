@@ -6,34 +6,44 @@
   ];
 
   # Must be member of cert-group to get access to the certs
-  # NOTE; root also required because that's the service user for nginx-config-reload.
   users.groups.alpha-certs.members = [ "haproxy" ];
+  users.groups.passwords-certs.members = [ "haproxy" ];
 
-  # Ensure no other modules enable nginx, only Haproxy is deployed!
-  services.nginx.enable = false;
+  security.acme.certs."alpha.proesmans.eu" = {
+    reloadServices = [ config.systemd.services.haproxy.name ];
+  };
 
-  security.dhparams = {
-    enable = true;
-    # NOTE; Suggested by Mozilla TLS config generator
-    defaultBitSize = 2048;
-    # Name of parameter set must match the systemd service name!
-    params.haproxy = {
-      # Defaults are used.
-      # Use 'params.haproxy.path' to retrieve the parameters.
-    };
+  security.acme.certs."passwords.proesmans.eu" = {
+    reloadServices = [ config.systemd.services.haproxy.name ];
   };
 
   services.haproxy =
     let
-      upstream.idm.server = config.services.kanidm.serverSettings.bindaddress;
+      upstream.idm = rec {
+        inherit (config.services.kanidm.serverSettings) origin bindaddress;
+        hostname = (lib.removePrefix "https://" origin);
+        server = bindaddress;
+      };
+      upstream.passwords = rec {
+        inherit (config.services.vaultwarden.config) ROCKET_ADDRESS ROCKET_PORT DOMAIN;
+        hostname = (lib.removePrefix "https://" DOMAIN);
+        server = "${ROCKET_ADDRESS}:${toString ROCKET_PORT}";
+      };
       upstream.photos = rec {
         inherit (config.services.immich) host port;
+        inherit (config.services.immich.settings.server) externalDomain;
+        hostname = (lib.removePrefix "https://" externalDomain);
         server = "${host}:${toString port}";
       };
       certs.alpha = {
         cert = "fullchain.pem";
         key = "key.pem";
         directory = config.security.acme.certs."alpha.proesmans.eu".directory;
+      };
+      certs.passwords = {
+        cert = "fullchain.pem";
+        key = "key.pem";
+        directory = config.security.acme.certs."passwords.proesmans.eu".directory;
       };
     in
     {
@@ -85,6 +95,11 @@
           key-base '${certs.alpha.directory}'
           load crt '${certs.alpha.cert}' key '${certs.alpha.key}'
 
+        crt-store passwords
+          crt-base '${certs.passwords.directory}'
+          key-base '${certs.passwords.directory}'
+          load crt '${certs.passwords.cert}' key '${certs.passwords.key}'
+
         # --- :80 → https redirect (keeps host + uri) ---
         frontend http_redirect
           mode http
@@ -101,7 +116,7 @@
           tcp-request content accept if { req_ssl_hello_type 1 }
 
           # route by SNI
-          use_backend passthrough_idm if { req.ssl_sni -i alpha.idm.proesmans.eu }
+          use_backend passthrough_idm if { req.ssl_sni -i ${upstream.idm.hostname} }
           default_backend local_tls_termination # anything else → local terminator
 
         # --- tcp backend that points to a local unix-socket ssl terminator ---
@@ -115,7 +130,7 @@
         frontend https_terminator
           mode http
           # accept proxy v2 from the tcp mux and terminate tls here
-          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' crt '@passwords/${certs.passwords.cert}' alpn h2,http/1.1 accept-proxy
 
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
@@ -123,8 +138,8 @@
           # host routing, use "host_xx" for specific overrides
           #
           # WARN; Add assignment for BACKEND NAME when adding a new host!
-          acl host_photos    req.hdr(Host) -i photos.alpha.proesmans.eu
-          acl host_passwords req.hdr(Host) -i passwords.alpha.proesmans.eu
+          acl host_photos    req.hdr(Host) -i ${upstream.photos.hostname}
+          acl host_passwords req.hdr(Host) -i ${upstream.passwords.hostname}
 
           http-request set-var(txn.backend_name) str(upstream_photos_app) if host_photos
           http-request set-var(txn.max_body) str("500m") if host_photos
@@ -163,6 +178,11 @@
           # server app unix@/run/photos/app.sock check
           server app ${upstream.photos.server} check
 
+        # --- http backend to the passwords app ---
+        backend upstream_passwords_app
+          mode http
+          server app ${upstream.passwords.server} check
+
         # --- raw tcp/tls passthrough for kanidm with proxy protocol v2 ---
         # haproxy can originate v2 directly.
         backend passthrough_idm
@@ -171,4 +191,31 @@
           server idm ${upstream.idm.server} send-proxy-v2 check
       '';
     };
+
+  systemd.services.haproxy = {
+    wants = [
+      "acme-finished-alpha.proesmans.eu.target"
+      "acme-finished-passwords.proesmans.eu.target"
+    ];
+    after = [
+      "acme-alpha.proesmans.eu.service"
+      "acme-passwords.proesmans.eu.service"
+      "acme-selfsigned-alpha.proesmans.eu.service"
+      "acme-selfsigned-passwords.proesmans.eu.service"
+    ];
+  };
+
+  # Ensure no other modules enable nginx, only Haproxy is deployed!
+  services.nginx.enable = false;
+
+  security.dhparams = {
+    enable = true;
+    # NOTE; Suggested by Mozilla TLS config generator
+    defaultBitSize = 2048;
+    # Name of parameter set must match the systemd service name!
+    params.haproxy = {
+      # Defaults are used.
+      # Use 'params.haproxy.path' to retrieve the parameters.
+    };
+  };
 }
