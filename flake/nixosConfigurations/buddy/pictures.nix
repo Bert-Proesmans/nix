@@ -80,7 +80,12 @@ in
       createDB = true;
     };
 
-    environment.TZ = "Europe/Brussels"; # Used for interpreting timestamps without time zone
+    environment = {
+      TZ = "Europe/Brussels"; # Used for interpreting timestamps without time zone
+      # Loopback address ranges are automatically added!
+      #REF; https://expressjs.com/en/guide/behind-proxies.html
+      # IMMICH_TRUSTED_PROXIES = ""; # Don't set when empty!
+    };
 
     machine-learning = {
       enable = true;
