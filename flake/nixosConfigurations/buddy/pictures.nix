@@ -93,6 +93,16 @@ in
         IMMICH_HOST = lib.mkForce "127.175.0.99"; # Upstream overwrite
         IMMICH_PORT = lib.mkForce "3003"; # Upstream overwrite
 
+        # ERROR; Cannot initialise shaders for hardware acceleration without writeable home directory?
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] libva: VA-API version 1.22.0
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] libva: Trying to open /run/opengl-driver/lib/dri/radeonsi_drv_video.so
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] libva: Found init function __vaDriverInit_1_22
+        # aug 16 21:10:29 buddy immich[1684]: Failed to create /var/empty/.cache for shader cache (Operation not permitted)---disabling.
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] libva: va_openDriver() returns 0
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] Initialised VAAPI connection: version 1.22
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] VAAPI driver: Mesa Gallium driver 25.2.0 for AMD Radeon Vega 3 Graphics (radeonsi, raven, ACO, DRM 3.61, 6.12.41).
+        # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] Driver not found in known nonstandard list, using standard behaviour.
+        HOME = "/var/cache/immich/home";
         # ERROR; Huggingface library doing something fucky wucky producing the following error message
         # RuntimeError: Data processing error: I/O error: Operation not permitted (os error 1)
         #
