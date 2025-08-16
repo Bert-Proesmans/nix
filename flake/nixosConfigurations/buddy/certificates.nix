@@ -1,12 +1,8 @@
 # Setup automatic (ACME) certificate renewal for proesmans domains
-{ config, ... }:
+{ lib, config, ... }:
 {
   sops.secrets.cloudflare-proesmans-key = { };
   sops.secrets.cloudflare-zones-key = { };
-
-  users.groups.alpha-certs = { };
-  users.groups.idm-certs = { };
-  users.groups.passwords-certs = { };
 
   security.acme = {
     acceptTerms = true;
@@ -24,22 +20,22 @@
       dnsResolver = "1.1.1.1:53";
     };
 
-    certs."idm.proesmans.eu" = {
-      # This block requests a wildcard certificate.
-      domain = "*.idm.proesmans.eu";
-      group = config.users.groups.idm-certs.name;
-    };
-
-    certs."passwords.proesmans.eu" = {
-      # This block requests a wildcard certificate.
-      domain = "*.passwords.proesmans.eu";
-      group = config.users.groups.passwords-certs.name;
+    certs."alpha.idm.proesmans.eu" = {
+      domain = lib.mkForce "alpha.idm.proesmans.eu";
+      # NOTE; Certificate split to limit eavesdropping by proxy
+      extraDomainNames = lib.mkForce [ ];
     };
 
     certs."alpha.proesmans.eu" = {
       # This block requests a wildcard certificate.
-      domain = "*.alpha.proesmans.eu";
-      group = config.users.groups.alpha-certs.name;
+      domain = lib.mkForce "*.alpha.proesmans.eu";
+      extraDomainNames = lib.mkForce [
+        "idm.proesmans.eu"
+        "pictures.proesmans.eu"
+        "alpha.pictures.proesmans.eu"
+        "passwords.proesmans.eu"
+        "alpha.passwords.proesmans.eu"
+      ];
     };
   };
 }

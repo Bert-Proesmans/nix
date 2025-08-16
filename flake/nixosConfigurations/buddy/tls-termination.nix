@@ -5,45 +5,45 @@
     443
   ];
 
-  # Must be member of cert-group to get access to the certs
-  users.groups.alpha-certs.members = [ "haproxy" ];
-  users.groups.passwords-certs.members = [ "haproxy" ];
-
-  security.acme.certs."alpha.proesmans.eu" = {
-    reloadServices = [ config.systemd.services.haproxy.name ];
-  };
-
-  security.acme.certs."passwords.proesmans.eu" = {
-    reloadServices = [ config.systemd.services.haproxy.name ];
+  security.acme = {
+    defaults.reloadServices = [ config.systemd.services.haproxy.name ];
+    certs."alpha.proesmans.eu".group = "haproxy";
   };
 
   services.haproxy =
     let
       upstream.idm = rec {
         inherit (config.services.kanidm.serverSettings) origin bindaddress;
-        hostname = (lib.removePrefix "https://" origin);
+        aliases = [ "idm.proesmans.eu" ];
+        # WARN; Domain and Origin are separate values from the effective DNS hostname.
+        # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
+        hostname =
+          assert origin == "https://idm.proesmans.eu";
+          "alpha.idm.proesmans.eu";
         server = bindaddress;
       };
       upstream.passwords = rec {
         inherit (config.services.vaultwarden.config) ROCKET_ADDRESS ROCKET_PORT DOMAIN;
-        hostname = (lib.removePrefix "https://" DOMAIN);
+        aliases = [ "passwords.proesmans.eu" ];
+        hostname =
+          assert DOMAIN == "https://alpha.passwords.proesmans.eu";
+          (lib.removePrefix "https://" DOMAIN);
         server = "${ROCKET_ADDRESS}:${toString ROCKET_PORT}";
       };
-      upstream.photos = rec {
+      upstream.pictures = rec {
         inherit (config.services.immich) host port;
         inherit (config.services.immich.settings.server) externalDomain;
-        hostname = (lib.removePrefix "https://" externalDomain);
+        aliases = [ "pictures.proesmans.eu" ];
+        hostname =
+          assert externalDomain == "https://pictures.proesmans.eu";
+          "alpha.pictures.proesmans.eu";
         server = "${host}:${toString port}";
       };
       certs.alpha = {
         cert = "fullchain.pem";
         key = "key.pem";
+        # Wildcard + multi-domain
         directory = config.security.acme.certs."alpha.proesmans.eu".directory;
-      };
-      certs.passwords = {
-        cert = "fullchain.pem";
-        key = "key.pem";
-        directory = config.security.acme.certs."passwords.proesmans.eu".directory;
       };
     in
     {
@@ -95,11 +95,6 @@
           key-base '${certs.alpha.directory}'
           load crt '${certs.alpha.cert}' key '${certs.alpha.key}'
 
-        crt-store passwords
-          crt-base '${certs.passwords.directory}'
-          key-base '${certs.passwords.directory}'
-          load crt '${certs.passwords.cert}' key '${certs.passwords.key}'
-
         # --- :80 → https redirect (keeps host + uri) ---
         frontend http_redirect
           mode http
@@ -130,7 +125,12 @@
         frontend https_terminator
           mode http
           # accept proxy v2 from the tcp mux and terminate tls here
-          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' crt '@passwords/${certs.passwords.cert}' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' alpn h2,http/1.1 accept-proxy
+
+          # do alias redirects
+          http-request redirect prefix https://${upstream.idm.hostname} code 302 if { hdr(host) -i idm.proesmans.eu }
+          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { hdr(host) -i pictures.proesmans.eu }
+          http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { hdr(host) -i passwords.proesmans.eu }
 
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
@@ -138,11 +138,11 @@
           # host routing, use "host_xx" for specific overrides
           #
           # WARN; Add assignment for BACKEND NAME when adding a new host!
-          acl host_photos    req.hdr(Host) -i ${upstream.photos.hostname}
+          acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
           acl host_passwords req.hdr(Host) -i ${upstream.passwords.hostname}
 
-          http-request set-var(txn.backend_name) str(upstream_photos_app) if host_photos
-          http-request set-var(txn.max_body) str("500m") if host_photos
+          http-request set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures
+          http-request set-var(txn.max_body) str("500m") if host_pictures
 
           http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
 
@@ -171,12 +171,12 @@
 
           use_backend %[var(txn.backend_name)]
 
-        # --- http backend to the photos app ---
-        backend upstream_photos_app
+        # --- http backend to the pictures app ---
+        backend upstream_pictures_app
           mode http
           # prefer unix if your app exposes it; otherwise keep tcp:
           # server app unix@/run/photos/app.sock check
-          server app ${upstream.photos.server} check
+          server app ${upstream.pictures.server} check
 
         # --- http backend to the passwords app ---
         backend upstream_passwords_app
@@ -193,16 +193,8 @@
     };
 
   systemd.services.haproxy = {
-    wants = [
-      "acme-finished-alpha.proesmans.eu.target"
-      "acme-finished-passwords.proesmans.eu.target"
-    ];
-    after = [
-      "acme-alpha.proesmans.eu.service"
-      "acme-passwords.proesmans.eu.service"
-      "acme-selfsigned-alpha.proesmans.eu.service"
-      "acme-selfsigned-passwords.proesmans.eu.service"
-    ];
+    requires = [ "acme-alpha.proesmans.eu.service" ];
+    after = [ "acme-alpha.proesmans.eu.service" ];
   };
 
   # Ensure no other modules enable nginx, only Haproxy is deployed!

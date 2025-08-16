@@ -164,6 +164,8 @@ in
         # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
         clientSecret = config.sops.placeholder.immich-oauth-secret;
         defaultStorageQuota = 500;
+        # ERROR; Immich does not like a redirect status code on the well-known URL
+        # issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
         issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
         mobileOverrideEnabled = false;
         mobileRedirectUri = "";
@@ -176,7 +178,7 @@ in
       };
       passwordLogin.enabled = true;
       reverseGeocoding.enabled = true;
-      server.externalDomain = "https://photos.alpha.proesmans.eu";
+      server.externalDomain = "https://pictures.proesmans.eu";
       server.loginPageMessage = "Proesmans fotos, klik op de knop onderaan om verder te gaan";
       server.publicUsers = true;
       storageTemplate.enabled = true;

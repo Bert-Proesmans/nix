@@ -47,10 +47,10 @@ in
   };
 
   # Allow kanidm user access to the idm certificate managed by the host
-  security.acme.certs."idm.proesmans.eu" = {
+  security.acme.certs."alpha.idm.proesmans.eu" = {
     reloadServices = [ config.systemd.services.kanidm.name ];
+    group = "kanidm";
   };
-  users.groups.idm-certs.members = [ "kanidm" ];
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
     type = "zfs_fs";
@@ -60,7 +60,10 @@ in
 
   networking.hosts = {
     # Redirect Kanidm traffic to frontend proxy for provisioning
-    "127.0.0.1" = [ (lib.removePrefix "https://" config.services.kanidm.serverSettings.origin) ];
+    "127.0.0.1" = [
+      "idm.proesmans.eu"
+      "alpha.idm.proesmans.eu"
+    ];
   };
 
   services.kanidm = {
@@ -72,9 +75,9 @@ in
     serverSettings.version = "2";
     serverSettings = {
       bindaddress = "127.204.0.1:8443";
-      # HostName; alpha.idm.proesmans.eu
-      origin = "https://alpha.idm.proesmans.eu";
       domain = "idm.proesmans.eu";
+      origin = "https://idm.proesmans.eu";
+      # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       db_fs_type = "zfs"; # Changes page size to 64K
       role = "WriteReplica";
       # log_level = "debug";
@@ -82,19 +85,21 @@ in
       # Accept proxy protocol from frontend stream handler
       http_client_address_info.proxy-v2 = [ "127.0.0.0/8" ];
 
-      tls_chain = config.security.acme.certs."idm.proesmans.eu".directory + "/fullchain.pem";
-      tls_key = config.security.acme.certs."idm.proesmans.eu".directory + "/key.pem";
+      tls_chain = config.security.acme.certs."alpha.idm.proesmans.eu".directory + "/fullchain.pem";
+      tls_key = config.security.acme.certs."alpha.idm.proesmans.eu".directory + "/key.pem";
     };
 
     clientSettings = {
-      uri = config.services.kanidm.serverSettings.origin;
+      # ERROR; MUST MATCH _instance_ DNS hostname exactly due to certificate validation!
+      uri = "https://alpha.idm.proesmans.eu";
       verify_hostnames = true;
       verify_ca = true;
     };
 
     provision = {
       enable = true;
-      instanceUrl = config.services.kanidm.serverSettings.origin;
+      # ERROR; MUST MATCH _instance_ DNS hostname exactly due to certificate validation!
+      instanceUrl = "https://alpha.idm.proesmans.eu";
       idmAdminPasswordFile = config.sops.secrets.idm_admin-password.path;
       acceptInvalidCerts = false;
 
@@ -126,9 +131,11 @@ in
         displayName = "Immich SSO";
         basicSecretFile = config.sops.secrets.immich-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
-        originLanding = "https://photos.alpha.proesmans.eu/";
+        originLanding = "https://pictures.proesmans.eu/";
         originUrl = [
-          "https://photos.alpha.proesmans.eu/auth/login"
+          # NOTE; Global url redirects to specific instance URLs
+          "https://pictures.proesmans.eu/auth/login"
+          "https://alpha.pictures.proesmans.eu/auth/login"
           "app.immich:///oauth-callback" # "app.immich:///" (??)
         ];
         preferShortUsername = true;
@@ -158,10 +165,11 @@ in
   };
 
   systemd.services.kanidm = {
-    wants = [ "acme-finished-idm.proesmans.eu.target" ];
+    requires = [ "acme-alpha.idm.proesmans.eu.service" ];
     after = [
-      "acme-selfsigned-idm.proesmans.eu.service"
-      "acme-idm.proesmans.eu.service"
+      "acme-alpha.idm.proesmans.eu.service"
+      # Provisioning is rerouted through proxy for certificate validation
+      config.systemd.services.haproxy.name
     ];
 
     unitConfig.RequiresMountsFor = [
