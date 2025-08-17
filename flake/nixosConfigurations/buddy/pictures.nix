@@ -182,7 +182,8 @@ in
         # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
         clientSecret = config.sops.placeholder.immich-oauth-secret;
         defaultStorageQuota = 500;
-        # ERROR; Immich does not like a redirect status code on the well-known URL
+        # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
+        # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
         # issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
         issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
         mobileOverrideEnabled = false;

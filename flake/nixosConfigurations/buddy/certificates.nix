@@ -23,14 +23,15 @@
     certs."alpha.idm.proesmans.eu" = {
       domain = lib.mkForce "alpha.idm.proesmans.eu";
       # NOTE; Certificate split to limit eavesdropping by proxy
-      extraDomainNames = lib.mkForce [ ];
+      extraDomainNames = lib.mkForce [
+        "idm.proesmans.eu"
+      ];
     };
 
     certs."alpha.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = lib.mkForce "*.alpha.proesmans.eu";
       extraDomainNames = lib.mkForce [
-        "idm.proesmans.eu"
         "pictures.proesmans.eu"
         "alpha.pictures.proesmans.eu"
         "passwords.proesmans.eu"

@@ -111,7 +111,11 @@
           tcp-request content accept if { req_ssl_hello_type 1 }
 
           # route by SNI
-          use_backend passthrough_idm if { req.ssl_sni -i ${upstream.idm.hostname} }
+          use_backend passthrough_idm if { ${
+            lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
+              [ upstream.idm.hostname ] ++ upstream.idm.aliases
+            )
+          } }
           default_backend local_tls_termination # anything else → local terminator
 
         # --- tcp backend that points to a local unix-socket ssl terminator ---
@@ -128,7 +132,6 @@
           bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' alpn h2,http/1.1 accept-proxy
 
           # do alias redirects
-          http-request redirect prefix https://${upstream.idm.hostname} code 302 if { hdr(host) -i idm.proesmans.eu }
           http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { hdr(host) -i pictures.proesmans.eu }
           http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { hdr(host) -i passwords.proesmans.eu }
 

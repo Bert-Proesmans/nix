@@ -75,9 +75,13 @@ in
     serverSettings.version = "2";
     serverSettings = {
       bindaddress = "127.204.0.1:8443";
+      # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
+      # ERROR; These hostnames cannot be used as web resources under the openid specification
+      # NOTE; These hostnames can be used as web resources under the webauthn+cookies specification
+      #
+      # HELP; Domain and origin must be the same for all regional instances of IDM.
       domain = "idm.proesmans.eu";
       origin = "https://idm.proesmans.eu";
-      # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       db_fs_type = "zfs"; # Changes page size to 64K
       role = "WriteReplica";
       # log_level = "debug";
@@ -137,6 +141,9 @@ in
           "https://pictures.proesmans.eu/auth/login"
           "https://alpha.pictures.proesmans.eu/auth/login"
           "app.immich:///oauth-callback" # "app.immich:///" (??)
+          # If unlinking/relinking oauth ids are allowed
+          "https://pictures.proesmans.eu/user-settings"
+          "https://alpha.pictures.proesmans.eu/user-settings"
         ];
         preferShortUsername = true;
         # RS256 is used instead of ES256 so additionally we need legacy crypto
