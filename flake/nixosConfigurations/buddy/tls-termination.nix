@@ -156,8 +156,7 @@
           # reject if no backend set (optional hardening)
           http-request deny status 421 if !{ var(txn.backend_name) -m found }
 
-          # enforce size, units in bytes
-          
+          # enforce payload size, units in bytes          
           http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
           http-request set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)
           http-request set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)

@@ -10,6 +10,7 @@
     ./memory-handling.nix
     ./private-network.nix
     ./tls-termination.nix
+    ./web-cache.nix
   ];
 
   # Slows down write operations considerably

@@ -10,6 +10,9 @@
     certs."omega.proesmans.eu".group = "haproxy";
   };
 
+  # Allow r/w access to varnish ingest
+  users.groups.varnish-forwarders.members = [ "haproxy" ];
+
   services.haproxy =
     let
       upstream.buddy = {
@@ -27,12 +30,12 @@
       #   hostname = ;
       #   server = "100.116.84.29:443"; # Tailscale forward
       # };
-      # upstream.pictures = {
-      #   aliases = [ "pictures.proesmans.eu" ];
-      #   hostname = "omega.pictures.proesmans.eu";
-      #   # TODO; Add varnish web cache inbetween
-      #   server = "100.116.84.29:443"; # Tailscale forward
-      # };
+      upstream.pictures = {
+        # NOTE; Upstream is local varnish webcache
+        aliases = [ "pictures.proesmans.eu" ];
+        hostname = "omega.pictures.proesmans.eu";
+        server = null; # Tailscale forward
+      };
       certs.omega = {
         cert = "fullchain.pem";
         key = "key.pem";
@@ -124,10 +127,48 @@
           # accept proxy v2 from the tcp mux and terminate tls here
           bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@omega/${certs.omega.cert}' alpn h2,http/1.1 accept-proxy
 
-          # reject
-          http-request deny status 421
+          # do alias redirects
+          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { hdr(host) -i pictures.proesmans.eu }
 
-        # --- http backend to the pictures app ---
+          # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
+          http-request set-var(txn.max_body) str("10m")
+
+          # host routing, use "host_xx" for specific overrides
+          #
+          # WARN; Add assignment for BACKEND NAME when adding a new host!
+          acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
+
+          http-request set-var(txn.backend_name) str(upstream_varnish) if host_pictures
+          http-request set-var(txn.max_body) str("500m") if host_pictures
+
+          # reject if no backend set (optional hardening)
+          http-request deny status 421 if !{ var(txn.backend_name) -m found }
+
+          # enforce payload size, units in bytes          
+          http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
+          http-request set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)
+          http-request set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)
+          http-request deny status 413 if { var(txn.body_size_diff) -m int gt 0 }
+          http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }
+
+          http-request set-header X-Forwarded-Proto https
+          http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+          http-request set-header X-Forwarded-Server %[hostname]
+          
+          # websocket friendliness (haproxy already handles Connection hop-by-hop headers,
+          # but we preserve Upgrade semantics explicitly)
+          acl is_websocket req.hdr(Upgrade) -i websocket
+          http-request set-header Connection "upgrade" if is_websocket
+          
+          # HSTS (63072000 seconds)
+          http-response set-header Strict-Transport-Security max-age=63072000
+
+          use_backend %[var(txn.backend_name)]
+
+        # --- http backend to the varnish ---
+        backend upstream_varnish
+          mode http
+          server varnish1 unix@/run/varnishd/frontend.sock check send-proxy
 
         # --- raw tcp/tls passthrough with proxy protocol v2 ---
         # haproxy can originate v2 directly.
