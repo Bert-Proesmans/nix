@@ -4,10 +4,12 @@
 }:
 {
   imports = [
+    ./certificates.nix
     ./disks.nix
     ./hardware-configuration.nix
     ./memory-handling.nix
     ./private-network.nix
+    ./tls-termination.nix
   ];
 
   # Slows down write operations considerably
