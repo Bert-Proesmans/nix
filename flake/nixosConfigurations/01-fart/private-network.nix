@@ -5,7 +5,7 @@
 {
   sops.secrets.tailscale_connect_key.owner = "root";
   services.tailscale = {
-    enable = false; # DEBUG
+    enable = true;
     disableTaildrop = true;
     openFirewall = true;
     useRoutingFeatures = "none";
