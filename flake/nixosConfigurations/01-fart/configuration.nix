@@ -60,9 +60,9 @@
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     (modulesPath + "/profiles/minimal.nix")
-    ./internet-security.nix
-    ./tls-termination.nix
-    ./web-cache.nix
+    #./internet-security.nix
+    #./tls-termination.nix
+    #./web-cache.nix
   ];
 
   system.stateVersion = "25.05";
@@ -79,13 +79,13 @@
     # Allow emergency shell in stage-1-init
     "boot.shell_on_fail" # DEBUG
   ];
-  boot.kernel.sysctl = {
-    # REF; https://wiki.archlinux.org/title/Zram#Optimizing_swap_on_zram
-    "vm.swappiness" = 200;
-    "vm.page-cluster" = 0;
-    "vm.watermark_boost_factor" = 0;
-    "vm.watermark_scale_factor" = 125;
-  };
+  # boot.kernel.sysctl = {
+  #   # REF; https://wiki.archlinux.org/title/Zram#Optimizing_swap_on_zram
+  #   "vm.swappiness" = 200;
+  #   "vm.page-cluster" = 0;
+  #   "vm.watermark_boost_factor" = 0;
+  #   "vm.watermark_scale_factor" = 125;
+  # };
   boot.initrd.availableKernelModules = [
     "ata_piix"
     "uhci_hcd"
@@ -106,7 +106,7 @@
     # ERROR; Managing least-recently-used (LRU) inside ZRAM will improve latency, but this isn't how the mechanism exactly works either.
     # The writeback device will receive _randomly_ chosen 'idle' pages, causing high variance in latency! There is a configurable access
     # timer, however, that marks pages as idle automatically.
-    enable = true;
+    enable = false; # DEBUG
     # NOTE; Refer to this swap device by "/sys/block/zram0"
     swapDevices = 1;
     memoryMax = 2 * 1024 * 1024 * 1024; # (2GB) Bytes, total size of swap device aka max size of uncompressed data
@@ -116,7 +116,7 @@
   };
 
   systemd.services."zram0-maintenance" = {
-    enable = true;
+    enable = false; # DEBUG
     description = "Maintain zram0 data";
     startAt = "*-*-* 00/1:00:00"; # Every hour
     requisite = [ "systemd-zram-setup@zram0.service" ];
@@ -289,7 +289,7 @@
 
   sops.secrets.tailscale_connect_key.owner = "root";
   services.tailscale = {
-    enable = true;
+    enable = false; # DEBUG
     disableTaildrop = true;
     openFirewall = true;
     useRoutingFeatures = "none";
