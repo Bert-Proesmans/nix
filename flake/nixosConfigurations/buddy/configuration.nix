@@ -12,6 +12,7 @@
     ./identity.nix
     ./passwords.nix
     ./pictures.nix
+    ./private-network.nix
     ./tls-termination.nix
     flake.profiles.hypervisor
   ];
@@ -40,17 +41,6 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
     ];
   };
-
-  # Temporary, will be moved to proxy-vm later
-  # sops.secrets.tailscale_connect_key.owner = "root";
-  # services.tailscale = {
-  #   enable = true;
-  #   disableTaildrop = true;
-  #   openFirewall = true;
-  #   useRoutingFeatures = "none";
-  #   authKeyFile = config.sops.secrets.tailscale_connect_key.path;
-  #   extraDaemonFlags = [ "--no-logs-no-support" ];
-  # };
 
   # Ignore below
   # Consistent defaults accross all machine configurations.
