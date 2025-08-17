@@ -106,6 +106,10 @@
         frontend tls_muxing
           mode tcp
           bind :443 v4v6
+          # Conditionally accept proxy protocol from tunnel hosts
+          acl trusted_proxies src 100.127.116.49 # add others separated by space eg, 100.0.0.2
+          tcp-request connection expect-proxy layer4 if trusted_proxies
+          
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
           tcp-request content accept if { req_ssl_hello_type 1 }
