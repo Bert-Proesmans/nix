@@ -13,4 +13,9 @@
   tags = [
     "hypervisor"
   ];
+  services."192.168.88.11".tags = [
+    "dns"
+    "webserver"
+  ];
+  services."100.116.84.29".tags = [ "tailscale" ];
 }

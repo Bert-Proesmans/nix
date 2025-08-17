@@ -42,15 +42,35 @@
 
                 services = lib.mkOption {
                   description = "Services provided by this host";
-                  type = lib.types.listOf (
-                    lib.types.enum [
-                      "dhcp"
-                      "dns"
-                      "webserver"
-                      # TODO
-                    ]
+                  type = lib.types.attrsOf (
+                    lib.types.submodule (
+                      { name, ... }:
+                      {
+                        options = {
+                          address = lib.mkOption {
+                            description = "IP Address to reach this service";
+                            type = lib.types.nullOr lib.types.str; # TODO; IP-type
+                            default = name;
+                          };
+                          tags = lib.mkOption {
+                            description = "";
+                            type = lib.types.listOf (
+                              lib.types.either lib.types.str (
+                                lib.types.enum [
+                                  "dhcp"
+                                  "dns"
+                                  "webserver"
+                                  # TODO
+                                ]
+                              )
+                            );
+                            apply = lib.lists.unique;
+                          };
+                        };
+                      }
+                    )
                   );
-                  default = [ ];
+                  default = { };
                 };
 
                 macAddresses = lib.mkOption {
