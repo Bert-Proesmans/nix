@@ -7,11 +7,11 @@
 
   security.acme = {
     defaults.reloadServices = [ config.systemd.services.haproxy.name ];
-    certs."omega.proesmans.eu".group = "haproxy";
+    certs."omega.proesmans.eu".group = config.services.haproxy.group;
   };
 
-  # Allow r/w access to varnish ingest
-  users.groups.varnish-forwarders.members = [ "haproxy" ];
+  # Allow r/w access to varnish frontend socket
+  users.groups.varnish-frontend.members = [ config.services.haproxy.group ];
 
   services.haproxy =
     let
@@ -19,8 +19,6 @@
         aliases = [
           "idm.proesmans.eu"
           "omega.idm.proesmans.eu"
-          "pictures.proesmans.eu"
-          "omega.pictures.proesmans.eu"
         ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
         server = "100.116.84.29:443"; # Tailscale forward
@@ -34,7 +32,7 @@
         # NOTE; Upstream is local varnish webcache
         aliases = [ "pictures.proesmans.eu" ];
         hostname = "omega.pictures.proesmans.eu";
-        server = null; # Tailscale forward
+        server = null; # Varnish forward
       };
       certs.omega = {
         cert = "fullchain.pem";
@@ -168,7 +166,7 @@
         # --- http backend to the varnish ---
         backend upstream_varnish
           mode http
-          server varnish1 unix@/run/varnishd/frontend.sock check send-proxy
+          server varnish unix@/run/varnish-sockets/frontend.sock check send-proxy-v2
 
         # --- raw tcp/tls passthrough with proxy protocol v2 ---
         # haproxy can originate v2 directly.
@@ -176,12 +174,35 @@
           mode tcp
           # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
           server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
+
+        # --- requests routed back from varnish ---
+        frontend varnish_to_origin
+          bind unix@/run/haproxy-sockets/frontend.sock accept-proxy group haproxy-frontend mode 660
+          # bind 127.0.0.1:6666 # DEBUG
+          mode http
+          default_backend passthrough_buddy_with_tls
+
+        backend passthrough_buddy_with_tls
+          mode http
+          # client → haproxy(:443) → varnish(unix-socket) → haproxy(unix-socket) → buddy(100.116.84.29:443) (send PROXY v2)
+          # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
+          server buddy_tailscale_tls ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt sni req.hdr(host)
       '';
     };
 
   systemd.services.haproxy = {
     requires = [ "acme-omega.proesmans.eu.service" ];
     after = [ "acme-omega.proesmans.eu.service" ];
+  };
+
+  # Add members to group haproxy-frontend for r/w access to /run/haproxy-sockets/frontend.sock
+  users.groups.haproxy-frontend.members = [ config.services.haproxy.group ];
+  systemd.tmpfiles.settings."50-haproxy-sockets" = {
+    "/run/haproxy-sockets".d = {
+      user = config.services.haproxy.user;
+      group = config.users.groups.varnish-frontend.name;
+      mode = "0755";
+    };
   };
 
   # Ensure no other modules enable nginx, only Haproxy is deployed!

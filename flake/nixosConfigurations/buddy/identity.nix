@@ -140,10 +140,12 @@ in
           # NOTE; Global url redirects to specific instance URLs
           "https://pictures.proesmans.eu/auth/login"
           "https://alpha.pictures.proesmans.eu/auth/login"
+          "https://omega.pictures.proesmans.eu/auth/login"
           "app.immich:///oauth-callback" # "app.immich:///" (??)
+
           # If unlinking/relinking oauth ids are allowed
-          "https://pictures.proesmans.eu/user-settings"
-          "https://alpha.pictures.proesmans.eu/user-settings"
+          # "https://pictures.proesmans.eu/user-settings"
+          # "https://alpha.pictures.proesmans.eu/user-settings"
         ];
         preferShortUsername = true;
         # RS256 is used instead of ES256 so additionally we need legacy crypto
