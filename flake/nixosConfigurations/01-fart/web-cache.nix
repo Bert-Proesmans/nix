@@ -39,18 +39,6 @@
       }
 
       sub vcl_recv {
-        if (req.http.host == "omega.pictures.proesmans.eu") {
-          # rewrite host for backend fetch 
-          # WARN; assumes pretty brittle setup, needs iteration
-          set req.http.X-Orig-Host = req.http.host;
-          set req.http.host = "alpha.pictures.proesmans.eu";
-        }
-
-        # Implementing websocket support (https://www.varnish-cache.org/docs/4.0/users-guide/vcl-example-websockets.html)
-        if (req.http.Upgrade ~ "(?i)websocket") {
-          return (pipe);
-        }
-
         # allow caching for static assets
         if (req.url ~ "\.(jpg|jpeg|png|gif|css|js)$") {
             return (hash);
@@ -72,10 +60,6 @@
       }
 
       sub vcl_deliver {
-        if (resp.http.Location && req.http.X-Orig-Host) {
-          set resp.http.Location = regsub(resp.http.Location, "alpha.pictures.proesmans.eu", req.http.X-Orig-Host);
-        }
-
         # optional: add header to see if served from cache
         if (obj.hits > 0) {
           set resp.http.X-Cache = "HIT";

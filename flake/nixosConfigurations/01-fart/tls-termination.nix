@@ -16,6 +16,7 @@
   services.haproxy =
     let
       upstream.buddy = {
+        # Always forward these domains to buddy
         aliases = [
           "idm.proesmans.eu"
           "omega.idm.proesmans.eu"
@@ -23,7 +24,8 @@
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
         server = "100.116.84.29:443"; # Tailscale forward
       };
-      # upstream.idm = rec {
+      # upstream.idm = {
+      #   # Not yet implemented
       #   aliases = [ ];
       #   hostname = ;
       #   server = "100.116.84.29:443"; # Tailscale forward
@@ -34,32 +36,33 @@
         hostname = "omega.pictures.proesmans.eu";
         server = null; # Varnish forward
       };
-      certs.omega = {
-        cert = "fullchain.pem";
-        key = "key.pem";
-        # Wildcard + multi-domain
-        directory = config.security.acme.certs."omega.proesmans.eu".directory;
-      };
     in
     {
       enable = true;
       config = ''
         global
-          # logging goes to journald via stdout/stderr under systemd; no daemon/pidfile
           # (stats socket is injected by your nixos module; do not redefine here)
+          #
+
           # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
           # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
+          #
           ssl-default-bind-curves X25519:prime256v1:secp384r1
           ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
           ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-bind-options prefer-client-ciphers ssl-min-ver TLSv1.2 no-tls-tickets
-
           ssl-default-server-curves X25519:prime256v1:secp384r1
           ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
           ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
-
           ssl-dh-param-file '${config.security.dhparams.params.haproxy.path}'
+
+          # Logging 
+          #
+          # Put state changes, warnings, errors and more problematic messages on stdout
+          log stdout    format raw    local0  notice
+          # Push "traffic logs" into systemd journal through syslog stub
+          log /dev/log  format local  local7  info info
 
         defaults
           mode http
@@ -70,6 +73,8 @@
           timeout client  65s
           timeout server  65s
           timeout tunnel  1h    # long-lived websocket/tunnel support
+
+          # Side-effect free use and reuse of upstream connections
           http-reuse safe
 
           # NOTE; haproxy does not recompress if upstream has applied compression. This all depends on the Accept-Encoding header inside the requets.
@@ -79,28 +84,32 @@
 
         defaults tcp
           mode tcp
+          log global
           option tcplog
           timeout connect 60s
           timeout client  65s
           timeout server  65s
           timeout tunnel  1h  # long-lived websocket/tunnel support
 
+        # Manual certificate enlisting because the filenames do not match the expected syntax
         crt-store omega
-          crt-base '${certs.omega.directory}'
-          key-base '${certs.omega.directory}'
-          load crt '${certs.omega.cert}' key '${certs.omega.key}'
+          crt-base '${config.security.acme.certs."omega.proesmans.eu".directory}'
+          key-base '${config.security.acme.certs."omega.proesmans.eu".directory}'
+          # NOTE; Wildcard + multiple domains certificate
+          load crt 'fullchain.pem' key 'key.pem'
 
-        # --- :80 → https redirect (keeps host + uri) ---
-        frontend http_redirect
+        listen http_plain
+          # --- self-explanatory ---
           mode http
           bind :80 v4v6
           http-request redirect scheme https code 301 unless { ssl_fc }
 
-        # --- tcp tls mux on :443 with sni routing ---
-        # this mirrors nginx `stream { ... }` behavior.
-        frontend tls_muxing
+        listen tls_muxing
+          # --- tcp tls mux with sni routing ---
+          # this mirrors nginx `stream { ... }` behavior.
           mode tcp
           bind :443 v4v6
+          
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
           tcp-request content accept if { req_ssl_hello_type 1 }
@@ -110,83 +119,95 @@
             lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") upstream.buddy.aliases
           } }
           
-          default_backend local_tls_termination # anything else → local terminator
-
-        # --- tcp backend that points to a local unix-socket ssl terminator ---
-        # we keep tcp here and hop via PROXY v2 into the terminator.
-        backend local_tls_termination
-          mode tcp
+          # anything else → locally terminated
           server localterm unix@/run/haproxy/local-https.sock send-proxy-v2
 
-        # --- https terminator over a unix socket (http mode after decryption) ---
+        backend passthrough_buddy
+          # --- raw tcp passthrough with proxy protocol v2 ---
+          mode tcp
+          # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
+          server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
+
         # this is the equivalent of nginx "listen unix:... ssl proxy_protocol" http server.
         frontend https_terminator
+          # --- accept TLS handshakes and mangle packets ---
           mode http
-          # accept proxy v2 from the tcp mux and terminate tls here
-          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@omega/${certs.omega.cert}' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
 
           # do alias redirects
-          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { hdr(host) -i pictures.proesmans.eu }
+          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { ${
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
+          } }
 
-          # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
-          http-request set-var(txn.max_body) str("10m")
+          # --- websocket detection (h1 and h2) ---
+          acl is_websocket req.hdr(Upgrade) -i websocket
+          acl is_websocket req.hdr(Connection) -i upgrade
+          acl is_websocket req.hdr(:method) -i CONNECT req.hdr(:protocol) -i websocket
 
           # host routing, use "host_xx" for specific overrides
           #
           # WARN; Add assignment for BACKEND NAME when adding a new host!
           acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
 
-          http-request set-var(txn.backend_name) str(upstream_varnish) if host_pictures
-          http-request set-var(txn.max_body) str("500m") if host_pictures
+          http-request set-header X-Forwarded-Proto https
+          http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+          http-request set-header X-Forwarded-Server %[hostname]
+          
+          # HSTS (63072000 seconds)
+          http-response set-header Strict-Transport-Security max-age=63072000
 
-          # reject if no backend set (optional hardening)
-          http-request deny status 421 if !{ var(txn.backend_name) -m found }
+          # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
+          http-request set-var(txn.max_body) str("10m")
+
+          http-request set-var(txn.backend_name) str(to_varnish) if host_pictures
+          http-request set-var(txn.max_body) str("500m") if host_pictures
 
           # enforce payload size, units in bytes          
           http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
           http-request set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)
           http-request set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)
           http-request deny status 413 if { var(txn.body_size_diff) -m int gt 0 }
-          http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }
+          http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }          
 
-          http-request set-header X-Forwarded-Proto https
-          http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
-          http-request set-header X-Forwarded-Server %[hostname]
-          
-          # websocket friendliness (haproxy already handles Connection hop-by-hop headers,
-          # but we preserve Upgrade semantics explicitly)
-          acl is_websocket req.hdr(Upgrade) -i websocket
-          http-request set-header Connection "upgrade" if is_websocket
-          
-          # HSTS (63072000 seconds)
-          http-response set-header Strict-Transport-Security max-age=63072000
+          # reject if no backend set (optional hardening)
+          http-request deny status 421 if !{ var(txn.backend_name) -m found }
+
+          # short-circuit websockets
+          http-request set-var(txn.backend_name) str(tls_to_buddy) if host_pictures is_websocket
 
           use_backend %[var(txn.backend_name)]
 
-        # --- http backend to the varnish ---
-        backend upstream_varnish
+        backend to_varnish
+          # --- http backend to the varnish web cache ---
           mode http
+
+          # transform omega.<host> -> alpha.<host>
+          #
+          # NOTE; HTTP header 'host' is updated before delivering to varnish to have consistency between request and response.
+          http-request set-var(req.new_host) hdr(Host),regsub(^omega\.,alpha.,)
+          http-request set-header Host %[var(req.new_host)]
+
           server varnish unix@/run/varnish-sockets/frontend.sock check send-proxy-v2
 
-        # --- raw tcp/tls passthrough with proxy protocol v2 ---
-        # haproxy can originate v2 directly.
-        backend passthrough_buddy
-          mode tcp
-          # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
-          server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
-
-        # --- requests routed back from varnish ---
-        frontend varnish_to_origin
+        listen tls_to_buddy
+          # --- proxy http over tls because varnish community edition cannot (with proxy-v2) ---
+          mode http
           bind unix@/run/haproxy-sockets/frontend.sock accept-proxy group haproxy-frontend mode 660
           # bind 127.0.0.1:6666 # DEBUG
-          mode http
-          default_backend passthrough_buddy_with_tls
 
-        backend passthrough_buddy_with_tls
-          mode http
+          # Allow server-side websocket connection termination
+          option http-server-close
+
           # client → haproxy(:443) → varnish(unix-socket) → haproxy(unix-socket) → buddy(100.116.84.29:443) (send PROXY v2)
           # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
-          server buddy_tailscale_tls ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt sni req.hdr(host)
+          #
+          # NOTE; No need to override sni explicitly if no http header manipulation is happening in this block!
+          #
+          # ERROR; sni argument is processed _before_ per-connection set-headers are in effect! 
+          # DO NOT USE 'sni req.hdr(host)' => Doesn't match updated host
+          # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
+          # is created.
+          server buddy_tailscale_tls ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
       '';
     };
 
@@ -200,7 +221,7 @@
   systemd.tmpfiles.settings."50-haproxy-sockets" = {
     "/run/haproxy-sockets".d = {
       user = config.services.haproxy.user;
-      group = config.users.groups.varnish-frontend.name;
+      group = config.users.groups.haproxy-frontend.name;
       mode = "0755";
     };
   };
