@@ -128,7 +128,6 @@
           # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
           server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
 
-        # this is the equivalent of nginx "listen unix:... ssl proxy_protocol" http server.
         frontend https_terminator
           # --- accept TLS handshakes and mangle packets ---
           mode http
@@ -140,14 +139,13 @@
           } }
 
           # --- websocket detection (h1 and h2) ---
-          acl is_websocket req.hdr(Upgrade) -i websocket
-          acl is_websocket req.hdr(Connection) -i upgrade
-          acl is_websocket req.hdr(:method) -i CONNECT req.hdr(:protocol) -i websocket
+          acl h1_is_websocket req.hdr(Upgrade) -i websocket or req.hdr(Connection) -i upgrade
+          acl h2_is_websocket ssl_fc_alpn -i h2 and req.hdr(:method) -i CONNECT and req.hdr(:protocol) -i websocket
 
           # host routing, use "host_xx" for specific overrides
           #
-          # WARN; Add assignment for BACKEND NAME when adding a new host!
-          acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
+          # HELP; Add flags for new proxied hosts below!
+          acl host_pictures req.hdr(Host) -i ${upstream.pictures.hostname}
 
           http-request set-header X-Forwarded-Proto https
           http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
@@ -159,21 +157,29 @@
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
 
-          http-request set-var(txn.backend_name) str(to_varnish) if host_pictures
+          http-request set-var(txn.backend_name) str(to_varnish) if host_pictures !h1_is_websocket !h2_is_websocket
           http-request set-var(txn.max_body) str("500m") if host_pictures
 
           # enforce payload size, units in bytes          
           http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
           http-request set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)
-          http-request set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)
+          http-request set-var(txn.cl_size_diff) req.hdr_val(content-length),sub(txn.max_body_bytes)
           http-request deny status 413 if { var(txn.body_size_diff) -m int gt 0 }
           http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }          
 
-          # reject if no backend set (optional hardening)
-          http-request deny status 421 if !{ var(txn.backend_name) -m found }
+          # transform omega.<domain> -> alpha.<domain> if websocket forwarding
+          #
+          acl host_is_omega hdr_beg(host) -i omega.
+          # WARN; hdr(host) prefers :authority (http2) if present, 'host:' otherwise
+          http-request set-var(req.new_host) req.hdr(host),regsub(^omega\.,alpha.,) if host_is_omega h1_is_websocket or h2_is_websocket
+          http-request set-header :authority %[var(req.new_host)] if { ssl_fc_alpn -i h2 } host_is_omega h1_is_websocket or h2_is_websocket
+          http-request set-header Host %[var(req.new_host)] if host_is_omega h1_is_websocket or h2_is_websocket
 
           # short-circuit websockets
-          http-request set-var(txn.backend_name) str(tls_to_buddy) if host_pictures is_websocket
+          http-request set-var(txn.backend_name) str(tls_to_buddy) if host_pictures h1_is_websocket or h2_is_websocket
+
+          # reject if no backend set (optional hardening)
+          http-request deny status 421 if !{ var(txn.backend_name) -m found }
 
           use_backend %[var(txn.backend_name)]
 
@@ -181,33 +187,38 @@
           # --- http backend to the varnish web cache ---
           mode http
 
-          # transform omega.<host> -> alpha.<host>
+          # transform omega.<domain> -> alpha.<domain>
           #
           # NOTE; HTTP header 'host' is updated before delivering to varnish to have consistency between request and response.
-          http-request set-var(req.new_host) hdr(Host),regsub(^omega\.,alpha.,)
-          http-request set-header Host %[var(req.new_host)]
+          #
+          acl host_is_omega hdr_beg(host) -i omega.
+          # WARN; hdr(host) prefers :authority (http2) if present, 'host:' otherwise
+          http-request set-var(req.new_host) hdr(host),regsub(^omega\.,alpha.,) if host_is_omega
+          http-request set-header :authority %[var(req.new_host)] if { ssl_fc_alpn -i h2 } host_is_omega
+          http-request set-header Host %[var(req.new_host)] if host_is_omega
 
           server varnish unix@/run/varnish-sockets/frontend.sock check send-proxy-v2
 
         listen tls_to_buddy
-          # --- proxy http over tls because varnish community edition cannot (with proxy-v2) ---
+          # --- varnish community edition cannot connect upstream over TLS, so this is a hairpin (with proxy-v2) ---
           mode http
           bind unix@/run/haproxy-sockets/frontend.sock accept-proxy group haproxy-frontend mode 660
           # bind 127.0.0.1:6666 # DEBUG
-
+          
           # Allow server-side websocket connection termination
           option http-server-close
 
           # client → haproxy(:443) → varnish(unix-socket) → haproxy(unix-socket) → buddy(100.116.84.29:443) (send PROXY v2)
           # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
           #
-          # NOTE; No need to override sni explicitly if no http header manipulation is happening in this block!
+          # NOTE; sni override is explicitly required if request headers, like host, were manipulated for upstream use! Before entering
+          # this (backend) block the sni must be known!
           #
-          # ERROR; sni argument is processed _before_ per-connection set-headers are in effect! 
-          # DO NOT USE 'sni req.hdr(host)' => Doesn't match updated host
+          # ERROR; sni argument is processed _before_ per-request set-headers are in effect! 
           # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
           # is created.
-          server buddy_tailscale_tls ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          # USE 'sni req.hdr(host)' => If the frontend has corrected to the right upstream hostname
+          server default ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt sni req.hdr(host)
       '';
     };
 
