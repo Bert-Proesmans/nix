@@ -143,6 +143,8 @@
           hash_data(req.http.X-Forwarded-Proto);
         }
 
+        # TODO; This is probably not the right place to restore cookies!
+        # REF; https://varnish-cache.org/docs/7.7/reference/states.html
         if (req.http.X-Upstream-Cookies) {
           # Add dropped cookies again to fetch upstream resources correctly
           set req.http.cookie = req.http.X-Upstream-Cookies;

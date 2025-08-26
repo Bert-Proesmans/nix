@@ -64,6 +64,15 @@
           # Push "traffic logs" into systemd journal through syslog stub
           log /dev/log  format local  local7  info info
 
+          # Workarounds
+          #
+          # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
+          # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
+          #
+          # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
+          # both programs with haproxy strictly applying standards.
+          h2-workaround-bogus-websocket-clients
+
         defaults
           mode http
           option httplog
@@ -79,12 +88,11 @@
 
           # NOTE; haproxy does not recompress if upstream has applied compression. This all depends on the Accept-Encoding header inside the requets.
           # gzip (haproxy has no brotli). mirror the nginx mime set as closely as haproxy allows.
-          compression algo gzip
+          compression algo gzip deflate
           compression type text/html text/plain text/css text/javascript application/javascript application/x-javascript application/json application/ld+json application/wasm application/xml application/xhtml+xml application/rss+xml application/atom+xml text/xml text/markdown text/vtt text/cache-manifest text/calendar text/csv font/ttf font/otf image/svg+xml application/vnd.ms-fontobject
 
         defaults tcp
           mode tcp
-          log global
           option tcplog
           timeout connect 60s
           timeout client  65s
@@ -99,20 +107,20 @@
           load crt 'fullchain.pem' key 'key.pem'
 
         listen http_plain
-          # --- self-explanatory ---
+          description replies with a redirect to https
           mode http
           bind :80 v4v6
           http-request redirect scheme https code 301 unless { ssl_fc }
 
         listen tls_muxing
-          # --- tcp tls mux with sni routing ---
-          # this mirrors nginx `stream { ... }` behavior.
+          description tcp tls mux with sni routing, this mirrors nginx `stream { ... }` behavior
           mode tcp
           bind :443 v4v6
           
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
           tcp-request content accept if { req_ssl_hello_type 1 }
+          tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
           use_backend passthrough_buddy if { ${
@@ -123,24 +131,54 @@
           server localterm unix@/run/haproxy/local-https.sock send-proxy-v2
 
         backend passthrough_buddy
-          # --- raw tcp passthrough with proxy protocol v2 ---
+          description raw tcp passthrough with proxy protocol v2
           mode tcp
           # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
           server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
 
         frontend https_terminator
-          # --- accept TLS handshakes and mangle packets ---
+          description accept TLS handshakes and mangle packets
           mode http
           bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
+
+          log global
+          # DEBUG
+          #log-format "''${HAPROXY_HTTP_LOG_FMT} <backend=%[var(txn.backend_name)]> debug=%[var(txn.debug)]"
+          # DEBUG
+          #http-request capture req.hdr(Host)        len 80
+          #http-request capture req.hdr(Upgrade)     len 20
+          #http-request capture req.hdr(Connection)  len 20
+          #http-request capture req.fhdr(:method)    len 20
+          #http-request capture req.fhdr(:protocol)  len 20
+
+          #http-request set-var-fmt(txn.debug) "alpn=%[ssl_fc_alpn] ws=%[var(txn.is_ws)] h1_ws=%[var(txn.is_ws_h1)] h2_ws=%[var(txn.is_ws_h2)] host='%[capture.req.hdr(0)]' up='%[capture.req.hdr(1)]' conn='%[capture.req.hdr(2)]' m='%[capture.req.hdr(3)]' protohdr='%[capture.req.hdr(4)]'"
 
           # do alias redirects
           http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { ${
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
           } }
 
-          # --- websocket detection (h1 and h2) ---
-          acl h1_is_websocket req.hdr(Upgrade) -i websocket or req.hdr(Connection) -i upgrade
-          acl h2_is_websocket ssl_fc_alpn -i h2 and req.hdr(:method) -i CONNECT and req.hdr(:protocol) -i websocket
+          # http/1.1 websocket detection
+          #
+          # NOTE; HTTP_2.0 is a built-in ACL
+          #
+          acl is_websocket req.hdr(Upgrade) -i websocket
+          acl is_upgrade   req.hdr(Connection) -i upgrade
+          http-request set-var(txn.is_ws_h1) bool(true) if is_websocket is_upgrade !HTTP_2.0
+
+          # http/2 websocket detection
+          #
+          # SEEALSO; global > h2-workaround-bogus-websocket-clients
+          #
+          acl h2_ws_connect  req.hdr(:method)  -i CONNECT
+          acl h2_ws_protocol req.hdr(:protocol) -i websocket
+          http-request set-var(txn.is_ws_h2) bool(true) if h2_ws_connect h2_ws_protocol HTTP_2.0
+
+          http-request set-var(txn.is_ws) bool(true) if { var(txn.is_ws_h1) -m bool } or { var(txn.is_ws_h2) -m bool }
+
+          # log explicitly when acl matches
+          http-request set-var(txn.ws_detected) str(http1.1) if is_websocket is_upgrade
+          http-request set-var(txn.ws_detected) str(http2)   if h2_ws_connect h2_ws_protocol
 
           # host routing, use "host_xx" for specific overrides
           #
@@ -157,7 +195,7 @@
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
 
-          http-request set-var(txn.backend_name) str(to_varnish) if host_pictures !h1_is_websocket !h2_is_websocket
+          http-request set-var(txn.backend_name) str(to_varnish) if host_pictures !is_websocket !is_upgrade
           http-request set-var(txn.max_body) str("500m") if host_pictures
 
           # enforce payload size, units in bytes          
@@ -167,16 +205,15 @@
           http-request deny status 413 if { var(txn.body_size_diff) -m int gt 0 }
           http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }          
 
+          # short-circuit websockets
+          http-request set-var(txn.backend_name) str(tls_to_buddy) if host_pictures { var(txn.is_ws) -m bool }
+          
           # transform omega.<domain> -> alpha.<domain> if websocket forwarding
           #
           acl host_is_omega hdr_beg(host) -i omega.
-          # WARN; hdr(host) prefers :authority (http2) if present, 'host:' otherwise
-          http-request set-var(req.new_host) req.hdr(host),regsub(^omega\.,alpha.,) if host_is_omega h1_is_websocket or h2_is_websocket
-          http-request set-header :authority %[var(req.new_host)] if { ssl_fc_alpn -i h2 } host_is_omega h1_is_websocket or h2_is_websocket
-          http-request set-header Host %[var(req.new_host)] if host_is_omega h1_is_websocket or h2_is_websocket
-
-          # short-circuit websockets
-          http-request set-var(txn.backend_name) str(tls_to_buddy) if host_pictures h1_is_websocket or h2_is_websocket
+          # NOTE; Documentation is unclear if this does the logical thing abstracted over both http1.1 and http2..
+          # (Maybe need to use set-uri)
+          http-request set-header Host %[req.hdr(Host),regsub(^omega\.,alpha.,)] if { var(txn.is_ws) -m bool } host_is_omega
 
           # reject if no backend set (optional hardening)
           http-request deny status 421 if !{ var(txn.backend_name) -m found }
@@ -184,7 +221,7 @@
           use_backend %[var(txn.backend_name)]
 
         backend to_varnish
-          # --- http backend to the varnish web cache ---
+          description http backend to the varnish web cache
           mode http
 
           # transform omega.<domain> -> alpha.<domain>
@@ -192,15 +229,13 @@
           # NOTE; HTTP header 'host' is updated before delivering to varnish to have consistency between request and response.
           #
           acl host_is_omega hdr_beg(host) -i omega.
-          # WARN; hdr(host) prefers :authority (http2) if present, 'host:' otherwise
-          http-request set-var(req.new_host) hdr(host),regsub(^omega\.,alpha.,) if host_is_omega
-          http-request set-header :authority %[var(req.new_host)] if { ssl_fc_alpn -i h2 } host_is_omega
-          http-request set-header Host %[var(req.new_host)] if host_is_omega
+          # NOTE; Documentation is unclear if this does the logical thing abstracted over both http1.1 and http2..
+          http-request set-header Host %[req.hdr(Host),regsub(^omega\.,alpha.,)]
 
           server varnish unix@/run/varnish-sockets/frontend.sock check send-proxy-v2
 
         listen tls_to_buddy
-          # --- varnish community edition cannot connect upstream over TLS, so this is a hairpin (with proxy-v2) ---
+          description varnish community edition cannot connect upstream over TLS, so this is a hairpin (with proxy-v2)
           mode http
           bind unix@/run/haproxy-sockets/frontend.sock accept-proxy group haproxy-frontend mode 660
           # bind 127.0.0.1:6666 # DEBUG
