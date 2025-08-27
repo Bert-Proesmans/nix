@@ -70,8 +70,10 @@
           # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
           #
           # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
-          # both programs with haproxy strictly applying standards.
+          # both programs with haproxy strictly applying standards and firefox farting all over.
           h2-workaround-bogus-websocket-clients
+          # TODO; Tweak(?) tune.h2.be.initial-window-size / tune.h2.fe.initial-window-size to improve window size ?
+          # This will make bandwidth usage unfair for a possible better latency experience for the user. 
 
         defaults
           mode http
@@ -82,6 +84,9 @@
           timeout client  65s
           timeout server  65s
           timeout tunnel  1h    # long-lived websocket/tunnel support
+
+          # Allow server-side websocket connection termination
+          option http-server-close
 
           # Side-effect free use and reuse of upstream connections
           http-reuse safe
@@ -120,7 +125,9 @@
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
           tcp-request content accept if { req_ssl_hello_type 1 }
-          tcp-request content capture req.ssl_sni len 100
+          # DEBUG
+          # NOTE; Each enabled capture uses a bit of memory per stream
+          # tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
           use_backend passthrough_buddy if { ${
@@ -145,6 +152,7 @@
           # DEBUG
           #log-format "''${HAPROXY_HTTP_LOG_FMT} <backend=%[var(txn.backend_name)]> debug=%[var(txn.debug)]"
           # DEBUG
+          # NOTE; Each enabled capture uses a bit of memory per stream
           #http-request capture req.hdr(Host)        len 80
           #http-request capture req.hdr(Upgrade)     len 20
           #http-request capture req.hdr(Connection)  len 20
@@ -239,9 +247,6 @@
           mode http
           bind unix@/run/haproxy-sockets/frontend.sock accept-proxy group haproxy-frontend mode 660
           # bind 127.0.0.1:6666 # DEBUG
-          
-          # Allow server-side websocket connection termination
-          option http-server-close
 
           # client → haproxy(:443) → varnish(unix-socket) → haproxy(unix-socket) → buddy(100.116.84.29:443) (send PROXY v2)
           # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
@@ -253,7 +258,10 @@
           # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
           # is created.
           # USE 'sni req.hdr(host)' => If the frontend has corrected to the right upstream hostname
-          server default ${upstream.buddy.server} send-proxy-v2 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt sni req.hdr(host)
+          #
+          # NOTE; Using http2 protocol with reused backend connections should(?) reduce tcp connection overhead lowering total latency through channel multiplexing. 
+          # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
+          server default ${upstream.buddy.server} send-proxy-v2 check alpn h2,http/1.1 ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt sni req.hdr(host)
       '';
     };
 
