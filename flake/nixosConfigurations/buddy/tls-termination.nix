@@ -27,7 +27,7 @@
         aliases = [ "passwords.proesmans.eu" ];
         hostname =
           assert DOMAIN == "https://alpha.passwords.proesmans.eu";
-          (lib.removePrefix "https://" DOMAIN);
+          "alpha.passwords.proesmans.eu";
         server = "${ROCKET_ADDRESS}:${toString ROCKET_PORT}";
       };
       upstream.pictures = rec {
@@ -39,32 +39,33 @@
           "alpha.pictures.proesmans.eu";
         server = "${host}:${toString port}";
       };
-      certs.alpha = {
-        cert = "fullchain.pem";
-        key = "key.pem";
-        # Wildcard + multi-domain
-        directory = config.security.acme.certs."alpha.proesmans.eu".directory;
-      };
     in
     {
       enable = true;
       config = ''
         global
-          # logging goes to journald via stdout/stderr under systemd; no daemon/pidfile
           # (stats socket is injected by your nixos module; do not redefine here)
+          #
+
           # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
           # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
+          #
           ssl-default-bind-curves X25519:prime256v1:secp384r1
           ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
           ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-bind-options prefer-client-ciphers ssl-min-ver TLSv1.2 no-tls-tickets
-
           ssl-default-server-curves X25519:prime256v1:secp384r1
           ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
           ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
-
           ssl-dh-param-file '${config.security.dhparams.params.haproxy.path}'
+
+          # Logging 
+          #
+          # Put state changes, warnings, errors and more problematic messages on stdout
+          log stdout    format raw    local0  notice
+          # Push "traffic logs" into systemd journal through syslog stub
+          log /dev/log  format local  local7  info info
 
         defaults
           mode http
@@ -75,11 +76,16 @@
           timeout client  65s
           timeout server  65s
           timeout tunnel  1h    # long-lived websocket/tunnel support
+
+          # Allow server-side websocket connection termination
+          option http-server-close
+
+          # Side-effect free use and reuse of upstream connections
           http-reuse safe
 
           # NOTE; haproxy does not recompress if upstream has applied compression. This all depends on the Accept-Encoding header inside the requets.
           # gzip (haproxy has no brotli). mirror the nginx mime set as closely as haproxy allows.
-          compression algo gzip
+          compression algo gzip deflate
           compression type text/html text/plain text/css text/javascript application/javascript application/x-javascript application/json application/ld+json application/wasm application/xml application/xhtml+xml application/rss+xml application/atom+xml text/xml text/markdown text/vtt text/cache-manifest text/calendar text/csv font/ttf font/otf image/svg+xml application/vnd.ms-fontobject
 
         defaults tcp
@@ -90,22 +96,24 @@
           timeout server  65s
           timeout tunnel  1h  # long-lived websocket/tunnel support
 
+        # Manual certificate enlisting because the filenames do not match the expected syntax
         crt-store alpha
-          crt-base '${certs.alpha.directory}'
-          key-base '${certs.alpha.directory}'
-          load crt '${certs.alpha.cert}' key '${certs.alpha.key}'
+          crt-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
+          key-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
+          # NOTE; Wildcard + multiple domains certificate
+          load crt 'fullchain.pem' key 'key.pem'
 
-        # --- :80 → https redirect (keeps host + uri) ---
-        frontend http_redirect
+        listen http_plain
+          description replies with a redirect to https
           mode http
           bind :80 v4v6
           http-request redirect scheme https code 301 unless { ssl_fc }
 
-        # --- tcp tls mux on :443 with sni routing ---
-        # this mirrors nginx `stream { ... }` behavior.
-        frontend tls_muxing
+        listen tls_muxing
+          description tcp tls mux with sni routing, this mirrors nginx `stream { ... }` behavior
           mode tcp
           bind :443 v4v6
+
           # Conditionally accept proxy protocol from tunnel hosts
           acl trusted_proxies src 100.127.116.49 # add others separated by space eg, 100.0.0.2
           tcp-request connection expect-proxy layer4 if trusted_proxies
@@ -113,6 +121,9 @@
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
           tcp-request content accept if { req_ssl_hello_type 1 }
+          # DEBUG
+          # NOTE; Each enabled capture uses a bit of memory per stream
+          # tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
           use_backend passthrough_idm if { ${
@@ -120,24 +131,32 @@
               [ upstream.idm.hostname ] ++ upstream.idm.aliases
             )
           } }
-          default_backend local_tls_termination # anything else → local terminator
-
-        # --- tcp backend that points to a local unix-socket ssl terminator ---
-        # we keep tcp here and hop via PROXY v2 into the terminator.
-        backend local_tls_termination
-          mode tcp
+          
+          # anything else → locally terminated
           server localterm unix@/run/haproxy/local-https.sock send-proxy-v2
 
-        # --- https terminator over a unix socket (http mode after decryption) ---
-        # this is the equivalent of nginx "listen unix:... ssl proxy_protocol" http server.
         frontend https_terminator
+          description accept TLS handshakes and mangle packets
           mode http
           # accept proxy v2 from the tcp mux and terminate tls here
-          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/${certs.alpha.cert}' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@alpha/fullchain.pem' alpn h2,http/1.1 accept-proxy
+
+          log global
+          # DEBUG
+          #log-format "''${HAPROXY_HTTP_LOG_FMT} <backend=%[var(txn.backend_name)]> debug=%[var(txn.debug)]"
+          # DEBUG
+          # NOTE; Each enabled capture uses a bit of memory per stream
+          #http-request capture req.hdr(Host)        len 80
+
+          #http-request set-var-fmt(txn.debug) "alpn=%[ssl_fc_alpn] host='%[capture.req.hdr(0)]'"
 
           # do alias redirects
-          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { hdr(host) -i pictures.proesmans.eu }
-          http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { hdr(host) -i passwords.proesmans.eu }
+          http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { ${
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
+          } }
+          http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { ${
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
+          } }
 
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
@@ -153,8 +172,12 @@
 
           http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
 
-          # reject if no backend set (optional hardening)
-          http-request deny status 421 if !{ var(txn.backend_name) -m found }
+          http-request set-header X-Forwarded-Proto https
+          http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
+          http-request set-header X-Forwarded-Server %[hostname]
+          
+          # HSTS (63072000 seconds)
+          http-response set-header Strict-Transport-Security max-age=63072000
 
           # enforce payload size, units in bytes          
           http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
@@ -163,35 +186,23 @@
           http-request deny status 413 if { var(txn.body_size_diff) -m int gt 0 }
           http-request deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }
 
-          http-request set-header X-Forwarded-Proto https
-          http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
-          http-request set-header X-Forwarded-Server %[hostname]
-          
-          # websocket friendliness (haproxy already handles Connection hop-by-hop headers,
-          # but we preserve Upgrade semantics explicitly)
-          acl is_websocket req.hdr(Upgrade) -i websocket
-          http-request set-header Connection "upgrade" if is_websocket
-          
-          # HSTS (63072000 seconds)
-          http-response set-header Strict-Transport-Security max-age=63072000
+           # reject if no backend set (optional hardening)
+          http-request deny status 421 if !{ var(txn.backend_name) -m found }
 
           use_backend %[var(txn.backend_name)]
 
-        # --- http backend to the pictures app ---
         backend upstream_pictures_app
+          description forward to pictures app
           mode http
-          # prefer unix if your app exposes it; otherwise keep tcp:
-          # server app unix@/run/photos/app.sock check
           server app ${upstream.pictures.server} check
 
-        # --- http backend to the passwords app ---
         backend upstream_passwords_app
+          description forward to passwords app
           mode http
           server app ${upstream.passwords.server} check
 
-        # --- raw tcp/tls passthrough for kanidm with proxy protocol v2 ---
-        # haproxy can originate v2 directly.
         backend passthrough_idm
+          description raw tcp/tls passthrough for kanidm with proxy protocol
           mode tcp
           # client → haproxy(:443) → 127.204.0.1:8443 (send PROXY v2 as required by Kanidm)
           server idm ${upstream.idm.server} send-proxy-v2 check
