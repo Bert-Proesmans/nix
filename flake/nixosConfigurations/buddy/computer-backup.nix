@@ -62,6 +62,8 @@ in
   services.resilio = {
     # Use `rslsync --dump-sample-config´ to view an example configuration
     enable = true;
+    # NOTE; Doesn't seem to have an effect? 🤔
+    deviceName = "Alpha sync";
     checkForUpdates = false;
     licenseFile = config.sops.secrets.resilio-license.path;
     httpListenAddr = "127.69.55.1";
