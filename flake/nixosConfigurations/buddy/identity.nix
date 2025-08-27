@@ -2,6 +2,7 @@
   lib,
   pkgs,
   config,
+  flake,
   ...
 }:
 let
@@ -107,6 +108,9 @@ in
       idmAdminPasswordFile = config.sops.secrets.idm_admin-password.path;
       acceptInvalidCerts = false;
 
+      # TODO; Change logo and name if/when provisioning is supported
+      # REF; https://github.com/oddlama/kanidm-provision/issues/30
+
       extraJsonFile = config.sops.secrets.kanidm-extra.path;
       autoRemove = true;
       groups = {
@@ -132,10 +136,11 @@ in
       };
 
       systems.oauth2."photos" = {
-        displayName = "Immich SSO";
+        displayName = "Pictures";
         basicSecretFile = config.sops.secrets.immich-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://pictures.proesmans.eu/";
+        imageFile = "${flake.documentationAssets}/immich-logo.png";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
           "https://pictures.proesmans.eu/auth/login"
