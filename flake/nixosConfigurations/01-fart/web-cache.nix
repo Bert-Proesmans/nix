@@ -126,7 +126,7 @@
       }
 
       sub vcl_pass {
-        # Do as builtin
+        # builtin.vcl does nothing..
       }
 
       sub vcl_hash {        
@@ -143,14 +143,6 @@
           hash_data(req.http.X-Forwarded-Proto);
         }
 
-        # TODO; This is probably not the right place to restore cookies!
-        # REF; https://varnish-cache.org/docs/7.7/reference/states.html
-        if (req.http.X-Upstream-Cookies) {
-          # Add dropped cookies again to fetch upstream resources correctly
-          set req.http.cookie = req.http.X-Upstream-Cookies;
-          unset req.http.X-Upstream-Cookies;
-        }
-
         # builtin.vcl performs host+url hashing
         # Proceed with builtin default action
       }
@@ -163,7 +155,7 @@
           return (deliver);
         }
 
-        # builtin.vcl does nothing..
+        # builtin.vcl proceeds to deliver..
       }
 
       sub vcl_miss {
@@ -186,7 +178,21 @@
         #   }  
         # }
 
-        # builtin.vcl does nothing..
+        # builtin.vcl proceeds to fetch..
+      }
+
+      sub vcl_backend_fetch {
+        # Reinsertion of fixed up headers should happen here logically (right before actual fetch)
+        # REF; https://varnish-cache.org/docs/7.7/reference/states.html
+
+
+        if (bereq.http.X-Upstream-Cookies) {
+          # Cookies that were dropped are likely required when fetching upstream resources
+          set bereq.http.cookie = bereq.http.X-Upstream-Cookies;
+          unset bereq.http.X-Upstream-Cookies;
+        }
+
+        # builtin.vcl proceeds to fetch..
       }
 
       sub vcl_backend_response {
