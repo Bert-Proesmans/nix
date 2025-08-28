@@ -11,6 +11,7 @@
     ./hardware-configuration.nix
     ./zfs.nix
     ./wip.nix
+    ./wip-crowdsec.nix
     flake.profiles.virtual-machine
     flake.profiles.hypervisor
   ];
