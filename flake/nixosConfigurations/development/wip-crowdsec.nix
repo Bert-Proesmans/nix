@@ -33,13 +33,8 @@ in
         ({
           source = "journalctl";
           journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
-          labels.type = "syslog";
+          labels.type = "ssh";
         })
-        # ({
-        #   source = "journalctl";
-        #   journalctl_filter = [ "_SYSTEMD_UNIT=nginx.service" ];
-        #   labels.type = "syslog";
-        # })
       ];
 
       settings = {
@@ -58,6 +53,27 @@ in
       sensors = {
         "01-fart".passwordFile = config.sops.secrets.test-secret.path;
       };
+      bouncers = {
+        "local-firewall".passwordFile = config.sops.secrets.test-secret.path;
+      };
+
+      extraSetupCommands = ''
+        ## Collections
+        cscli collections install \
+          crowdsecurity/linux \
+          crowdsecurity/nginx
+
+        ## Parsers
+        # Whitelists private IPs
+        # if ! cscli parsers list | grep -q "whitelists"; then
+        #     cscli parsers install crowdsecurity/whitelists
+        # fi
+
+        ## Heavy operations
+        cscli postoverflows install \
+          crowdsecurity/ipv6_to_range \
+          crowdsecurity/rdns
+      '';
     };
 
   # WARN; Package "crowdsec-firewall-bouncer" does not exist upstream, need to overlay the package index!
