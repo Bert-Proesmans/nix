@@ -3,10 +3,12 @@
 
 # shellcheck shell=bash
 
-while ! nice -n19 cscli lapi status; do
-  echo "Waiting for CrowdSec daemon to be ready"
-  sleep 0.1
-done
+wait_for_lapi() {
+  while ! nice -n19 cscli lapi status; do
+    echo "Waiting for CrowdSec daemon to be ready"
+    sleep 0.1
+  done
+}
 
 add_machine_cscli() {
   if [ "$#" -ne 2 ]; then
