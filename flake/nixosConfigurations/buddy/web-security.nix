@@ -45,6 +45,10 @@
       # "02-fart".passwordFile = config.sops.secrets."02-fart-bouncer-crowdsec-key".path;
     };
 
+    additionalParsers = {
+      "s01-parse/bertp/immich-logs.yaml".source = ./crowdsec/immich-logs.yaml;
+    };
+
     extraSetupCommands = ''
       ## Collections
       cscli collections install \
