@@ -11,6 +11,7 @@
     ./private-network.nix
     ./tls-termination.nix
     ./web-cache.nix
+    ./web-security.nix
   ];
 
   # Slows down write operations considerably
