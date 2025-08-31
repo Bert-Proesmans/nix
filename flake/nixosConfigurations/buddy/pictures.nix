@@ -65,6 +65,8 @@ in
   # Disable snapshots on the cache dataset
   services.sanoid.datasets."storage/media/immich/cache".use_template = [ "ignore" ];
 
+  sops.secrets."user-smtp-immich".owner = "immich";
+  sops.secrets."password-smtp-immich".owner = "immich";
   services.immich = {
     enable = true;
     host = "127.175.0.1";
@@ -173,7 +175,18 @@ in
       map.enabled = true;
       map.lightStyle = "https://tiles.immich.cloud/v1/style/light.json";
       newVersionCheck.enabled = false;
-      notifications.smtp.enabled = false;
+      notifications.smtp = {
+        enabled = true;
+        from = "Pictures Proesmans.eu <noreply@proesmans.eu>";
+        replyTo = "noreply@proesmans.eu";
+        transport = {
+          host = "mail.smtp2go.com";
+          ignoreCert = false;
+          username = config.sops.placeholder.user-smtp-immich;
+          password = config.sops.placeholder.password-smtp-immich;
+          port = 465; # TLS ON
+        };
+      };
       oauth = {
         enabled = true;
         autoRegister = true;
