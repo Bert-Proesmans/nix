@@ -11,7 +11,8 @@
     ./hardware-configuration.nix
     ./zfs.nix
     ./wip.nix
-    ./wip-crowdsec.nix
+    # ./wip-crowdsec.nix
+    # ./wip-email-oauth-proxy.nix
     flake.profiles.virtual-machine
     flake.profiles.hypervisor
   ];
