@@ -65,8 +65,16 @@ in
   # Disable snapshots on the cache dataset
   services.sanoid.datasets."storage/media/immich/cache".use_template = [ "ignore" ];
 
-  sops.secrets."user-smtp-immich".owner = "immich";
-  sops.secrets."password-smtp-immich".owner = "immich";
+  users.groups.mail = {
+    # Members of this group have access to secret "password-smtp"
+    members = [ "immich" ];
+  };
+
+  sops.secrets.immich-oauth-secret = {
+    # Left here for reference sake.
+    # This secret is embedded in the sops-template where owner and reload-units is defined.
+  };
+
   services.immich = {
     enable = true;
     host = "127.175.0.1";
@@ -177,14 +185,17 @@ in
       newVersionCheck.enabled = false;
       notifications.smtp = {
         enabled = true;
-        from = "Pictures Proesmans.eu <noreply@proesmans.eu>";
-        replyTo = "noreply@proesmans.eu";
+        from = "Pictures Proesmans.eu <pictures@proesmans.eu>";
+        replyTo = "pictures@proesmans.eu";
         transport = {
-          host = "mail.smtp2go.com";
+          host = "localhost";
           ignoreCert = false;
-          username = config.sops.placeholder.user-smtp-immich;
-          password = config.sops.placeholder.password-smtp-immich;
-          port = 465; # TLS ON
+          username = "alpha@proesmans.eu";
+          password = config.sops.placeholder.password-smtp;
+          port = 587; # TODO; Fix STARTLS -> TLS ON
+          # ERROR; Immich performs protocol detection based on the port. The local mailproxy does not support SMTP over TLS,
+          # but emulates STARTLS
+          #port = 465; # TLS ON
         };
       };
       oauth = {
