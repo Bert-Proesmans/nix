@@ -48,7 +48,7 @@
   sops.templates."email-oauth2-proxy.config" = {
     owner = "emailproxy";
     restartUnits = [ config.systemd.services."email-oauth2-proxy".name ];
-    # STARTLS config
+    # STARTLS config - TODO SSL the connections between client<->proxy!
     #
     # local_starttls = True
     # local_certificate_path = ${
@@ -124,8 +124,7 @@
         # read-only and publicly accessible!
         "--cache-store \"/var/lib/email-oauth2-proxy/credentials.cache\""
 
-        #
-        # "--debug"
+        # "--debug" # DEBUG
       ];
       Restart = "always";
       TimeoutSec = 20;
@@ -134,6 +133,7 @@
       Group = "emailproxy";
       StateDirectory = "email-oauth2-proxy";
       StateDirectoryMode = "0700";
+      # NOTE; Capability required to bind to privileged network ports
       AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
       CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
     };

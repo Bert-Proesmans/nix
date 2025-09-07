@@ -1,7 +1,10 @@
-{ ... }:
+{
+  config,
+  ...
+}:
 let
-  # NOTE; Fixed upstream
-  vaultwardenStatePath = "/var/lib/vaultwarden";
+  # NOTE; Fixed upstream, with state-version <24.11
+  vaultwardenStatePath = "/var/lib/bitwarden_rs";
 in
 {
   disko.devices.zpool.storage.datasets."sqlite/vaultwarden" = {
@@ -10,26 +13,46 @@ in
     options.mountpoint = vaultwardenStatePath;
   };
 
+  users.groups.mail = {
+    # Members of this group have access to secret "password-smtp"
+    members = [ "vaultwarden" ];
+  };
+
+  sops.secrets.id-installation-bitwarden.owner = "vaultwarden";
+  sops.secrets.key-installation-bitwarden.owner = "vaultwarden";
+
+  sops.templates."sensitive-vaultwarden.env" = {
+    owner = "vaultwarden";
+    restartUnits = [ config.systemd.services."vaultwarden".name ];
+    content = ''
+      SMTP_PASSWORD = ${config.sops.placeholder."password-smtp"}
+      PUSH_INSTALLATION_ID = ${config.sops.placeholder.id-installation-bitwarden}
+      PUSH_INSTALLATION_KEY = ${config.sops.placeholder.key-installation-bitwarden}
+    '';
+  };
+
   services.vaultwarden = {
-    enable = false; # Not yet
+    enable = true;
     dbBackend = "sqlite";
     backupDir = null; # Not yet
 
-    environmentFile = null;
+    # WARN; Vaultwarden has no mechanism to load sensitive values from filepaths!
+    # Sensitive values must be loaded into the service using a secure environment file.
+    environmentFile = config.sops.templates."sensitive-vaultwarden.env".path;
     config = {
       ROCKET_ADDRESS = "127.99.66.1";
       ROCKET_PORT = 8222;
       ROCKET_LOG = "critical";
 
       IP_HEADER = "X-Forwarded-For";
-      # ADMIN_TOKEN_FILE = ""; # Empty to disable admin panel
-      # ADMIN_TOKEN = "";
+      # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
       EXTENDED_LOGGING = true;
+      # LOG_LEVEL = "debug"; # DEBUG
       LOG_LEVEL = "info";
 
       DOMAIN = "https://alpha.passwords.proesmans.eu";
-      SIGNUPS_ALLOWED = false;
+      SIGNUPS_ALLOWED = false; # SEEALSO; SIGNUPS_DOMAINS_WHITELIST
       WEBSOCKET_ENABLED = true;
       WEB_VAULT_ENABLED = true;
       SENDS_ALLOWED = true;
@@ -37,8 +60,7 @@ in
       EMERGENCY_ACCESS_ALLOWED = true;
       EMAIL_CHANGE_ALLOWED = false;
 
-      # TODO; Setup SMTP and enable verification!
-      SIGNUPS_VERIFY = false;
+      SIGNUPS_VERIFY = true;
       # Limit amount of signup e-mails to be sent to same e-mailaddress.
       # Expressed in seconds
       SIGNUPS_VERIFY_RESEND_TIME = 1800; # 30 minutes
@@ -46,9 +68,9 @@ in
       SIGNUPS_DOMAINS_WHITELIST = "proesmans.eu";
 
       # Who can create new organizations
-      ORG_CREATION_USERS = ""; # Empty to allow all users to create organizations
+      ORG_CREATION_USERS = "bert@proesmans.eu";
       INVITATIONS_ALLOWED = true;
-      INVITATION_ORG_NAME = "Proesmans password manager";
+      INVITATION_ORG_NAME = "Passwords | Proesmans.eu";
       INVITATION_EXPIRATION_HOURS = 168; # 7 days
 
       ORG_EVENTS_ENABLED = true;
@@ -69,10 +91,9 @@ in
       PASSWORD_HINTS_ALLOWED = false;
       SHOW_PASSWORD_HINT = false;
 
-      # TODO; Setup SMTP server
       # Require an e-mail to be sent before login succeeds
       # This is useful to guarantee notifications went out and nothing goes under the radar
-      REQUIRE_DEVICE_EMAIL = false;
+      REQUIRE_DEVICE_EMAIL = true;
       LOGIN_RATELIMIT_SECONDS = 60;
       LOGIN_RATELIMIT_MAX_BURST = 4;
       # Users cannot remember their device to skip further 2FA verifications
@@ -80,47 +101,39 @@ in
       # Number of minutes to wait before 2FA-enabled login is considered incomplete.
       INCOMPLETE_2FA_TIME_LIMIT = 1; # 1 minute
 
-      # TODO; Register for HaveIBeenPwned
       ## HIBP Api Key
-      ## HaveIBeenPwned API Key, request it here: https://haveibeenpwned.com/API/Key
+      # HaveIBeenPwned API Key, request it here: https://haveibeenpwned.com/API/Key
+      # WARN; No more one-time use API keys, it's a subscription service now. Use the https://haveibeenpwned.com/ website
+      # directly instead.
       # HIBP_API_KEY=
 
-      # TODO; Setup SMTP server
-      # Use suffix _FILE to load secrets from files
       # HELO_NAME = "alpha.passwords.proesmans.eu";
-      SMTP_HOST = "";
-      SMTP_FROM = "";
-      # SMTP_PORT = 465;
-      # SMTP_SECURITY = "force_tls";
-      # SMTP_AUTH_MECHANISM = "Login";
-      # SMTP_USERNAME_FILE = config.sops.secrets.smtp-username.path;
-      # SMTP_PASSWORD_FILE = config.sops.secrets.smtp-password.path;
+      SMTP_HOST = "localhost";
+      SMTP_PORT = 587;
+      SMTP_FROM = "passwords@proesmans.eu"; # Passwords | Proesmans.eu <passwords@proesmans.eu>
+      SMTP_SECURITY = "off";
+      # TODO; Enable TLS email connections
+      #SMTP_SECURITY = "force_tls"; # TODO; fix STARTTLS -> TLS on
+      SMTP_USERNAME = "alpha@proesmans.eu";
+      # SMTP_PASSWORD = # see environmentFile
 
-      # TODO; Register for mobile push notifications
       ## Enables push notifications (requires key and id from https://bitwarden.com/host)
       ## Details about mobile client push notification:
       ## - https://github.com/dani-garcia/vaultwarden/wiki/Enabling-Mobile-Client-push-notification
-      # PUSH_ENABLED=false
-      # PUSH_INSTALLATION_ID=CHANGEME
-      # PUSH_INSTALLATION_KEY=CHANGEME
-
-      # WARNING: Do not modify the following settings unless you fully understand their implications!
-      # Default Push Relay and Identity URIs
-      # PUSH_RELAY_URI=https://push.bitwarden.com
-      # PUSH_IDENTITY_URI=https://identity.bitwarden.com
+      PUSH_ENABLED = true;
+      # PUSH_INSTALLATION_ID # see environmentFile
+      # PUSH_INSTALLATION_KEY # see environmentFile
       # European Union Data Region Settings
-      # If you have selected "European Union" as your data region, use the following URIs instead.
-      # PUSH_RELAY_URI=https://api.bitwarden.eu
-      # PUSH_IDENTITY_URI=https://identity.bitwarden.eu
+      PUSH_RELAY_URI = "https://api.bitwarden.eu";
+      PUSH_IDENTITY_URI = "https://identity.bitwarden.eu";
 
-      # TODO; Setup SSO (requires release ?? to be available on nixpkgs)
+      # TODO; Setup SSO (requires release >1.35?? to be available on nixpkgs)
       SSO_ENABLED = false;
       SSO_ONLY = false;
-      # TODO; Setup SMTP server
       ## On SSO Signup if a user with a matching email already exists make the association
-      # SSO_SIGNUPS_MATCH_EMAIL=true
-      ## Allow unknown email verification status. Allowing this with `SSO_SIGNUPS_MATCH_EMAIL=true` open potential account takeover.
-      # SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION=false
+      SSO_SIGNUPS_MATCH_EMAIL = true;
+      # ERROR; Enabling 'SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION' with `SSO_SIGNUPS_MATCH_EMAIL=true` open potential account takeover!
+      SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = false;
       ## Base URL of the OIDC server (auto-discovery is used)
       ##  - Should not include the `/.well-known/openid-configuration` part and no trailing `/`
       ##  - ${SSO_AUTHORITY}/.well-known/openid-configuration should return a json document: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse

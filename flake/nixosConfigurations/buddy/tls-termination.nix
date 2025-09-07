@@ -71,7 +71,8 @@
           mode http
           option httplog
           option dontlognull
-          option forwardfor     # adds X-Forwarded-For with client ip
+          option forwarded      # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
+          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           timeout connect 60s
           timeout client  65s
           timeout server  65s
@@ -155,7 +156,7 @@
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
           } }
           http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { ${
-            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.passwords.aliases
           } }
 
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
