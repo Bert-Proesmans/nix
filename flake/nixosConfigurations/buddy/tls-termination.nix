@@ -72,7 +72,6 @@
           option httplog
           option dontlognull
           option forwarded      # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
-          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           timeout connect 60s
           timeout client  65s
           timeout server  65s
@@ -195,11 +194,15 @@
         backend upstream_pictures_app
           description forward to pictures app
           mode http
+          # ERROR; forwardfor doesn't work in default section, reason unknown
+          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           server app ${upstream.pictures.server} check
 
         backend upstream_passwords_app
           description forward to passwords app
           mode http
+          # ERROR; forwardfor doesn't work in default section, reason unknown
+          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           server app ${upstream.passwords.server} check
 
         backend passthrough_idm

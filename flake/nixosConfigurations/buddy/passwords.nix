@@ -43,14 +43,16 @@ in
     config = {
       ROCKET_ADDRESS = "127.99.66.1";
       ROCKET_PORT = 8222;
-      ROCKET_LOG = "critical";
-
       IP_HEADER = "X-Forwarded-For";
+
+      ROCKET_LOG_LEVEL = "debug"; # DEBUG
+      # ROCKET_LOG_LEVEL = "critical";
+      EXTENDED_LOGGING = true;
+      LOG_LEVEL = "debug"; # DEBUG
+      # LOG_LEVEL = "info";
+
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
-      EXTENDED_LOGGING = true;
-      # LOG_LEVEL = "debug"; # DEBUG
-      LOG_LEVEL = "info";
 
       DOMAIN = "https://alpha.passwords.proesmans.eu";
       SIGNUPS_ALLOWED = false; # SEEALSO; SIGNUPS_DOMAINS_WHITELIST
