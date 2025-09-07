@@ -45,11 +45,11 @@ in
       ROCKET_PORT = 8222;
       IP_HEADER = "X-Forwarded-For";
 
-      ROCKET_LOG_LEVEL = "debug"; # DEBUG
-      # ROCKET_LOG_LEVEL = "critical";
+      # ROCKET_LOG_LEVEL = "debug"; # DEBUG
+      ROCKET_LOG_LEVEL = "critical";
       EXTENDED_LOGGING = true;
-      LOG_LEVEL = "debug"; # DEBUG
-      # LOG_LEVEL = "info";
+      # LOG_LEVEL = "debug"; # DEBUG
+      LOG_LEVEL = "info";
 
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
