@@ -1,7 +1,6 @@
 {
   lib,
   flake,
-  pkgs,
   config,
   ...
 }:
@@ -19,62 +18,57 @@ in
   sops.secrets.crowdsec-apikey.owner = "crowdsec";
   sops.secrets.test-secret.owner = "crowdsec";
 
-  services.crowdsec =
-    let
-      # NOTE; Derived from upstream module config
-      configDir = "/var/lib/crowdsec/config";
-    in
-    {
-      enable = true;
-      enrollKeyFile = config.sops.secrets.crowdsec-apikey.path;
-      allowLocalJournalAccess = true;
+  services.crowdsec = {
+    enable = true;
+    enrollKeyFile = config.sops.secrets.crowdsec-apikey.path;
+    allowLocalJournalAccess = true;
 
-      acquisitions = [
-        ({
-          source = "journalctl";
-          journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
-          labels.type = "ssh";
-        })
-      ];
+    acquisitions = [
+      ({
+        source = "journalctl";
+        journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
+        labels.type = "ssh";
+      })
+    ];
 
-      settings = {
-        api.server.listen_uri = crowdsecAPI;
-        # Set to false to disable local sensor activity (only local-api (LAPI) remains)
-        # crowdsec_service.enable = false;
-        prometheus.enabled = false;
-        cscli.output = "human";
-        # config_paths = {
-        #   # Setup a R/W path to dynamically enable/disable simulations.
-        #   # SEEALSO; systemd.services.crowdsec.serviceConfig.ExecStartPre
-        #   simulation_path = "${configDir}/simulation.yaml";
-        # };
-      };
-
-      sensors = {
-        "01-fart".passwordFile = config.sops.secrets.test-secret.path;
-      };
-      bouncers = {
-        "local-firewall".passwordFile = config.sops.secrets.test-secret.path;
-      };
-
-      extraSetupCommands = ''
-        ## Collections
-        cscli collections install \
-          crowdsecurity/linux \
-          crowdsecurity/nginx
-
-        ## Parsers
-        # Whitelists private IPs
-        # if ! cscli parsers list | grep -q "whitelists"; then
-        #     cscli parsers install crowdsecurity/whitelists
-        # fi
-
-        ## Heavy operations
-        cscli postoverflows install \
-          crowdsecurity/ipv6_to_range \
-          crowdsecurity/rdns
-      '';
+    settings = {
+      api.server.listen_uri = crowdsecAPI;
+      # Set to false to disable local sensor activity (only local-api (LAPI) remains)
+      # crowdsec_service.enable = false;
+      prometheus.enabled = false;
+      cscli.output = "human";
+      # config_paths = {
+      #   # Setup a R/W path to dynamically enable/disable simulations.
+      #   # SEEALSO; systemd.services.crowdsec.serviceConfig.ExecStartPre
+      #   simulation_path = "${configDir}/simulation.yaml";
+      # };
     };
+
+    sensors = {
+      "01-fart".passwordFile = config.sops.secrets.test-secret.path;
+    };
+    bouncers = {
+      "local-firewall".passwordFile = config.sops.secrets.test-secret.path;
+    };
+
+    extraSetupCommands = ''
+      ## Collections
+      cscli collections install \
+        crowdsecurity/linux \
+        crowdsecurity/nginx
+
+      ## Parsers
+      # Whitelists private IPs
+      # if ! cscli parsers list | grep -q "whitelists"; then
+      #     cscli parsers install crowdsecurity/whitelists
+      # fi
+
+      ## Heavy operations
+      cscli postoverflows install \
+        crowdsecurity/ipv6_to_range \
+        crowdsecurity/rdns
+    '';
+  };
 
   # WARN; Package "crowdsec-firewall-bouncer" does not exist upstream, need to overlay the package index!
   proesmans.nix.overlays = [ flake.inputs.crowdsec.overlays.default ];

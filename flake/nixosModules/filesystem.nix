@@ -3,7 +3,6 @@
   lib,
   flake,
   config,
-  options,
   ...
 }:
 let

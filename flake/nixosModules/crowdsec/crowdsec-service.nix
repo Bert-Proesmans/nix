@@ -9,7 +9,6 @@ let
   cfg = config.services.crowdsec;
 
   # Hardcoded upstream
-  state-dir-crowdsec = "/Var/lib/crowdsec";
   format = pkgs.formats.yaml { };
   configFile = format.generate "crowdsec.yaml" cfg.settings;
   user = "crowdsec";

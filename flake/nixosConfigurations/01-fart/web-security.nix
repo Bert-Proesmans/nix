@@ -1,6 +1,5 @@
 {
   lib,
-  pkgs,
   config,
   ...
 }:
@@ -8,7 +7,7 @@ let
   # NOTE; sudo -u crowdsec cscli lapi register --url 'http://buddy.tailaac73.ts.net'
   controller-url-crowdsec = lib.pipe config.proesmans.facts.buddy.services [
     # Want the service endpoint over tailscale
-    (lib.filterAttrs (ip: v: builtins.elem "tailscale" v.tags))
+    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
     (lib.mapAttrsToList (ip: _: "http://${ip}:10124"))
     (lib.flip builtins.elemAt 0)
   ];
