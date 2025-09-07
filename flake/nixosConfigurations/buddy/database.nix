@@ -28,12 +28,14 @@ in
       type = "zfs_fs";
       # WARN; To be backed up ! Make atomic snapshot with "postgres/host/wal" !
       options.mountpoint = postgresStatePath;
+      options.refquota = "50G";
     };
 
     "postgres/host/wal" = {
       type = "zfs_fs";
       # WARN; To be backed up ! Make atomic snapshot with "postgres/host/state" !
       options.mountpoint = postgresWalPath;
+      options.refquota = "2G";
     };
   };
 

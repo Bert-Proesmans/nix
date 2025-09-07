@@ -57,6 +57,7 @@ in
     type = "zfs_fs";
     # WARN; To be backed up !
     options.mountpoint = kanidmStatePath;
+    options.refquota = "1G";
   };
 
   networking.hosts = {

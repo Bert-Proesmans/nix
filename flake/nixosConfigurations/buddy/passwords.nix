@@ -11,6 +11,7 @@ in
     type = "zfs_fs";
     # WARN; To be backed up !
     options.mountpoint = vaultwardenStatePath;
+    options.refquota = "10G";
   };
 
   users.groups.mail = {
