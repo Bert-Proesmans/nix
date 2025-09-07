@@ -185,7 +185,7 @@ in
       newVersionCheck.enabled = false;
       notifications.smtp = {
         enabled = true;
-        from = "Pictures Proesmans.eu <pictures@proesmans.eu>";
+        from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
         replyTo = "pictures@proesmans.eu";
         transport = {
           host = "localhost";
