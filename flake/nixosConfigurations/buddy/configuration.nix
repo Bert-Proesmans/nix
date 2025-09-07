@@ -16,6 +16,7 @@
     ./private-network.nix
     ./tls-termination.nix
     ./web-security.nix
+    ./wiki.nix
     flake.profiles.hypervisor
   ];
 
