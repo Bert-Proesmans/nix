@@ -33,7 +33,7 @@
       import directors; # Upstream balancer
       import cookie; # Cookie string manipulation
 
-      backend upstream_pictures {
+      backend upstream {
         # ERROR; Varnish community does NOT support tls upstream connections!
         # NOTE; Varnish enterprise does..
         .path = "/run/haproxy-sockets/frontend.sock";  # run it back to haproxy
@@ -47,6 +47,7 @@
           #.url = "/"; # short easy way (GET /)
           
           # Debug with; varnishadm backend.list
+          # Picked pictures endpoint because that one came first, but this backend/configuration is actually hostname agnostic!
           .request =
             "GET / HTTP/1.1"
             "Host: alpha.pictures.proesmans.eu"
@@ -63,11 +64,16 @@
       sub vcl_recv {
         # Parametrize backend selection to abstract later procedures
         # ERROR; No string, but backend type value
-        set req.backend_hint = upstream_pictures;
+        set req.backend_hint = upstream;
 
         # Remove the proxy header (see https://httpoxy.org/#mitigate-varnish)
         unset req.http.proxy;
         
+        # Normalize host value for easy matching
+        if (req.http.host ~ "[[:upper:]]") {
+          set req.http.host = req.http.host.lower();
+        }
+
         # Normalize the query arguments
         set req.url = std.querysort(req.url);
 
@@ -88,10 +94,12 @@
         # Don't manipulate empty cookies
         if (req.http.cookie !~ "^\s*$") {
           cookie.parse(req.http.cookie);
-          # Global cookies to be gone!
+          #
+          # Manipulate cookie values here using the cookie module
+          #
           set req.http.cookie = cookie.get_string();
 
-          if(req.url ~ "^/api/assets/") {
+          if(req.http.host ~ "pictures\.proesmans\.eu$" && req.url ~ "^/api/assets/") {
             # Ignore all cookies for immich assets, but keep them for the backend request on cache-miss.
             # SECURITY; This path must use secure randomly generated asset ids to not leak assets!
             #
@@ -205,7 +213,7 @@
           set beresp.ttl = 48h;
         }
 
-        if (bereq.url ~ "^/api/assets/") {
+        if (bereq.http.host ~ "pictures\.proesmans\.eu$" && bereq.url ~ "^/api/assets/") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
