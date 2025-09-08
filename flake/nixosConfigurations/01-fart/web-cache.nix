@@ -202,14 +202,14 @@
           # Force enable caching, do not follow server directives
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 6h;
+          set beresp.ttl = 48h;
         }
 
         if (bereq.url ~ "^/api/assets/") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 24h;
+          set beresp.ttl = 48h;
         }
 
         if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
@@ -219,12 +219,12 @@
 
         # Allow stale content, in case the backend goes down.
         # make Varnish keep all objects for 6 hours beyond their TTL
-        set beresp.grace = 6h;
+        set beresp.grace = 24h;
 
         if (beresp.http.ETag || beresp.http.Last-Modified) {
           # Response has appropriate headers for efficient stale checks.
           # Allow for up to 24 additional hours for upstream checks.
-          set beresp.keep = 24h;
+          set beresp.keep = 72h;
         }
 
         # builtin.vcl handles HTTP content-range normalization
