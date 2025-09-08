@@ -16,12 +16,6 @@ let
   };
 in
 {
-  nixpkgs.config.allowUnfreePredicate =
-    pkg:
-    builtins.elem (lib.getName pkg) [
-      "resilio-sync"
-    ];
-
   environment.systemPackages = [ pkgs.resilio-sync ];
 
   sops.secrets = {

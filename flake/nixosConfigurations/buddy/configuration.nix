@@ -1,4 +1,4 @@
-{ flake, ... }:
+{ lib, flake, ... }:
 {
   imports = [
     ./backup.nix
@@ -44,6 +44,13 @@
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
     ];
   };
+
+  nixpkgs.config.allowUnfreePredicate =
+    pkg:
+    builtins.elem (lib.getName pkg) [
+      "resilio-sync"
+      "outline"
+    ];
 
   # Ignore below
   # Consistent defaults accross all machine configurations.

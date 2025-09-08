@@ -39,6 +39,14 @@
           "alpha.pictures.proesmans.eu";
         server = "${host}:${toString port}";
       };
+      upstream.wiki = rec {
+        inherit (config.services.outline) publicUrl port;
+        aliases = [ "wiki.proesmans.eu" ];
+        hostname =
+          assert publicUrl == "https://alpha.wiki.proesmans.eu";
+          "alpha.wiki.proesmans.eu";
+        server = "localhost:${toString port}";
+      };
     in
     {
       enable = true;
@@ -157,6 +165,9 @@
           http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { ${
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.passwords.aliases
           } }
+          http-request redirect prefix https://${upstream.wiki.hostname} code 302 if { ${
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.wiki.aliases
+          } }
 
           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
           http-request set-var(txn.max_body) str("10m")
@@ -166,11 +177,14 @@
           # WARN; Add assignment for BACKEND NAME when adding a new host!
           acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
           acl host_passwords req.hdr(Host) -i ${upstream.passwords.hostname}
+          acl host_wiki      req.hdr(Host) -i ${upstream.wiki.hostname}
 
           http-request set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures
           http-request set-var(txn.max_body) str("500m") if host_pictures
 
           http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
+          
+          http-request set-var(txn.backend_name) str(upstream_wiki_app) if host_wiki
 
           http-request set-header X-Forwarded-Proto https
           http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
@@ -204,6 +218,13 @@
           # ERROR; forwardfor doesn't work in default section, reason unknown
           option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           server app ${upstream.passwords.server} check
+
+        backend upstream_wiki_app
+          description forward to wiki app
+          mode http
+          # ERROR; forwardfor doesn't work in default section, reason unknown
+          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
+          server app ${upstream.wiki.server} check
 
         backend passthrough_idm
           description raw tcp/tls passthrough for kanidm with proxy protocol

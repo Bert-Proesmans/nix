@@ -44,6 +44,11 @@ in
       owner = "kanidm";
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
+
+    outline-oauth-secret = {
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
   };
 
   # Allow kanidm user access to the idm certificate managed by the host
@@ -121,6 +126,7 @@ in
         "immich.access" = { };
         "immich.admin" = { };
         "immich.quota.large" = { };
+        "outline.access" = { };
       };
       persons."bert.proesmans" = {
         displayName = "Bert Proesmans";
@@ -132,6 +138,7 @@ in
           "immich.access"
           "immich.admin"
           "immich.quota.large"
+          "outline.access"
         ];
       };
 
@@ -174,6 +181,25 @@ in
             valuesByGroup."immich.quota.large" = [ "1000" ]; # 1000GB storage
           };
         };
+      };
+
+      systems.oauth2."wiki" = {
+        displayName = "Wiki";
+        basicSecretFile = config.sops.secrets.outline-oauth-secret.path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://wiki.proesmans.eu/";
+        # imageFile = "<TODO>";
+        originUrl = [
+          # NOTE; Global url redirects to specific instance URLs
+          "https://wiki.proesmans.eu/auth/oidc.callback"
+          "https://alpha.wiki.proesmans.eu/auth/oidc.callback"
+          "https://omega.wiki.proesmans.eu/auth/oidc.callback"
+        ];
+        scopeMaps."outline.access" = [
+          "openid"
+          "email"
+          "profile"
+        ];
       };
     };
   };

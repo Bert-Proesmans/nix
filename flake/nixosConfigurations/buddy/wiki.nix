@@ -4,12 +4,37 @@
   config,
   ...
 }:
+let
+  # Hardcoded upstream
+  outlineStatePath = "/var/lib/outline";
+in
 {
   # WHyyyyyyyyyy does bookstack only support MySQL ??!!
   services.bookstack = {
     enable = false;
     hostname = "alpha.wiki.proesmans.eu";
     settings = { };
+  };
+
+  users.groups.mail = {
+    # Members of this group have access to secret "password-smtp"
+    members = [ config.services.outline.user ];
+  };
+
+  sops.secrets = {
+    password-smtp.restartUnits = [ config.systemd.services.outline.name ];
+    outline-oauth-secret = {
+      mode = "0440";
+      group = config.services.outline.group;
+      restartUnits = [ config.systemd.services.outline.name ];
+    };
+  };
+
+  disko.devices.zpool.storage.datasets."documents/wiki" = {
+    type = "zfs_fs";
+    # WARN; To be backed up !
+    options.mountpoint = outlineStatePath;
+    options.refquota = "10G";
   };
 
   # Second best option that is packages is outline, but no proper diagrams.net integration -_-
@@ -24,37 +49,64 @@
   # ... wiki.js v3 (if/when that ever releases)
   #
   services.outline = {
-    enable = false; # Not yet
-    publicUrl = "https://alpha.wiki.proesmans.eu";
+    enable = true;
     port = 3561;
     databaseUrl = "local"; # automatically provision locally
     redisUrl = "local"; # automatically provision locally
-    storage.type = "local";
-    logo = "<TODO>";
+    storage.storageType = "local";
+    # logo = "<TODO>";
+    publicUrl = "https://alpha.wiki.proesmans.eu";
+    # Instance is fronted with TLS proxy
+    forceHttps = false;
 
     smtp = {
       host = "localhost";
       port = 587; # TODO; Fix STARTLS -> TLS ON
       secure = false; # TODO; Fix STARTLS -> TLS ON
       username = "alpha@proesmans.eu";
-      passwordFile = "<TODO>";
-      fromEmail = "<TODO>";
-      replyEmail = "<TODO>";
+      passwordFile = config.sops.secrets.password-smtp.path;
+      fromEmail = "wiki@proesmans.eu";
+      replyEmail = "wiki@proesmans.eu";
     };
 
-    oidcAuthentication = {
-      displayName = "Login met Proesmans account";
-      authUrl = "<TODO>";
-      tokenUrl = "<TODO>";
-      userinfoUrl = "<TODO>";
-      clientId = "<TODO>";
-      clientSecretFile = "<TODO>";
-      usernameClaim = "preferred_username";
-      scopes = [
-        "openid"
-        "profile"
-        "email"
-      ];
+    ### REMEMBER TO DISABLE E-MAIL MAGIC LINK ON NEW INSTALLATIONS ###
+
+    # NOTE; Open-ID autodiscovery works, but the nixos module hasn't been updated yet
+    oidcAuthentication = null;
+    # oidcAuthentication = {
+    #   displayName = "Login met Proesmans account";
+    #   OIDC_ISSUER_URL
+    #   authUrl = "<TODO>";
+    #   tokenUrl = "<TODO>";
+    #   userinfoUrl = "<TODO>";
+    #   clientId = "<TODO>";
+    #   clientSecretFile = config.sops.secrets.outline-oauth-secret.path;
+    #   usernameClaim = "preferred_username";
+    #   scopes = [
+    #     "openid"
+    #     "profile"
+    #     "email"
+    #   ];
+    # };
+  };
+
+  systemd.services.outline = lib.mkIf config.services.outline.enable {
+    environment = {
+      OIDC_DISPLAY_NAME = "Proesmans account";
+      OIDC_ISSUER_URL = "https://alpha.idm.proesmans.eu/oauth2/openid/wiki";
+      OIDC_CLIENT_ID = "wiki";
+      # Restrict account creation to these email domains
+      ALLOWED_DOMAINS = "proesmans.eu";
+      # Prevent automatic redirect into the SSO process (value doesn't matter)
+      OIDC_DISABLE_REDIRECT = "yes";
     };
+
+    script = lib.mkBefore ''
+      export OIDC_CLIENT_SECRET="$(head -n1 ${lib.escapeShellArg config.sops.secrets.outline-oauth-secret.path})"
+    '';
+
+    unitConfig.RequiresMountsFor = [
+      outlineStatePath
+    ];
   };
 }
