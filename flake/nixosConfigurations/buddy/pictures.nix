@@ -70,9 +70,13 @@ in
     members = [ "immich" ];
   };
 
-  sops.secrets.immich-oauth-secret = {
-    # Left here for reference sake.
-    # This secret is embedded in the sops-template where owner and reload-units is defined.
+  sops.secrets = {
+    password-smtp.restartUnits = [ config.systemd.services.immich-server.name ];
+    immich-oauth-secret = {
+      # NOTE; The secret is embedded inside a sops-template, this always works.
+      # The output of the template itself is access controlled instead.
+      restartUnits = [ config.systemd.services.immich-server.name ];
+    };
   };
 
   services.immich = {
