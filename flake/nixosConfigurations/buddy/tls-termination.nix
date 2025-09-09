@@ -43,7 +43,7 @@
         inherit (config.services.outline) publicUrl port;
         aliases = [ "wiki.proesmans.eu" ];
         hostname =
-          assert publicUrl == "https://alpha.wiki.proesmans.eu";
+          assert publicUrl == "https://wiki.proesmans.eu";
           "alpha.wiki.proesmans.eu";
         server = "localhost:${toString port}";
       };

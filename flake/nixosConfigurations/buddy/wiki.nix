@@ -48,8 +48,6 @@ in
   # link/backlink tracking etc.
   # ... wiki.js v3 (if/when that ever releases)
   #
-  # TODO; Update nixos-unstable for outline v0.87.3
-  # REF; https://nixpk.gs/pr-tracker.html?pr=440699
   #
   services.outline = {
     enable = true;
@@ -58,7 +56,7 @@ in
     redisUrl = "local"; # automatically provision locally
     storage.storageType = "local";
     # logo = "<TODO>";
-    publicUrl = "https://alpha.wiki.proesmans.eu";
+    publicUrl = "https://wiki.proesmans.eu";
     # Instance is fronted with TLS proxy
     forceHttps = false;
 
