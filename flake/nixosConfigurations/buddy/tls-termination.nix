@@ -42,8 +42,9 @@
       upstream.wiki = rec {
         inherit (config.services.outline) publicUrl port;
         aliases = [ "wiki.proesmans.eu" ];
+        # TODO; Reintroduce check after figuring out proper domain settings for outline
         hostname =
-          assert publicUrl == "https://wiki.proesmans.eu";
+          #assert publicUrl == "https://wiki.proesmans.eu"; # DEBUG
           "alpha.wiki.proesmans.eu";
         server = "localhost:${toString port}";
       };

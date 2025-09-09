@@ -56,7 +56,10 @@ in
     redisUrl = "local"; # automatically provision locally
     storage.storageType = "local";
     # logo = "<TODO>";
-    publicUrl = "https://wiki.proesmans.eu";
+    # ERROR; alpha.wiki is not the correct public share url domain!
+    publicUrl = "https://alpha.wiki.proesmans.eu";
+    # ERROR; using wiki.proesmans.eu breaks websockets!
+    # publicUrl = "https://wiki.proesmans.eu";
     # Instance is fronted with TLS proxy
     forceHttps = false;
 
