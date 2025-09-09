@@ -79,7 +79,7 @@
           mode http
           option httplog
           option dontlognull
-          option forwardfor     # adds X-Forwarded-For with client ip
+          option forwarded      # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
           timeout connect 60s
           timeout client  65s
           timeout server  65s

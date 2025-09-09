@@ -75,6 +75,15 @@
           # Push "traffic logs" into systemd journal through syslog stub
           log /dev/log  format local  local7  info info
 
+          # Workarounds
+          #
+          # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
+          # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
+          #
+          # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
+          # both programs with haproxy strictly applying standards and firefox farting all over.
+          h2-workaround-bogus-websocket-clients
+
         defaults
           mode http
           option httplog
@@ -169,9 +178,6 @@
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.wiki.aliases
           } }
 
-          # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
-          http-request set-var(txn.max_body) str("10m")
-
           # host routing, use "host_xx" for specific overrides
           #
           # WARN; Add assignment for BACKEND NAME when adding a new host!
@@ -179,19 +185,22 @@
           acl host_passwords req.hdr(Host) -i ${upstream.passwords.hostname}
           acl host_wiki      req.hdr(Host) -i ${upstream.wiki.hostname}
 
-          http-request set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures
-          http-request set-var(txn.max_body) str("500m") if host_pictures
-
-          http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
-          
-          http-request set-var(txn.backend_name) str(upstream_wiki_app) if host_wiki
-
           http-request set-header X-Forwarded-Proto https
           http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
           http-request set-header X-Forwarded-Server %[hostname]
           
           # HSTS (63072000 seconds)
           http-response set-header Strict-Transport-Security max-age=63072000
+
+           # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
+          http-request set-var(txn.max_body) str("10m")
+
+          http-request set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures
+          http-request set-var(txn.max_body) str("500m") if host_pictures
+
+          http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
+          
+          http-request set-var(txn.backend_name) str(upstream_wiki_app) if host_wiki
 
           # enforce payload size, units in bytes          
           http-request set-var(txn.max_body_bytes) var(txn.max_body_str),bytes
