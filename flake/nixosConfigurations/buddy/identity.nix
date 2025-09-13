@@ -128,7 +128,7 @@ in
         "immich.quota.large" = { };
         "outline.access" = { };
       };
-      persons."bert.proesmans" = {
+      persons."bert" = {
         displayName = "Bert Proesmans";
         mailAddresses = [ "bert@proesmans.eu" ];
         groups = [
