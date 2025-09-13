@@ -24,12 +24,23 @@ in
       # The whole json file is encrypted, instead of only json values.
       format = "binary";
       sopsFile = ./kanidm-extra.encrypted.json;
-      # EXAMPLE;
+      # EXAMPLE; Below a content example to extend
+      # REF; https://github.com/oddlama/kanidm-provision?tab=readme-ov-file#json-schema
+      #
+      # ERROR; _Only_ defining group membership from the person object does not work because group provisioning runs after
+      # user provisioning! The group provisioning by default removes all undeclared (underneath the groups key) members.
+      # Solution is to define group membership from the toplevel "groups" key, see below.
+      #
       # {
+      #   "groups": {
+      #     "<group-key>": {
+      #       "members": [ "<username>" ]
+      #     }
+      #   }
       #   "persons": {
       #     "<username>": {
       #       "displayName": "<name>",
-      #       "groups": [ "<name>" ],
+      #       # NO GROUPS PROPERTY, add members through the toplevel groups key! (see above)
       #       "legalName": null,
       #       "mailAddresses": [ "<email>" ],
       #       "present": true
@@ -124,7 +135,6 @@ in
         "household.beta" = { };
 
         "immich.access" = { };
-        "immich.admin" = { };
         "immich.quota.large" = { };
         "outline.access" = { };
       };
@@ -136,7 +146,6 @@ in
           "idm_service_desk" # tainted role
           "household.alpha"
           "immich.access"
-          "immich.admin"
           "immich.quota.large"
           "outline.access"
         ];
