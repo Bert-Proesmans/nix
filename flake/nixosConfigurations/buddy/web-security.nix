@@ -32,6 +32,11 @@ in
           journalctl_filter = [ "_SYSTEMD_UNIT=immich-server.service" ];
           labels.type = "immich";
         })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=vaultwarden.service" ];
+          labels.type = "Vaultwarden";
+        })
       ];
 
       # patterns = [ ];
@@ -52,6 +57,7 @@ in
         "crowdsecurity/linux"
         "crowdsecurity/haproxy"
         "gauth-fr/immich"
+        "Dominic-Wagner/vaultwarden"
       ];
       scenarios = [ ];
       parsers = [ ];

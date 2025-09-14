@@ -50,6 +50,8 @@ in
       EXTENDED_LOGGING = true;
       # LOG_LEVEL = "debug"; # DEBUG
       LOG_LEVEL = "info";
+      # Log timezone aware, for crowdsec
+      LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S.%3f%z";
 
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
