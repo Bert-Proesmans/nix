@@ -13,51 +13,65 @@ let
   ];
 in
 {
-  sops.secrets."01-fart-sensor-crowdsec-key".owner = "crowdsec";
-  # WARN; Bouncer service is running as root !
-  sops.secrets."01-fart-bouncer-crowdsec-key".owner = "root";
+  sops.secrets."01-fart-sensor-crowdsec-key" = { };
+  # WARN; Bouncer service is running as root!
+  sops.secrets."01-fart-bouncer-crowdsec-key" = { };
+
+  sops.templates."crowdsec-connect.yaml" = {
+    owner = "crowdsec";
+    restartUnits = [ config.systemd.services.crowdsec.name ];
+    content = ''
+      url: ${controller-url-crowdsec}
+      login: ${"01-fart"}
+      password: ${config.sops.placeholder."01-fart-sensor-crowdsec-key"}
+    '';
+  };
 
   services.crowdsec = {
     # NOTE; Setup as remote sensor
     enable = true;
+    autoUpdateService = true;
+    openFirewall = false;
 
-    allowLocalJournalAccess = true;
-    acquisitions = [
-      ({
-        source = "journalctl";
-        journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
-        labels.type = "ssh";
-      })
-      ({
-        source = "journalctl";
-        journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
-        labels.type = "haproxy";
-      })
-    ];
-
-    settings = {
-      # This instance acts as a sensor for another controller engine!
-      api.server.enable = false;
-      prometheus.enabled = false;
-      cscli.output = "human";
+    localConfig = {
+      acquisitions = [
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
+          labels.type = "ssh";
+        })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
+          labels.type = "haproxy";
+        })
+      ];
     };
 
-    # Attach this crowdsec engine to the central LAPI on host buddy
-    lapiConnect.url = controller-url-crowdsec;
-    lapiConnect.name = "01-fart";
-    lapiConnect.passwordFile = config.sops.secrets."01-fart-sensor-crowdsec-key".path;
+    hub = {
+      collections = [
+        "crowdsecurity/linux"
+        "crowdsecurity/haproxy"
+      ];
+      scenarios = [ ];
+      parsers = [ ];
+      postOverflows = [
+        "crowdsecurity/ipv6_to_range"
+        "crowdsecurity/rdns"
+      ];
+    };
 
-    extraSetupCommands = ''
-      ## Collections
-      cscli collections install \
-        crowdsecurity/linux \
-        crowdsecurity/haproxy        
-
-      ## Heavy operations
-      cscli postoverflows install \
-        crowdsecurity/ipv6_to_range \
-        crowdsecurity/rdns
-    '';
+    settings = {
+      general = {
+        # This instance acts as a sensor for another controller engine!
+        api.server.enable = false;
+        prometheus.enabled = false;
+        cscli.output = "human";
+      };
+      lapi = {
+        credentialsFile = config.sops.templates."crowdsec-connect.yaml".path;
+      };
+    };
   };
 
   services.crowdsec-firewall-bouncer = {

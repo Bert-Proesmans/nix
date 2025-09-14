@@ -1,5 +1,4 @@
 {
-  flake,
   lib,
   pkgs,
   config,
@@ -19,55 +18,6 @@ let
 in
 {
   options.services.crowdsec = {
-    # lapiConnect = lib.mkOption {
-    #   type = lib.types.submodule ({
-    #     options = {
-    #       enable = (lib.mkEnableOption "sending sensor data to LAPI on another host") // {
-    #         default = true;
-    #       };
-
-    #       url = lib.mkOption {
-    #         type = lib.types.str;
-    #         description = ''
-    #           URL pointing to the host that runs the crowdsec LAPI in master mode.
-    #         '';
-    #       };
-
-    #       name = lib.mkOption {
-    #         type = lib.types.str;
-    #         default = config.networking.hostName;
-    #         description = ''
-    #           Name of the current host, also used as username, that identifies this crowdsec engine to the master LAPI.
-    #         '';
-    #       };
-
-    #       passwordFile = lib.mkOption {
-    #         type = lib.types.nullOr (
-    #           lib.types.pathWith {
-    #             inStore = false;
-    #             absolute = true;
-    #           }
-    #         );
-    #         description = ''
-    #           Location of the file where the authentication password is stored to fetch decisions from the master LAPI.
-    #         '';
-    #       };
-    #     };
-    #   });
-    #   default = {
-    #     enable = false;
-    #   };
-    #   description = ''
-    #     Configure this crowdsec engine as a slave to a Crowdsec Local API (LAPI) running on another host.
-    #     See <https://docs.crowdsec.net/u/user_guides/multiserver_setup> for details about multi-server setup.
-    #   '';
-    #   example = {
-    #     url = "https://my-lapi-server";
-    #     name = "sensor-01";
-    #     passwordFile = "/run/secrets/sensor-01-key";
-    #   };
-    # };
-
     sensors = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule (
@@ -177,24 +127,6 @@ in
           To fix this issue, enable LAPI by setting `services.crowdsec.settings.general.api.server.enable` to true.
         '';
       })
-      # ({
-      #   assertion = cfg.settings.api.server.enable -> !cfg.lapiConnect.enable;
-      #   message = ''
-      #     The crowdsec engine cannot be configured as LAPI master and slave at the same time.
-      #     To fix this issue either;
-      #       - Disable the LAPI by setting `services.crowdsec.settings.api.server.enable` to false
-      #       - Disable LAPI slave mode by setting `services.crowdsec.lapiConnect.enable` to false
-      #   '';
-      # })
-      # ({
-      #   assertion = !cfg.settings.api.server.enable -> cfg.lapiConnect.enable;
-      #   message = ''
-      #     The crowdsec engine must be configured with a destination for sensor alerts.
-      #     To fix this issue either;
-      #       - Enable LAPI by setting `services.crowdsec.settings.api.server.enable` to true
-      #       - Setup LAPI slave mode by configuring `services.crowdsec.lapiConnect` with data from a LAPI master
-      #   '';
-      # })
     ];
 
     systemd.targets.crowdsec = {
@@ -202,11 +134,11 @@ in
       wantedBy = [ "multi-user.target" ];
       requires = [
         "crowdsec.service"
-        "crowdsec-setup.service"
+        "crowdsec-lapi-setup.service"
       ];
     };
 
-    systemd.services.crowdsec-update-hub = {
+    systemd.services.crowdsec-update-hub = lib.mkIf (cfg.autoUpdateService) {
       # NOTE; Reload configuration is disabled upstream due to database connection leaks
       # NOTE; Must restart as root, because service is running as low priviliged user (crowdsec)
       serviceConfig.ExecStartPost = lib.mkForce "+systemctl restart crowdsec.service";
@@ -215,77 +147,28 @@ in
     systemd.services.crowdsec = {
       partOf = [ config.systemd.targets.crowdsec.name ];
 
-      # # ERROR; Reloading crowdsec after updates causes the log to be spammed with 'unable to fetch scenarios from db: XXX'
-      # # REF; https://github.com/crowdsecurity/crowdsec/issues/656
-      # # reloadTriggers = [ configFile ];
-      # restartTriggers = [ configFile ];
+      serviceConfig = {
+        # Give crowdsec limited time to shutdown after receiving systemd's stop signal.
+        TimeoutSec = 20;
+        RestartSec = 60; # Value copied from crowdsec repo
+      };
 
-      # serviceConfig = {
-      #   # ERROR; NOT notify-reload because ExecReload is manually defined.
-      #   # Running the ExecReload commands is mutually exclusive with the ReloadSignal.
-      #   Type = "notify";
-
-      #   # Give crowdsec limited time to shutdown after receiving systemd's stop signal.
-      #   TimeoutSec = 20;
-      #   RestartSec = 60; # Value copied from crowdsec repo
-
-      #   ExecStartPre = lib.mkMerge [
-      #     (lib.mkBefore (
-      #       lib.optional cfg.lapiConnect.enable "${pkgs.writeShellScriptBin "register-to-lapi" ''
-      #         set -e
-
-      #         if [ ! -s '${cfg.settings.api.client.credentials_path}' ]; then
-      #           # ERROR; Cannot use 'cscli lapi register ..' because that command wants a valid local_api_credentials file, which we
-      #           # want to create as new with that same command.. /facepalm
-      #           cat > '${cfg.settings.api.client.credentials_path}' <<EOF
-      #         url: ${cfg.lapiConnect.url}
-      #         login: ${cfg.lapiConnect.name}
-      #         password: ''$(cat '${cfg.lapiConnect.passwordFile}')
-      #         EOF
-      #           echo "This crowdsec instance is configured to send alerts to LAPI at '${cfg.lapiConnect.url}'"
-      #         fi
-
-      #         # ERROR; Hub update is only executed when online credentials are set, but this is _not_ a requirement.
-      #         # This should be fixed upstream!
-      #         cscli hub update
-      #       ''}/bin/register-to-lapi"
-      #     ))
-      #     (lib.mkAfter [
-      #       # Checks completed configuration before starting daemon
-      #       "${cfg.package}/bin/crowdsec -c /etc/crowdsec/config.yaml -t -error"
-      #     ])
-      #   ];
-
-      #   # NOTE; Overwritten because the configuration file got symlinked!
-      #   ExecStart = lib.mkForce "${cfg.package}/bin/crowdsec -c /etc/crowdsec/config.yaml";
-
-      #   # Configuration reloading allows crowdsec to use newly setup configuration without going through the stop/start state machine.
-      #   # The state machine will restart all services linked to the target and/or service causing disruption.
-      #   # To make reloading work we need to symlink the configuration file, see services.haproxy for a straightforward example.
-      #   ExecReload = [
-      #     "${cfg.package}/bin/crowdsec -c /etc/crowdsec/config.yaml -t -error"
-      #     # WARN; Asynchronous signal, not good for service ordering. But assumed to succeed shortly after because
-      #     # the configuration is already validated at this point.
-      #     "${pkgs.coreutils}/bin/kill -HUP $MAINPID"
-      #   ];
-      # };
-
-      # unitConfig =
-      #   let
-      #     inherit (config.systemd.services.crowdsec.serviceConfig) TimeoutSec;
-      #     maxTries = 5;
-      #     bufferSec = 5;
-      #   in
-      #   {
-      #     # The max. time needed to perform `maxTries` start attempts of systemd
-      #     # plus a bit of buffer time (bufferSec) on top.
-      #     StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
-      #     StartLimitBurst = maxTries;
-      #   };
+      unitConfig =
+        let
+          inherit (config.systemd.services.crowdsec.serviceConfig) TimeoutSec;
+          maxTries = 5;
+          bufferSec = 5;
+        in
+        {
+          # The max. time needed to perform `maxTries` start attempts of systemd
+          # plus a bit of buffer time (bufferSec) on top.
+          StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
+          StartLimitBurst = maxTries;
+        };
     };
 
-    systemd.services.crowdsec-setup = {
-      description = "Crowdsec LAPI setup";
+    systemd.services.crowdsec-lapi-setup = lib.mkIf (cfg.settings.general.api.server.enable) {
+      description = "Crowdsec LAPI configuration";
 
       requires = [ config.systemd.services.crowdsec.name ];
       after = [ config.systemd.services.crowdsec.name ];
@@ -301,7 +184,7 @@ in
       script = (builtins.readFile ./lapi-setup.sh) + ''
         # NOTE; Don't remove this comment line, a newline is required here
 
-        ${lib.optionalString cfg.settings.general.api.server.enable ''
+        ${lib.optionalString (cfg.settings.general.api.server.enable) ''
           # If the engine is configured to connect to a remote LAPI and connecting fails, the crowdsec service itself fails.
           # If the engine is configured as standalone/master LAPI, wait until it's initialised fully.
           wait_for_lapi

@@ -39,16 +39,14 @@ in
   };
 
   config = lib.mkIf (cfg.enable) ({
-    proesmans.nix.overlays = [
-      # NOTE; Adds package "crowdsec-firewall-bouncer"
-      flake.inputs.crowdsec.overlays.default
-    ];
+    # Setup bouncer package from nixpkgs upstream by default
+    services.crowdsec-firewall-bouncer.package = lib.mkDefault pkgs.crowdsec-firewall-bouncer;
 
     systemd.targets.crowdsec = {
       description = lib.mkDefault "Crowdsec";
       wantedBy = [ "multi-user.target" ];
       requires = [
-        config.systemd.services.crowdsec-firewall-bouncer.name
+        "crowdsec-firewall-bouncer.service"
       ];
     };
 
