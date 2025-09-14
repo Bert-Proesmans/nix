@@ -147,7 +147,6 @@
         if (req.http.X-Forwarded-Proto) {
           # Cache the HTTP vs HTTPs separately
           # NOTE; Prevents exfiltration of data without secure protocol
-          # TODO; Attempt to cache thumbnail assets even though a valid token is required!
           hash_data(req.http.X-Forwarded-Proto);
         }
 
@@ -205,34 +204,38 @@
 
       sub vcl_backend_response {
         # SEEALSO; sub vcl_recv
+        if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
+          # Don't cache 50x responses
+          return (abandon);
+        }
+
+        # Allow serving stale content in case the backend goes down.
+        # The cache will still attempt to revalidate these objects at client request.
+        set beresp.grace = 6h;
+
+        if (beresp.http.ETag || beresp.http.Last-Modified) {
+          # Response has appropriate headers for efficient stale checks.
+          # 'Keep' will not offer the object to the client, but ask the server for update metadata instead of the full object.
+          set beresp.keep = 1w;
+        }
+
         # NOTE; Step optimized regex! DO NOT "IMPROVE"
         if (bereq.http.Content-type ~ "^(((image|video|font)/.+)|application/javascript|text/css).*$") {
           # Force enable caching, do not follow server directives
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 48h;
+          if (beresp.ttl <= 0s) {
+            set beresp.ttl = 2d;
+          }
         }
 
         if (bereq.http.host ~ "pictures\.proesmans\.eu$" && bereq.url ~ "^/api/assets/") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 48h;
-        }
-
-        if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
-          # Don't cache 50x responses
-          return (abandon);
-        }
-
-        # Allow stale content, in case the backend goes down.
-        # make Varnish keep all objects for 6 hours beyond their TTL
-        set beresp.grace = 24h;
-
-        if (beresp.http.ETag || beresp.http.Last-Modified) {
-          # Response has appropriate headers for efficient stale checks.
-          # Allow for up to 24 additional hours for upstream checks.
-          set beresp.keep = 72h;
+          set beresp.ttl = 7d;
+          set beresp.grace = 7d;
+          set beresp.keep = 1w;
         }
 
         # builtin.vcl handles HTTP content-range normalization
