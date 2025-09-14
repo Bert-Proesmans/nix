@@ -106,7 +106,17 @@
             # WARN; Upstream requires following cookies; immich_access_token,immich_auth_type,immich_is_authenticated
             set req.http.X-Upstream-Cookies = req.http.cookie;
             unset req.http.cookie;
-          }          
+          }
+
+          # NOTE; '/s/' is the prefix of public share links.
+          if(req.http.host ~ "wiki\.proesmans\.eu$" && (req.url ~ "^/s/" || req.url ~ "^/static/assets/" || req.url ~ "^/fonts/")) {
+            # Ignore all cookies for public wiki resources, but keep them for the backend request on cache-miss.
+            # SECURITY; The public share path must use secure randomly generated resource ids to not leak page contents!
+            #
+            # WARN; Upstream requires following cookies; <none>
+            set req.http.X-Upstream-Cookies = req.http.cookie;
+            unset req.http.cookie;
+          }
         }
 
         # Are there cookies left with only spaces or that are empty?
@@ -233,9 +243,17 @@
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 7d;
-          set beresp.grace = 7d;
-          set beresp.keep = 1w;
+          set beresp.ttl = 1w; # serving from cache
+          set beresp.grace = 6w; # serving from cache with attempting refresh on client request
+          set beresp.keep = 1w; # no serving, best case refresh if no metadata change
+        }
+
+        if (bereq.http.host ~ "wiki\.proesmans\.eu$" && bereq.url ~ "^/s/") {
+          # Force enable caching because immich returns HTTP "cache-control: no-cache, must revalidate"
+          unset beresp.http.cache-control;
+          unset beresp.http.Set-Cookie;
+          set beresp.ttl = 1h;
+          set beresp.grace = 2w; # Keep public page url alive for a long time
         }
 
         # builtin.vcl handles HTTP content-range normalization
