@@ -133,11 +133,9 @@ in
       (_final: prev: {
         crowdsec = prev.crowdsec.overrideAttrs (old: {
           # Add systemd libs to build environment so unit type "notify" works as expected.
-          buildInputs =
-            (old.buildInputs or [ ])
-            ++ prev.lib.optionals (lib.meta.availableOn prev.stdenv.hostPlatform prev.systemd) [
-              prev.systemd
-            ];
+          # ERROR; Doesn't work on its own, the service crowdsec-lapi-setup triggers instantly.
+          # ..this needs more tweaks to the package recipe!
+          buildInputs = (old.buildInputs or [ ]) ++ [ prev.systemd ];
 
           # Speed up build completion because this always builds locally
           doCheck = false;
