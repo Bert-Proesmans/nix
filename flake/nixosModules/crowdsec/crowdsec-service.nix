@@ -7,6 +7,11 @@
 let
   cfg = config.services.crowdsec;
 
+  # Hardcoded upstream
+  format = pkgs.formats.yaml { };
+  configFile = format.generate "crowdsec.yaml" cfg.settings.general;
+  confDir = "/etc/crowdsec/";
+
   # ERROR; Upstream locked the cscli binary inside the module configuration.
   # Attempt to pick it out of the list of global system packages.
   cscli =
@@ -129,18 +134,27 @@ in
       })
     ];
 
-    proesmans.nix.overlays = [
-      (_final: prev: {
-        crowdsec = prev.crowdsec.overrideAttrs (old: {
-          # Add systemd libs to build environment so unit type "notify" works as expected.
-          # ERROR; Doesn't work on its own, the service crowdsec-lapi-setup triggers instantly.
-          # ..this needs more tweaks to the package recipe!
-          buildInputs = (old.buildInputs or [ ]) ++ [ prev.systemd ];
+    systemd.tmpfiles.settings = {
+      "11-crowdsec" = {
+        # ERROR; cscli explain doesn't take the reference to the configuration file location and falls back to the default one..
+        # The config file is linked into the default location as workaround.
+        "${lib.strings.normalizePath "${confDir}/config.yaml"}"."L+".argument = "${configFile}";
+      };
+    };
 
-          # Speed up build completion because this always builds locally
-          doCheck = false;
-        });
-      })
+    proesmans.nix.overlays = [
+      # ERROR; Doesn't work on its own, the service crowdsec-lapi-setup triggers instantly.
+      # ..this needs more tweaks to the package recipe!
+      # TODO; Fix
+      # (_final: prev: {
+      #   crowdsec = prev.crowdsec.overrideAttrs (old: {
+      #     # Add systemd libs to build environment so unit type "notify" works as expected.
+      #     buildInputs = (old.buildInputs or [ ]) ++ [ prev.systemd ];
+
+      #     # Speed up build completion because this always builds locally
+      #     doCheck = false;
+      #   });
+      # })
     ];
 
     systemd.targets.crowdsec = {
