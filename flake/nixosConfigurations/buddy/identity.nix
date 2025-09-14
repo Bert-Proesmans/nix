@@ -154,8 +154,7 @@ in
       systems.oauth2."photos" = {
         displayName = "Pictures";
         basicSecretFile = config.sops.secrets.immich-oauth-secret.path;
-        # WARN; URLs must end with a forward slash if path element is empty!
-        originLanding = "https://pictures.proesmans.eu/";
+        originLanding = "https://pictures.proesmans.eu/auth/login?autoLaunch=1";
         imageFile = "${flake.documentationAssets}/immich-logo.png";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
@@ -197,6 +196,7 @@ in
         basicSecretFile = config.sops.secrets.outline-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://wiki.proesmans.eu/";
+        imageFile = "${flake.documentationAssets}/outline-logo.png";
         # imageFile = "<TODO>";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
