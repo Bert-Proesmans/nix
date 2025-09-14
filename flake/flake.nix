@@ -93,6 +93,7 @@
       # See also; self.outputs.nixosModules.nix-system
       #
       overlays = {
+        outline = import ./overlays/outline/default.nix;
         # example = final: previous: {
         #   hello = previous.hello.overrideAttrs (old: {
         #     version = "${old.version}-superior";
