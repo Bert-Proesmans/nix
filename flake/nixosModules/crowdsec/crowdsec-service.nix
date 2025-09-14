@@ -129,16 +129,35 @@ in
       })
     ];
 
+    proesmans.nix.overlays = [
+      (_final: prev: {
+        crowdsec = prev.crowdsec.overrideAttrs (old: {
+          # Add systemd libs to build environment so unit type "notify" works as expected.
+          buildInputs =
+            (old.buildInputs or [ ])
+            ++ prev.lib.optionals (lib.meta.availableOn prev.stdenv.hostPlatform prev.systemd) [
+              prev.systemd
+            ];
+
+          # Speed up build completion because this always builds locally
+          doCheck = false;
+        });
+      })
+    ];
+
     systemd.targets.crowdsec = {
       description = lib.mkDefault "Crowdsec";
       wantedBy = [ "multi-user.target" ];
       requires = [
         "crowdsec.service"
+      ]
+      ++ (lib.optionals (config.systemd.services.crowdsec-lapi-setup.enable) [
         "crowdsec-lapi-setup.service"
-      ];
+      ]);
     };
 
-    systemd.services.crowdsec-update-hub = lib.mkIf (cfg.autoUpdateService) {
+    systemd.services.crowdsec-update-hub = {
+      enable = cfg.autoUpdateService;
       # NOTE; Reload configuration is disabled upstream due to database connection leaks
       # NOTE; Must restart as root, because service is running as low priviliged user (crowdsec)
       serviceConfig.ExecStartPost = lib.mkForce "+systemctl restart crowdsec.service";
@@ -167,7 +186,8 @@ in
         };
     };
 
-    systemd.services.crowdsec-lapi-setup = lib.mkIf (cfg.settings.general.api.server.enable) {
+    systemd.services.crowdsec-lapi-setup = {
+      enable = cfg.settings.general.api.server.enable;
       description = "Crowdsec LAPI configuration";
 
       requires = [ config.systemd.services.crowdsec.name ];
