@@ -220,7 +220,9 @@ in
         scope = "openid email profile";
         signingAlgorithm = "RS256";
         # NOTE; Immich currently ONLY applies these claims during account creation!
-        storageLabelClaim = "immich_label";
+        # ERROR; storage label _must_ be unique for each user (or unset)!
+        # Trying to group media from multiple users behind the same label is a wrong assumption.
+        storageLabelClaim = "preferred_username";
         storageQuotaClaim = "immich_quota";
       };
       passwordLogin.enabled = true;

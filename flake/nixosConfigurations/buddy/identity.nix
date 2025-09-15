@@ -167,6 +167,8 @@ in
           # "https://pictures.proesmans.eu/user-settings"
           # "https://alpha.pictures.proesmans.eu/user-settings"
         ];
+        # NOTE; Impacts claim preferred_username; provides "name" instead of full "user principal name"
+        # bert@proesmans.eu -> bert
         preferShortUsername = true;
         # RS256 is used instead of ES256 so additionally we need legacy crypto
         enableLegacyCrypto = true;
@@ -177,13 +179,6 @@ in
         ];
         claimMaps = {
           # NOTE; Immich currently ONLY applies these claims during account creation!
-          "immich_label" = {
-            joinType = "ssv"; # Immich requires a string type
-            valuesByGroup = {
-              "household.alpha" = [ "alpha" ]; # storage label "alpha" (organises library location by household)
-              "household.beta" = [ "beta" ];
-            };
-          };
           "immich_quota" = {
             joinType = "ssv"; # Immich requires a string type
             valuesByGroup."immich.quota.large" = [ "1000" ]; # 1000GB storage
