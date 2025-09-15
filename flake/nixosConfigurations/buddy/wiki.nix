@@ -96,11 +96,15 @@ in
 
   systemd.services.outline = lib.mkIf config.services.outline.enable {
     environment = {
+      # Use current URL host to connect multiplayer editor
+      COLLABORATION_URL = "auto";
+
       OIDC_DISPLAY_NAME = "Proesmans account";
       OIDC_ISSUER_URL = "https://alpha.idm.proesmans.eu/oauth2/openid/wiki";
       OIDC_CLIENT_ID = "wiki";
-      # Restrict account creation to these email domains
-      ALLOWED_DOMAINS = "proesmans.eu";
+      # ERROR; Option does nothing.
+      # There is no filtering of new accounts. Filtering is not necessary because there is no open/social provider connected.
+      # ALLOWED_DOMAINS = "proesmans.eu";
       # Prevent automatic redirect into the SSO process (value doesn't matter)
       # NOTE; Only works if there are multiple login providers! If there is only OIDC the login page will always redirect.
       OIDC_DISABLE_REDIRECT = "yes";

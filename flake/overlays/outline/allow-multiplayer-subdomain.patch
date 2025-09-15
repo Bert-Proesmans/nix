@@ -1,0 +1,57 @@
+diff --git a/app/scenes/Document/components/MultiplayerEditor.tsx b/app/scenes/Document/components/MultiplayerEditor.tsx
+index bb27f4e..4c344a4 100644
+--- a/app/scenes/Document/components/MultiplayerEditor.tsx
++++ b/app/scenes/Document/components/MultiplayerEditor.tsx
+@@ -76,11 +76,17 @@ function MultiplayerEditor({ onSynced, ...props }: Props, ref: any) {
+     const debug = env.ENVIRONMENT === "development";
+     const name = `document.${documentId}`;
+     const localProvider = new IndexeddbPersistence(name, ydoc);
++
++    const baseCollabUrl =
++      env.COLLABORATION_URL === "auto"
++        ? `${window.location.protocol.replace("http", "ws")}//${window.location.host}/collaboration`
++        : `${env.COLLABORATION_URL}/collaboration`;
++
+     const provider = new HocuspocusProvider({
+       parameters: {
+         editorVersion: EDITOR_VERSION,
+       },
+-      url: `${env.COLLABORATION_URL}/collaboration`,
++      url: baseCollabUrl,
+       name,
+       document: ydoc,
+       token,
+diff --git a/server/env.ts b/server/env.ts
+index d10e10c..cd4cde4 100644
+--- a/server/env.ts
++++ b/server/env.ts
+@@ -4,6 +4,7 @@ import environment from "./utils/environment";
+ import os from "os";
+ import {
+   validate,
++  ValidateIf,
+   IsNotEmpty,
+   IsUrl,
+   IsOptional,
+@@ -226,15 +227,18 @@ export class Environment {
+    * service, if different (unlikely)
+    */
+   @Public
++  @ValidateIf((o) => o.COLLABORATION_URL !== "auto")
+   @IsUrl({
+     require_tld: false,
+     require_protocol: true,
+     protocols: ["http", "https", "ws", "wss"],
+   })
+   @IsOptional()
+-  public COLLABORATION_URL = (environment.COLLABORATION_URL || this.URL)
+-    .replace(/\/$/, "")
+-    .replace(/^http/, "ws");
++  public COLLABORATION_URL = environment.COLLABORATION_URL === "auto"
++    ? "auto"
++    : (environment.COLLABORATION_URL || this.URL)
++      .replace(/\/$/, "")
++      .replace(/^http/, "ws");
+ 
+   /**
+    * The maximum number of network clients that can be connected to a single
