@@ -32,6 +32,7 @@ in
         header = "Health Dashboard";
         # Enables light mode by default (overridden by user preference)
         dark-mode = false;
+        default-sort-by = "name";
         buttons = [
           {
             name = "Visit idm";
@@ -102,7 +103,7 @@ in
         {
           enabled = true;
           name = "Identity management"; # Master node
-          group = "services";
+          # group = "services";
           url = "https://idm.proesmans.eu/ui/login";
           interval = "5m";
           conditions = [
@@ -118,13 +119,29 @@ in
         {
           enabled = true;
           name = "Pictures";
-          group = "services";
+          # group = "services";
           url = "https://pictures.proesmans.eu/api/server/ping";
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
             "[RESPONSE_TIME] < 150ms"
             "[BODY].res == pong"
+            # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
+            # "[DOMAIN_EXPIRATION] > 720h"
+            "[CERTIFICATE_EXPIRATION] > 10d"
+          ];
+          maintenance-windows = [ ];
+        }
+        {
+          enabled = true;
+          name = "Wiki";
+          # group = "alpha";
+          url = "https://wiki.proesmans.eu/s/1f53ffce-0927-4a7c-a5bc-e14132cd81ff";
+          interval = "5m";
+          conditions = [
+            "[STATUS] == 200"
+            "[RESPONSE_TIME] < 150ms"
+            "[BODY] == pat(*<h1 dir=\"ltr\">Proesmans.EU</h1>*)"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
             "[CERTIFICATE_EXPIRATION] > 10d"
