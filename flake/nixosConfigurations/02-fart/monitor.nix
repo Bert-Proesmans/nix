@@ -20,6 +20,15 @@ in
     every = [ ]; # Every day
   };
 
+  networking.hosts = {
+    # ERROR; wiki.proesmans.eu doesn't currently resolve over the internet
+    # Temporarily connect to wiki application over tailscale tunnel
+    "100.116.84.29" = [
+      "wiki.proesmans.eu"
+      "alpha.wiki.proesmans.eu"
+    ];
+  };
+
   services.gatus = {
     enable = true;
     openFirewall = false;
