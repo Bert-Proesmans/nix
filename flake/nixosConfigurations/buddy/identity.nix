@@ -60,6 +60,11 @@ in
       owner = "kanidm";
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
+
+    gatus-oauth-secret = {
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
   };
 
   # Allow kanidm user access to the idm certificate managed by the host
@@ -130,6 +135,11 @@ in
       extraJsonFile = config.sops.secrets.kanidm-extra.path;
       autoRemove = true;
       groups = {
+        # Dynamic group of member accounts that can perform interactive login
+        # ERROR; Do not declare, provisioning attempts to delete all members.
+        # "idm_all_persons" = { }; # Builtin
+
+        # Known group with static membership, members can perform password reset for others
         "idm_service_desk" = { }; # Builtin
         "household.alpha" = { };
         "household.beta" = { };
@@ -204,6 +214,25 @@ in
           "email"
           "profile"
         ];
+      };
+
+      systems.oauth2."status" = {
+        displayName = "Health dashboard";
+        basicSecretFile = config.sops.secrets.gatus-oauth-secret.path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://status.proesmans.eu/";
+        # imageFile = "${flake.documentationAssets}/outline-logo.png";
+        # imageFile = "<TODO>";
+
+        # ERROR; PKCE is not supported by Gatus.
+        # Disables PKCE.
+        allowInsecureClientDisablePkce = true;
+        originUrl = [
+          # NOTE; Global url redirects to specific instance URLs
+          "https://status.proesmans.eu/authorization-code/callback"
+          "https://omega.status.proesmans.eu/authorization-code/callback"
+        ];
+        scopeMaps."idm_all_persons" = [ "openid" ];
       };
     };
   };
