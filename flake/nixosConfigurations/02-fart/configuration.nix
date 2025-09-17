@@ -4,13 +4,13 @@
 }:
 {
   imports = [
-    #./certificates.nix
+    ./certificates.nix
     ./disks.nix
     ./hardware-configuration.nix
     ./memory-handling.nix
     ./monitor.nix
     ./private-network.nix
-    #./tls-termination.nix
+    ./tls-termination.nix
     #./web-cache.nix
     ./web-security.nix
   ];
