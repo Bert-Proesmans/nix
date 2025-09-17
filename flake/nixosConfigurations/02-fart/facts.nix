@@ -7,4 +7,5 @@
     "fart"
   ];
   encryptedDisks = true;
+  services."100.127.116.49".tags = [ "tailscale" ];
 }
