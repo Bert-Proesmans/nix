@@ -12,8 +12,8 @@ in
   sops.secrets.crowdsec-apikey.owner = "crowdsec";
   sops.secrets."01-fart-sensor-crowdsec-key".owner = "crowdsec";
   sops.secrets."01-fart-bouncer-crowdsec-key".owner = "crowdsec";
-  # sops.secrets."02-fart-sensor-crowdsec-key".owner = "crowdsec";
-  # sops.secrets."02-fart-bouncer-crowdsec-key".owner = "crowdsec";
+  sops.secrets."02-fart-sensor-crowdsec-key".owner = "crowdsec";
+  sops.secrets."02-fart-bouncer-crowdsec-key".owner = "crowdsec";
   services.crowdsec = {
     enable = true;
     autoUpdateService = true;
@@ -99,11 +99,11 @@ in
 
     sensors = {
       "01-fart".passwordFile = config.sops.secrets."01-fart-sensor-crowdsec-key".path;
-      # "02-fart".passwordFile = config.sops.secrets."02-fart-sensor-crowdsec-key".path;
+      "02-fart".passwordFile = config.sops.secrets."02-fart-sensor-crowdsec-key".path;
     };
     bouncers = {
       "01-fart".passwordFile = config.sops.secrets."01-fart-bouncer-crowdsec-key".path;
-      # "02-fart".passwordFile = config.sops.secrets."02-fart-bouncer-crowdsec-key".path;
+      "02-fart".passwordFile = config.sops.secrets."02-fart-bouncer-crowdsec-key".path;
     };
   };
 }
