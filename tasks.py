@@ -270,6 +270,10 @@ def deploy(
         # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
         #
         # "--option accept-flake-config true",
+        
+        # TODO; Process these flags into the task
+        # deploy_flags.append("--build-on") # ARM deploy
+        # deploy_flags.append("remote") # ARM deploy
 
         # NOTE; The (nixos-anywhere) default is to let the target pull packages from the caches first, and if they not exist there
         # the current (buildhost) host will push the packages.

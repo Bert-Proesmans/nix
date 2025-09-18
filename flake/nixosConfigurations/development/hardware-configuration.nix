@@ -2,8 +2,9 @@
 {
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
-  # Also cross-compile for aarch64
-  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+  # WARN; Don't actually need to cross-compile for aarch64. Choose to remote build the closures!
+  # Nixos-anywhere supports remote build, also nixos-rebuild supports(?) remote build.
+  # boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.

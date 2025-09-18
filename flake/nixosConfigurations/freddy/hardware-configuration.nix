@@ -17,12 +17,10 @@
     "boot.shell_on_fail" # DEBUG
   ];
   boot.initrd.availableKernelModules = [
-    "sd_mod"
-    "uhci_hcd"
-    "usbhid"
+    "xhci_pci"
     "virtio_pci"
     "virtio_scsi"
-    "xhci_pci"
+    "usbhid"
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;

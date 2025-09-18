@@ -111,6 +111,36 @@
     ];
   };
 
+  sops.secrets."freddy-builder-ssh-key" = {
+    # Key is accessed by the nix-daemon, as root
+  };
+  nix.distributedBuilds = true;
+  nix.buildMachines = [
+    {
+      hostName = "141.148.244.144";
+      protocol = "ssh-ng";
+      system = "aarch64-linux"; # Type of host
+      systems = [ "aarch64-linux" ]; # Derivation types that can be built
+      sshUser = "builder";
+      # SSH Key must be seperately installed using the task "key-buildmachines-install" on the development hosts.
+      sshKey = config.sops.secrets."freddy-builder-ssh-key".path;
+      # Base64 encoding of public key contents of the ssh host key
+      # base64 -w0 <path>/ssh_host_ed25519.pub
+      publicHostKey = "c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUNlV3lLbnZtNFI0dXdlVitRVm1HeWJEV3VDTTNleElWbkZVMXAxVmQycDg=";
+      maxJobs = 2; # TODO; Optimize
+      speedFactor = 10; # TODO; Optimize
+      # Mandatory can be used to only build specific derivations on this machine, to optimize its usage for example.
+      # mandatoryFeatures = [ "big-parallel" ];
+      supportedFeatures = [
+        "nixos-test"
+        "benchmark"
+        "big-parallel"
+        "kvm"
+        "gccarch-armv8-a"
+      ];
+    }
+  ];
+
   # Ignore below
   # Consistent defaults accross all machine configurations.
   system.stateVersion = "23.11";
