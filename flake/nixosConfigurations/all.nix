@@ -127,4 +127,25 @@ in
       ./02-fart/configuration.nix
     ];
   };
+
+  freddy = lib.nixosSystem {
+    inherit lib system specialArgs;
+    modules = modules ++ [
+      flake.inputs.nix-topology.nixosModules.default
+      (
+        { lib, config, ... }:
+        {
+          _file = __curPos.file;
+
+          config = {
+            networking.hostName = lib.mkForce "freddy";
+            proesmans.facts = facts // {
+              self = lib.mkForce config.proesmans.facts."freddy";
+            };
+          };
+        }
+      )
+      ./freddy/configuration.nix
+    ];
+  };
 }

@@ -1,0 +1,16 @@
+freddy_decrypter: ENC[AES256_GCM,data:3U9MrLaeApusbod4qtvPXjqXkocUQ3m2etmhd2yhcs6rE2GBeMr9VymxapF7ORST/t1DQJx5nWgPQd852TmtrffTh4dh68x2KYUHRxDGGkMrW3VeRqwzR+3srTiQZFzEklcfPoeRFl5UiW/5KGgeu3ns2gye53ZPa3osEXTdjo5rV+DqoH4NDJDWWG1t6O/nnSKWKJ561j1RhuQ9vLVcZ/Be9usYqR5nlvkB9zy0Fe8hhT+VOA/x,iv:vvS2Ar5eOdyVcUUL9f/IToCIfz6cMUavLicZL02bYlo=,tag:BI5ajASXmIOTNB2po6gcug==,type:str]
+sops:
+  age:
+    - recipient: age13s286le0puqz79e96zkpxw9pwuv9jqvgptd4k2j0n257jvgpp5qs75nejw
+      enc: |
+        -----BEGIN AGE ENCRYPTED FILE-----
+        YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBGL3psNVQwam5TU0x5UUxO
+        dE1aaktHWWl1dHJ1RFRaQ3V0cmY5eE4wZm5VCjhFRUF1bnU0dmdRWVFDZm9nZW43
+        a0xNZVM3WGNrT3RRcGNjVXFXbWJzVDQKLS0tIDJQclNaTDl0Y0lVU2V4cGRnOHRQ
+        cCtqNmVuZzh1K1haSUZXcmo0K0plTG8Kt2k9TNgOsFtxrHCpAYL4IVl5B0UXzj9H
+        MM5gXx1HX2SM/gJDLKt1BxVr4CRuJsIPLQ1cnzU7uqhubHW8BqoHmQ==
+        -----END AGE ENCRYPTED FILE-----
+  lastmodified: "2025-09-18T18:29:40Z"
+  mac: ENC[AES256_GCM,data:dJPl4jk6ZFLg77ui9HYjgOx1gFmdZFof279DEFQP6a61rUJOWF/s5aVw2bSaUgyEwQuoJ7Qj2kV6RRnjLO58dDI8fCU2zwmBP7uqBi+/YTIN77QnQ87iGvxHnYm8U3nFWWJN6qq6QJA5F3Q5+haHa3OD7FBk8TGq22pK47w5PIg=,iv:IEurRq0nB8BezeQUn6CKQcTs8F1ayh35PkPmn3AKaWg=,tag:8MpIl/WuH7a5yF8C8GuW2Q==,type:str]
+  unencrypted_suffix: _unencrypted
+  version: 3.10.2
