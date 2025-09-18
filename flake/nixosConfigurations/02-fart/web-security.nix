@@ -45,7 +45,28 @@ in
           journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
           labels.type = "haproxy";
         })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=kanidm.service" ];
+          labels.type = "kanidm";
+        })
       ];
+
+      # patterns = [ ];
+      parsers = {
+        s00Raw = [ ];
+        # WARN; These parsers are added to a stateful directory! Changing the contents will add duplicates!
+        # Regularly clean /etc/crowdsec/* when iterating.
+        s01Parse = import ./crowdsec/s01-parsers.nix;
+        s02Enrich = [ ];
+      };
+      # postOverflows = { };
+      # WARN; These scenarios are added to a stateful directory! Changing the contents will add duplicates!
+      # Regularly clean /etc/crowdsec/* when iterating.
+      scenarios = import ./crowdsec/scenarios.nix;
+      # contexts = [ ];
+      # notifications = [ ];
+      # profiles = [ ];
     };
 
     hub = {
