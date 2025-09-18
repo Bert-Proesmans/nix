@@ -236,7 +236,6 @@ in
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://wiki.proesmans.eu/";
         imageFile = "${flake.documentationAssets}/outline-logo.png";
-        # imageFile = "<TODO>";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
           "https://wiki.proesmans.eu/auth/oidc.callback"
@@ -255,8 +254,7 @@ in
         basicSecretFile = config.sops.secrets.gatus-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://status.proesmans.eu/";
-        # imageFile = "${flake.documentationAssets}/outline-logo.png";
-        # imageFile = "<TODO>";
+        imageFile = "${flake.documentationAssets}/gatus-logo.png";
 
         # ERROR; PKCE is not supported by Gatus.
         # Disables PKCE.
