@@ -291,10 +291,21 @@
   };
 
   systemd.services.varnish = {
+    # NOTE; I'm currently not sure if implementing varnish reload myself is worth the time.
+    # Varnish does not guarantee cache consistency between restarts, so every configuration update followed by service restart
+    # clears all cached data. A service (or config) reload persists the cached data instead.
+
     serviceConfig = {
       # ERROR; Service directories are set to varnish_d_ upstream!
       CacheDirectory = "varnishd";
       CacheDirectoryMode = "0700";
+
+      # Varnish' default shared memory segment bucket is 80 megabytes (see varnishd -l).
+      # The system default memory lock limit is 8 megabyte, increase the maximum memory lock amount to not get the cache swapped out below us.
+      #
+      # NOTE; Limit is a bit higher than the default vsl space (80m) to allow for other memory segment types to be locked too.
+      # REF; https://github.com/varnishcache/pkg-varnish-cache/blob/1f0d212dc45065f38bd80ac57fe22773a20a0595/systemd/varnish.service
+      LimitMEMLOCK = "100M";
     };
   };
 
