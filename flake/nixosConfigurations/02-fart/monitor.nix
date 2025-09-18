@@ -1,5 +1,12 @@
 { lib, config, ... }:
 let
+  buddy-tailscale-ip = lib.pipe config.proesmans.facts.buddy.services [
+    # Want the service endpoint over tailscale
+    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
+    (lib.mapAttrsToList (ip: _: ip))
+    (lib.flip builtins.elemAt 0)
+  ];
+
   # Hardcoded upstream
   statePath = "/var/lib/gatus";
 in
@@ -21,9 +28,12 @@ in
   };
 
   networking.hosts = {
-    # ERROR; wiki.proesmans.eu doesn't currently resolve over the internet
-    # Temporarily connect to wiki application over tailscale tunnel
-    "100.116.84.29" = [
+    "${buddy-tailscale-ip}" = [
+      # No IP for alpha.idm is known on the internet
+      "alpha.idm.proesmans.eu"
+
+      # ERROR; wiki.proesmans.eu doesn't currently resolve over the internet
+      # Temporarily connect to wiki application over tailscale tunnel
       "wiki.proesmans.eu"
       "alpha.wiki.proesmans.eu"
     ];
@@ -86,7 +96,7 @@ in
           enabled = true;
           name = "Alpha server";
           group = "core";
-          url = "icmp://100.116.84.29"; # Tailscale forward
+          url = "icmp://${buddy-tailscale-ip}"; # Tailscale forward
           interval = "5m";
           conditions = [
             "[CONNECTED] == true"
@@ -111,14 +121,31 @@ in
         }
         {
           enabled = true;
-          name = "Identity management"; # Master node
+          name = "Identity management @alpha"; # Master node
           # group = "services";
-          url = "https://idm.proesmans.eu/ui/login";
+          url = "https://alpha.idm.proesmans.eu/status";
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
             "[RESPONSE_TIME] < 150ms"
-            "[BODY] == pat(*<h3>Kanidm idm.proesmans.eu</h3>*)"
+            "[BODY] == true"
+            # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
+            # "[DOMAIN_EXPIRATION] > 720h"
+            "[CERTIFICATE_EXPIRATION] > 10d"
+          ];
+          maintenance-windows = [ ];
+        }
+        {
+          enabled = true;
+          name = "Identity management";
+          # group = "services";
+          # NOTE; This could fallback from OMEGA to ALPHA!
+          url = "https://idm.proesmans.eu/status";
+          interval = "5m";
+          conditions = [
+            "[STATUS] == 200"
+            "[RESPONSE_TIME] < 150ms"
+            "[BODY] == true"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
             "[CERTIFICATE_EXPIRATION] > 10d"
