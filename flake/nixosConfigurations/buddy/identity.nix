@@ -1,10 +1,24 @@
 {
+  lib,
   pkgs,
   config,
   flake,
   ...
 }:
 let
+  replication-transform =
+    peer-name:
+    lib.pipe config.proesmans.facts."${peer-name}".services [
+      # Want the service endpoint over tailscale
+      (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
+      (lib.mapAttrsToList (ip: _: "repl://${ip}:8444"))
+      (lib.flip builtins.elemAt 0)
+    ];
+  peer-to-origin = {
+    self = replication-transform "self";
+    "02-fart" = replication-transform "02-fart";
+  };
+
   # WARN; kanidm database filepath is fixed and cannot be changed!
   kanidmStatePath = builtins.dirOf config.services.kanidm.serverSettings.db_path;
 in
@@ -105,7 +119,6 @@ in
       domain = "idm.proesmans.eu";
       origin = "https://idm.proesmans.eu";
       db_fs_type = "zfs"; # Changes page size to 64K
-      role = "WriteReplica";
       # log_level = "debug";
       online_backup.enabled = false;
       # Accept proxy protocol from frontend stream handler
@@ -113,6 +126,27 @@ in
 
       tls_chain = config.security.acme.certs."alpha.idm.proesmans.eu".directory + "/fullchain.pem";
       tls_key = config.security.acme.certs."alpha.idm.proesmans.eu".directory + "/key.pem";
+
+      # Node with master data
+      role = "WriteReplica";
+      replication = {
+        bindaddress = "0.0.0.0:8444";
+        origin = peer-to-origin.self;
+
+        # Partner(s)
+        "${peer-to-origin."02-fart"}" = {
+          # Distribute local changes but do not accept writes
+          type = "allow-pull";
+          # WARNING; Expires every 180 days!
+          #
+          # Request certificate using command; kanidmd show-replication-certificate
+          #
+          # Renew certificate manually using command; kanidmd renew-replication-certificate
+          #
+          # NOTE; Hopefully the replication coordinator feature is finished soon!
+          consumer_cert = "MIIB9jCCAZygAwIBAgIBATAKBggqhkjOPQQDAjBMMRswGQYDVQQKDBJLYW5pZG0gUmVwbGljYXRpb24xLTArBgNVBAMMJGU4YTE1MDk3LTczNGQtNGU2NC05YjgwLTdkYzI3YmM0OGY4ZDAeFw0yNTA5MTgwOTM3MjNaFw0yOTA5MTgwOTM3MjNaMEwxGzAZBgNVBAoMEkthbmlkbSBSZXBsaWNhdGlvbjEtMCsGA1UEAwwkZThhMTUwOTctNzM0ZC00ZTY0LTliODAtN2RjMjdiYzQ4ZjhkMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvvDKzG2sbdnCuvDvqNrW5T5GCA5rAmZ30fI6rIcEYQa8ajgJcFythmMQMLFMogbhf2WqLkMCMoDWtklwEnmlg6NvMG0wDAYDVR0TAQH_BAIwADAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB0GA1UdDgQWBBTaOaPuXmtLDTJVv--VYBiQr9gHCTAPBgNVHREECDAGhwRkf3QxMAoGCCqGSM49BAMCA0gAMEUCIQCJSXRBDqWyjCfzRScxPvtygv4pLu095g3vjwBlgc6OGgIgeoVdrhuC8pVb1V3Mgn8oUjFYajeWUB4-WaqEBWN3KCE=";
+        };
+      };
     };
 
     clientSettings = {

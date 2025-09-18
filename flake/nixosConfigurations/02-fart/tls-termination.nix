@@ -1,4 +1,12 @@
 { lib, config, ... }:
+let
+  buddy-tailscale-ip = lib.pipe config.proesmans.facts.buddy.services [
+    # Want the service endpoint over tailscale
+    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
+    (lib.mapAttrsToList (ip: _: ip))
+    (lib.flip builtins.elemAt 0)
+  ];
+in
 {
   networking.firewall.allowedTCPPorts = [
     80
@@ -15,12 +23,20 @@
 
   services.haproxy =
     let
-      # upstream.buddy = {
-      #   # Always forward these domains to buddy
-      #   aliases = [ ];
-      #   # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-      #   server = "100.116.84.29:443"; # Tailscale forward
-      # };
+      upstream.buddy = {
+        # Always forward these domains to buddy
+        aliases = [ ];
+        # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
+        server = "${buddy-tailscale-ip}:443"; # Tailscale forward
+      };
+      upstream.idm = rec {
+        inherit (config.services.kanidm.serverSettings) origin bindaddress;
+        aliases = [ "idm.proesmans.eu" ];
+        hostname =
+          assert origin == "https://idm.proesmans.eu";
+          "omega.idm.proesmans.eu";
+        server = bindaddress;
+      };
       upstream.status = rec {
         inherit (config.services.gatus.settings.web) address port;
         # NOTE; Upstream is local varnish webcache
@@ -55,17 +71,6 @@
           log stdout    format raw    local0  notice
           # Push "traffic logs" into systemd journal through syslog stub
           log /dev/log  format local  local7  info info
-
-          # Workarounds
-          #
-          # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
-          # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
-          #
-          # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
-          # both programs with haproxy strictly applying standards and firefox farting all over.
-          h2-workaround-bogus-websocket-clients
-          # TODO; Tweak(?) tune.h2.be.initial-window-size / tune.h2.fe.initial-window-size to improve window size ?
-          # This will make bandwidth usage unfair for a possible better latency experience for the user. 
 
         defaults
           mode http
@@ -122,10 +127,25 @@
           # tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
-          # <TODO>
+          use_backend passthrough_idm if { ${
+            lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") upstream.idm.aliases
+          } }
           
           # anything else → locally terminated
           server localterm unix@/run/haproxy/local-https.sock send-proxy-v2
+
+        backend passthrough_idm
+          description raw tcp passthrough with proxy protocol v2
+          mode tcp
+          # Always prefer local instance of kanidm, if local instance is not available attempt
+          # connecting to alpha master node.
+          balance first
+          
+          # client → haproxy(:443) → omega(local)_kanidm(:8443) (send PROXY v2 as required by Kanidm)
+          server local_idm ${upstream.idm.server} id 1 send-proxy-v2 check
+          
+          # client → haproxy(:443) → buddy(:443) -> alpha_kanidm(:8443) (send PROXY v2)
+          server buddy_tailscale ${upstream.buddy.server} id 2 send-proxy-v2 check
 
         frontend https_terminator
           description accept TLS handshakes and mangle packets

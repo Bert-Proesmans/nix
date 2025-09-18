@@ -1,4 +1,12 @@
 { lib, config, ... }:
+let
+  buddy-tailscale-ip = lib.pipe config.proesmans.facts.buddy.services [
+    # Want the service endpoint over tailscale
+    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
+    (lib.mapAttrsToList (ip: _: ip))
+    (lib.flip builtins.elemAt 0)
+  ];
+in
 {
   networking.firewall.allowedTCPPorts = [
     80
@@ -17,19 +25,10 @@
     let
       upstream.buddy = {
         # Always forward these domains to buddy
-        aliases = [
-          "idm.proesmans.eu"
-          "omega.idm.proesmans.eu"
-        ];
+        aliases = [ ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-        server = "100.116.84.29:443"; # Tailscale forward
+        server = "${buddy-tailscale-ip}:443"; # Tailscale forward
       };
-      # upstream.idm = {
-      #   # Not yet implemented
-      #   aliases = [ ];
-      #   hostname = ;
-      #   server = "100.116.84.29:443"; # Tailscale forward
-      # };
       upstream.pictures = {
         # NOTE; Upstream is local varnish webcache
         aliases = [ "pictures.proesmans.eu" ];
@@ -140,7 +139,7 @@
         backend passthrough_buddy
           description raw tcp passthrough with proxy protocol v2
           mode tcp
-          # client → haproxy(:443) → buddy(100.116.84.29:443) (send PROXY v2)
+          # client → haproxy(:443) → buddy(:443) -> alpha_kanidm(:8443) (send PROXY v2)
           server buddy_tailscale ${upstream.buddy.server} send-proxy-v2 check
 
         frontend https_terminator
