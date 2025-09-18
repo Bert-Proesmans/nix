@@ -128,7 +128,9 @@ in
 
           # route by SNI
           use_backend passthrough_idm if { ${
-            lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") upstream.idm.aliases
+            lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
+              [ upstream.idm.hostname ] ++ upstream.idm.aliases
+            )
           } }
           
           # anything else → locally terminated
