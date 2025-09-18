@@ -74,6 +74,14 @@
           set req.http.host = req.http.host.lower();
         }
 
+        # --- Skip caching status endpoints ---
+        if(req.url ~ "^/status") {
+          return (pass);
+        }
+        if(req.http.host ~ "pictures\.proesmans\.eu$" && req.url ~ "^/api/server/ping") {
+          return (pass);
+        }
+
         # Normalize the query arguments
         set req.url = std.querysort(req.url);
 
