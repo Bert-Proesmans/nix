@@ -129,7 +129,7 @@ in
           # tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
-          use_backend passthrough_buddy if { ${
+          # use_backend passthrough_buddy if { ${
             lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") upstream.buddy.aliases
           } }
           
