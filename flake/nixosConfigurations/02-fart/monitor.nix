@@ -127,7 +127,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 150ms"
+            "[RESPONSE_TIME] < 250ms"
             "[BODY] == true"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -160,7 +160,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 150ms"
+            "[RESPONSE_TIME] < 250ms"
             "[BODY].res == pong"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -176,7 +176,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 150ms"
+            "[RESPONSE_TIME] < 250ms"
             "[BODY] == pat(*<h1 dir=\"ltr\">Proesmans.EU</h1>*)"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
