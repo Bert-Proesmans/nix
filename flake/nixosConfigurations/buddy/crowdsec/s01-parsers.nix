@@ -35,7 +35,7 @@
   {
     name = "bertp/kanidm-logs";
     description = "Detect authentication errors in kanidm logs";
-    debug = true; # DEBUG
+    # debug = true; # DEBUG
     filter = "evt.Parsed.program == 'kanidm'";
     onsuccess = "next_stage";
     nodes = [

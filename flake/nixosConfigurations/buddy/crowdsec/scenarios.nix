@@ -2,7 +2,7 @@
   {
     name = "bertp/kanidm-bruteforce";
     description = "Detect kanidm brute-force attempts";
-    debug = true; # DEBUG
+    # debug = true; # DEBUG
     filter = "evt.Meta.log_type == 'kanidm_authfail'";
     groupby = "evt.Meta.source_ip";
     type = "leaky";
