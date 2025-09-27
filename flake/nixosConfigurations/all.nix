@@ -148,4 +148,21 @@ in
       ./freddy/configuration.nix
     ];
   };
+
+  test-zfs_encrypted_swap = lib.nixosSystem {
+    inherit lib system specialArgs;
+    modules = modules ++ [
+      (
+        { lib, config, ... }:
+        {
+          _file = __curPos.file;
+
+          config = {
+            networking.hostName = lib.mkForce "freddy";
+          };
+        }
+      )
+      ./test-zfs_encrypted_swap/configuration.nix
+    ];
+  };
 }
