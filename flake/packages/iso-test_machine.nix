@@ -101,43 +101,57 @@ in
             let
               deployment-script = pkgs.writeShellApplication {
                 name = "host-install-step";
-                runtimeInputs = [
-                  pkgs.openssh
-                  pkgs.nixos-install
-                ];
+                runtimeInputs = [ pkgs.nixos-install ];
                 # ERROR; The host-deploy task must know how to deploy the hostconfiguration
                 # by name "development" !
                 text = ''
-                  if ! ssh-add -L >/dev/null 2>&1
-                  then
-                    echo "-- WARNING --"
-                    echo "No SSH keys were found, so you'll have to use password login. Make sure to set a root password with \`sudo passwd\`"
-                  fi
-
-                  echo "Formatting disk"
+                  echo 'Formatting disk'
                   # ERROR; lib.getExe doesn't work!
                   # ERROR; lib.getExe' doesn't work!
                   # NOTE; Disko uses trivial-scriptWriter with a non-path name for the derivation. This wraps the script into another derivation that
                   # links the script file at $out. (nixos-anywhere handles diskoscript the same)
                   # REF; https://github.com/nix-community/nixos-anywhere/blob/af70cbe8774492d03a0fb815f9d31bee83d856ce/src/nixos-anywhere.sh#L852
-                  "${machine.config.system.build.diskoScript}"
+                  '${machine.config.system.build.diskoScript}'
 
-                  echo "Installing system"
-                  nixos-install --no-root-passwd --no-channel-copy --system "${machine.config.system.build.toplevel}"
+                  echo 'Installing system'
+                  nixos-install --no-root-passwd --no-channel-copy --system '${machine.config.system.build.toplevel}'
                 '';
               };
             in
             [
               (pkgs.writeShellApplication {
                 name = "install-system";
-                runtimeInputs = [ deployment-script ];
+                runtimeInputs = [
+                  deployment-script
+                  pkgs.openssh
+                ];
                 text = ''
                   log_file="$(mktemp -t install-system.XXXXXX.log)"
 
                   trap 'echo "The full log journal can be found at path: $log_file"' EXIT
 
                   # Execute the wrapped script, capturing both stdout and stderr
-                  "${lib.getExe deployment-script}" 2>&1 | tee "$log_file"
+                  '${lib.getExe deployment-script}' 2>&1 | tee "$log_file"
+
+                  if ! ssh-add -L >/dev/null 2>&1
+                  then
+                    echo '-- WARNING --'
+                    # NOTE; Dollar($) allows for single quote escaping.. fucking shellcode man
+                    echo $'No SSH keys were found, so you\'ll have to use password login.'
+                    echo 'Make sure to set a root password with "sudo passwd" after chrooting into the new install.'
+                    echo
+                  fi
+
+                  echo 'Post-install actions'
+                  # NOTE; Must properly export zfs pool, otherwise next boot won't work due to mismatched machine IDs
+                  read -e -r -p 'Do you want to finish by unmounting all partitions/disks? ' choice
+                  if [[ "$choice" == [Yy]* ]]; then
+                    # NOTE; Disko uses trivial-scriptWriter with a path-like name for the derivation. This makes lib.getExe work correctly.
+                    '${lib.getExe machine.config.system.build.unmount}'
+                  else
+                    # NOTE; Dollar($) allows for single quote escaping.. fucking shellcode man
+                    echo $'Execute "${lib.getExe machine.config.system.build.unmount}" when you\'re done!'
+                  fi
 
                   echo "Execution log is saved at: $log_file"
                 '';

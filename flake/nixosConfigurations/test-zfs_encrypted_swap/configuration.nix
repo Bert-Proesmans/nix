@@ -12,6 +12,11 @@
     # ./swap.nix
   ];
 
+  boot.kernelParams = [
+    # Allow emergency shell in stage-1-init
+    "boot.shell_on_fail" # DEBUG
+  ];
+
   system.stateVersion = lib.trivial.release;
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
   hardware.enableRedistributableFirmware = false;

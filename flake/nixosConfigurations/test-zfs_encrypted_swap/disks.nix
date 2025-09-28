@@ -8,13 +8,13 @@
     ];
     # supportedFilesystems = [ "zfs" ];
     zfs = {
-      devNodes = "/dev/disk/by-id/";
+      devNodes = "/dev/";
       forceImportRoot = false;
       requestEncryptionCredentials = true;
     };
     loader.systemd-boot = {
       enable = true;
-      editor = false;
+      editor = true; # DEBUG
     };
   };
 
@@ -52,7 +52,9 @@
     };
     zpool.zroot = {
       type = "zpool";
-      mode = "mirror"; # doesn't matter with one zfs member
+      # NOTE; Single partition, in a single vdev, in pool
+      mode = "";
+      options.ashift = "12";
       rootFsOptions = {
         mountpoint = "none";
         canmount = "off";
@@ -98,8 +100,8 @@
             sync = "always";
             primarycache = "metadata";
             secondarycache = "none";
-            # NOTE; DIRECT I/O currently not supported with zvols. Setting does nothing
-            direct = "always";
+            # NOTE; DIRECT I/O currently not supported with zvols.
+            # direct = "always"; # ERROR; Setting this option will fail creation!
           };
         };
         # encrypted = {

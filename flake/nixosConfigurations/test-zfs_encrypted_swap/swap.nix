@@ -6,9 +6,6 @@
     # ZSWAP (a swap cache writing compressed pages to disk-baked swap) conflicts with this configuration.
     # ZRAM is a better iteration on ZSWAP because of automatic eviction of uncompressable data.
     "zswap.enabled=0"
-
-    # Allow emergency shell in stage-1-init
-    "boot.shell_on_fail" # DEBUG
   ];
 
   boot.kernel.sysctl = {

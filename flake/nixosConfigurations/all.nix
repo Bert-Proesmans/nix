@@ -158,7 +158,7 @@ in
           _file = __curPos.file;
 
           config = {
-            networking.hostName = lib.mkForce "freddy";
+            networking.hostName = lib.mkForce "test-machine";
           };
         }
       )
