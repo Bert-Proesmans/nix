@@ -21,8 +21,34 @@
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
   hardware.enableRedistributableFirmware = false;
 
+  # Sets required kernel modules for host _and initrd_ environment for interactive input!
+  virtualisation.hypervGuest.enable = true;
+
+  security.sudo.enable = true;
+  # Allow for passwordless sudo
+  security.sudo.wheelNeedsPassword = false;
+
+  # Allow for remote management
+  services.openssh.enable = true;
+  services.openssh.settings.PasswordAuthentication = true;
+
   users.mutableUsers = false;
   users.users.root.password = "insecure";
+  users.users.bert-proesmans = {
+    isNormalUser = true;
+    description = "Bert Proesmans";
+    extraGroups = [
+      "wheel" # Allows sudo access
+      # Read the systemd service journal without sudo
+      # ERROR; initrd logs DID NOT PERSIST (no storage for it was mounted) but were also forwarded to the kernel log buffer.
+      # To read initrd logs you must execute `sudo journalctl`, which displays the kernel log buffer too.
+      "systemd-journal"
+    ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
+    ];
+  };
+  proesmans.internationalisation.be-azerty.enable = true;
 
   networking.hostId = "2c7371ce";
   networking.useNetworkd = true;
