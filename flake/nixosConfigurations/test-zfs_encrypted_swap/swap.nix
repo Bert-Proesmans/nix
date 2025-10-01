@@ -38,7 +38,7 @@
     memoryMax = 2 * 1024 * 1024 * 1024; # (2GB) Bytes, total size of swap device aka max size of uncompressed data
     priority = 5; # default
     algorithm = "zstd";
-    writebackDevice = "/dev/pool/zram-backing-device"; # block device, see disko config
+    writebackDevice = "/dev/zvol/zroot/a-encryptedroot/zram-backing-device"; # block device, see disko config
   };
 
   systemd.services."zram0-maintenance" = {
