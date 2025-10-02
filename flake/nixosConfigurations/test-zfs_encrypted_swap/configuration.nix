@@ -9,12 +9,12 @@
   imports = [
     (modulesPath + "/profiles/minimal.nix")
     ./disks.nix
-    # ./swap.nix
+    ./swap.nix
   ];
 
   boot.kernelParams = [
     # Allow emergency shell in stage-1-init
-    "boot.shell_on_fail" # DEBUG
+    # "boot.shell_on_fail" # DEBUG
   ];
 
   system.stateVersion = lib.trivial.release;

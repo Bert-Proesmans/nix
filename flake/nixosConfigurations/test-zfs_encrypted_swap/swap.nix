@@ -17,11 +17,28 @@
   };
 
   systemd.oomd = {
-    # Newer iteration of earlyoom!
+    # Can replace earlyoom. Kills entire resource slices if something misbehaves.
+    # WARN; Functional at this point in time, but services/systemd units need more slice support. There need to be more
+    # slices that allow oomd to kill with higher precision. The current setup risks killing the user session (user slice)
+    # or system (system/root slice) if there is resource overusage without a more specific slice underneath those.
+    #
+    # Configure resource slice limits through "sliceConfig" per slice individually. Systemd out-of-memory daemon reads that
+    # configuration to react. eg
+    # systemd.slices.system-immich.sliceConfig = {
+    #  ManagedOOMMemoryPressure = "kill"; # <-- Activates monitoring of this slice by OOM daemon
+    #  ManagedOOMMemoryPressureLimit = "80%"; # <-- [optional] Act on (sub-)slice if memory usage was above limit for DefaultMemoryPressureDurationSec
+    # };
+    # SEEALSO; https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html#Memory%20Pressure%20Control
+    #
+    # HELP; Keep enabled, better integration will come automatically. Do not enable earlyoomd, the downsides to its reaping technique
+    # is also bad.
     enable = true;
+    # NOTE; These high-level slices are set to 80% pressure, since they potentially hold the entire system.
     enableRootSlice = true;
+    enableSystemSlice = true;
     enableUserSlices = true;
-    extraConfig.DefaultMemoryPressureDurationSec = "30s"; # Default
+    extraConfig.DefaultMemoryPressureLimit = "60%"; # Systemd default
+    extraConfig.DefaultMemoryPressureDurationSec = "20s"; # Fedora default
   };
 
   zramSwap = {
@@ -35,10 +52,25 @@
     enable = true;
     # NOTE; Refer to this swap device by "/sys/block/zram0"
     swapDevices = 1;
-    memoryMax = 2 * 1024 * 1024 * 1024; # (2GB) Bytes, total size of swap device aka max size of uncompressed data
+    # NOTE; Bytes written to the SWAP device are compressed. It's impossible to predict compression ratios.
+    # The only number we can set is the maximum total size of the swap device.
+    #
+    # HELP; Discover the typical compression ratio. Given a ratio, work backwards from the amount of physical RAM that can be comfortably
+    # allocated as SWAP. Don't forget to consider overhead (couple of megabytes)!
+    # EXAMPLE;
+    # - typical compression ratio; 10x
+    # - typical overhead; 40MB
+    # - total RAM; 1GB
+    # - required RAM; 600MB (kernel + systemd + services ~+ file buffer/cache)
+    # => 400MB for SWAP allocation => (400MB -40MB) *10 => 3600MB total SWAP device size
+    #
+    # HELP; SWAP is used as scratchspace to perform bookkeeping and storing idle memory pages. With services needing a couple of MBs RAM
+    # there is no way anything above 1GB is used (realistically). The default settings are good enough!
+    memoryPercent = 50; # default
+    memoryMax = null; # default
     priority = 5; # default
     algorithm = "zstd";
-    writebackDevice = "/dev/zvol/zroot/a-encryptedroot/zram-backing-device"; # block device, see disko config
+    writebackDevice = "/dev/zvol/zroot/encryptionroot/zram-backing-device"; # block device, see disko config
   };
 
   systemd.services."zram0-maintenance" = {
