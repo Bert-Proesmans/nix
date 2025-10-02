@@ -19,13 +19,15 @@ in
 
     loader.systemd-boot = {
       enable = true;
-      editor = true; # DEBUG
+      # editor = true; # DEBUG
+      editor = false;
     };
 
     initrd = {
       systemd = {
         enable = true;
-        emergencyAccess = true;
+        #emergencyAccess = true; # DEBUG
+        emergencyAccess = false;
         network.wait-online = {
           enable = true;
           anyInterface = true;
@@ -165,42 +167,48 @@ in
       };
 
       datasets = {
-        # NOTE; Stage-1 force loads encryption keys for all encrypted datasets during pool import. The _order_ of import is
-        # important to prevent pool-import failure and halting boot.
-        # WARN; `zfs list` by default sorts on 'creation' property, the pool-import script does not define a sorting.
-        # REF; https://github.com/NixOS/nixpkgs/blob/6310777266905c286a48893c48274b7efafc8772/nixos/modules/tasks/filesystems/zfs.nix#L225-L248
+        # ALWAYS BACKUP THE ENCRYPTIONROOT! At least once after updating key material.
+        # REF; https://sambowman.tech/blog/posts/mind-the-encryptionroot-how-to-save-your-data-when-zfs-loses-its-mind/
         #
-        # WARN; Something in Disko (or nix, maybe attr-merge has sorting side-effect) does an alphabetical sort of the dataset names
-        # before they end up inside the diskoScript (creation script). The datasets are created in alphabetical order by full dataset path.
-        # This means we must update the dataset names to get a proper key loading order!
-        "a-encryptedroot" = {
+        # NOTE; Stage-1 force loads encryption keys for _all_ encryption roots during pool import. It's not possible to use one
+        # dataset as an unlock medium for another dataset because the filesystem is not mounted inbetween loading encryption keys.
+        "encryptionroot" = {
           # Encryptionroot for the root filesystem, basically everything local to the system unimportant to backup.
           type = "zfs_fs";
           options = {
-            mountpoint = "legacy";
+            mountpoint = "none";
+            canmount = "off";
             encryption = "aes-256-gcm";
             keyformat = "passphrase";
             keylocation = "prompt";
             pbkdf2iters = "500000";
           };
+        };
+        "encryptionroot/root" = {
+          type = "zfs_fs";
+          options = {
+            mountpoint = "legacy";
+          };
           mountpoint = "/";
           mountOptions = [ "defaults" ];
         };
-        "a-encryptedroot/nix" = {
+        "encryptionroot/nix" = {
           type = "zfs_fs";
           options.mountpoint = "legacy";
           mountpoint = "/nix";
         };
 
-        # Refer to this logical partition by "/dev/zvol/zroot/a-encryptedroot/zram-backing-device"
+        # Refer to this logical partition by "/dev/zvol/zroot/encryptionroot/zram-backing-device"
         #
         # NOTE; The /dev/zvol symlink comes from UDEV rules delivered by the ZFS package.
         # WARN; UDEV generates a directory tree when it encounters forward slashes(/), contrary to systemd where
         # special path characters are encoded!
         # REF; https://github.com/openzfs/zfs/blob/8869caae5f6558b056d86aeae6d605df27086813/udev/rules.d/60-zvol.rules.in
         # REF; https://github.com/openzfs/zfs/blob/cb3c18a9a93dcff9b18f48b72aafcc06342c63e3/udev/zvol_id.c
-        "a-encryptedroot/zram-backing-device" = {
+        "encryptionroot/zram-backing-device" = {
           type = "zfs_volume";
+          # Probable usage; 0-50MB
+          # SEEALSO; zramSwap.{memoryPercent,writebackDevice}
           size = "1G";
           options = {
             refreservation = "1G";
@@ -216,42 +224,14 @@ in
           };
         };
 
-        "b-encryptedroot" = {
-          # Encryptionroot for all datasets with program/userdata. I want this backed up!
-          #
-          # Datasets are encrypted with a unique masterkey, but the encryptionroot defines how those master keys themselves are
-          # en-/decrypted! To prevent footguns the encryptionroot (and descending datasets) becomes the smallest unit to backup!
-          # There is the option to turn each dataset into its own encryptionroot which allows for more flexible backup schedule
-          # considering each individual dataset, but that is a lot more hassle with encryption keys for no functional gain.
-          #
-          # HELP; Create a new encryptionroot for each unique backup schema.
-          # REF; https://sambowman.tech/blog/posts/mind-the-encryptionroot-how-to-save-your-data-when-zfs-loses-its-mind/
-          type = "zfs_fs";
-          options = {
-            canmount = "off";
-            mountpoint = "none";
-            encryption = "aes-256-gcm";
-            keyformat = "passphrase"; # Swapped after creation, see below
-            keylocation = "prompt";
-            pbkdf2iters = "500000";
-          };
-          postCreateHook = ''
-            # zfs set keylocation="<url[http://|file://]>" "<fully qualified dataset path>"
-            # TODO; Deploy passphrase file to root filesystem
-            zfs set keylocation="file:///etc/secrets/secret.key" "zroot/b-encryptedroot"
-          '';
-        };
-
-        "dataencryptedroot/userdata" = {
+        "encryptionroot/userdata" = {
           # One of the storage locations.
           #
           # HELP; Create a new dataset for each unique mountpoint, and unique filesystem needs, and reducing denial-of-service-attack
           # risk.
           type = "zfs_fs";
+          options.mountpoint = "/userdata";
           mountpoint = "/userdata";
-          options = {
-            mountpoint = "/userdata";
-          };
         };
       };
     };
