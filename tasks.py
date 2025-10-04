@@ -11,13 +11,18 @@ from contextlib import contextmanager, nullcontext
 
 # REF; https://www.pyinvoke.org/
 from invoke import task
+
 # REF; https://github.com/numtide/deploykit/
+# REF; https://github.com/takluyver/pyxdg/
+from xdg.BaseDirectory import save_cache_path
 
 
 INVOKED_PATH = Path.cwd()
 
 PROJECT_DIR = Path(__file__).parent.resolve()
 os.chdir(PROJECT_DIR)
+
+CACHE_DIR = save_cache_path("proesmans")
 
 FLAKE = PROJECT_DIR / "flake"
 DOCS = PROJECT_DIR / "documentation"
@@ -270,7 +275,7 @@ def deploy(
         # REF; https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-flake.html#flake-format
         #
         # "--option accept-flake-config true",
-        
+
         # TODO; Process these flags into the task
         # deploy_flags.append("--build-on") # ARM deploy
         # deploy_flags.append("remote") # ARM deploy
@@ -467,6 +472,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     additional_switches.append("--sudo")
 
     if not any(x in ssh_connection_string for x in LOCAL_TARGETS_MARKER):
+        # Download as much from online caches because the link between development- and target host is slow.
         additional_switches.append("--use-substitutes")
 
     subprocess.run(
@@ -478,6 +484,24 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             ssh_connection_string,
             *additional_switches,
             "switch",
+        ],
+        check=True,
+    )
+
+    print("Pinning host closure as garbage root (nix gcroot)")
+    # The machine builds and is deployed succesfully, pinning should always succeed
+    subprocess.run(
+        [
+            "nix-store",
+            "--add-root",
+            f"{CACHE_DIR}/{flake_attr}.pin",
+            "--realise",
+            subprocess.run(
+                ["nix", "path-info", host_attr_path],
+                check=True,
+                text=True,
+                capture_output=True,
+            ).stdout.strip(),
         ],
         check=True,
     )

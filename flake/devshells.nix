@@ -8,6 +8,7 @@
       # See tasks.py for details on the operational workings of managing the nixos hosts.
       pkgs.python3.pkgs.invoke
       pkgs.python3.pkgs.deploykit
+      pkgs.python3.pkgs.pyxdg
     ];
 
     # Software directly available inside the developer shell
