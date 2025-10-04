@@ -1,4 +1,4 @@
-final: previous: {
+_final: previous: {
   outline = previous.outline.overrideAttrs (old: {
     patches = (old.patches or [ ]) ++ [
       ./allow-csp-subdomain.patch

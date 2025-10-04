@@ -153,7 +153,7 @@ in
     inherit lib system specialArgs;
     modules = modules ++ [
       (
-        { lib, config, ... }:
+        { lib, ... }:
         {
           _file = __curPos.file;
 

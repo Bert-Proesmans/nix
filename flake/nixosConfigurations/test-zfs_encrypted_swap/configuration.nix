@@ -1,7 +1,6 @@
 # Machine for testing various root filesystems
 {
   lib,
-  config,
   modulesPath,
   ...
 }:
