@@ -25,6 +25,7 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
+  boot.loader.systemd-boot.netbootxyz.enable = true;
   boot.loader.timeout = 1;
   boot.tmp.useTmpfs = true; # More than enough RAM
 
