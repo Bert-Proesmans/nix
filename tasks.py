@@ -195,6 +195,8 @@ def deploy(
 
     host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
+    # Development host is x86, but these systems are aarch64!
+    mismatched_architecture = hostname in ['freddy']
 
     assert host_configuration_dir.is_dir(), f"""
         There is no configuration folder found for host {hostname}.
@@ -225,7 +227,7 @@ def deploy(
     # Request user to provide disk encryption password
     password_generator = None
     if password_request:
-        print("Please provide a LUKS encryption secret")
+        print("Please provide a DISK encryption secret")
         # Generate and store a new key using;
         # tr -dc '[:alnum:]' </dev/urandom | head -c64
         password_generator = pipe_with_data(get_verified_password().encode("UTF-8"))
@@ -276,9 +278,9 @@ def deploy(
         #
         # "--option accept-flake-config true",
 
-        # TODO; Process these flags into the task
-        # deploy_flags.append("--build-on") # ARM deploy
-        # deploy_flags.append("remote") # ARM deploy
+        if mismatched_architecture:
+            deploy_flags.append("--build-on")
+            deploy_flags.append("remote")
 
         # NOTE; The (nixos-anywhere) default is to let the target pull packages from the caches first, and if they not exist there
         # the current (buildhost) host will push the packages.
