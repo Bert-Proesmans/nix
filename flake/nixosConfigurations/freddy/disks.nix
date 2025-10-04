@@ -1,5 +1,46 @@
-{ ... }:
 {
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+{
+  boot.zfs = {
+    devNodes = "/dev/";
+    forceImportRoot = false;
+    forceImportAll = false;
+    requestEncryptionCredentials = config.proesmans.facts.self.encryptedDisks;
+  };
+
+  boot.extraModprobeConfig = ''
+    # Fix the commit timeout (seconds), because the default has changed before
+    options zfs zfs_txg_timeout=5
+
+    # It defaults to 50% of total RAM, but we fix the amount of RAM used.
+    # 8 GiB (bytes)
+    options zfs zfs_arc_max=8589934592
+  '';
+
+  services.zfs = {
+    autoScrub.enable = true;
+    autoScrub.interval = "weekly";
+    trim.enable = true;
+  };
+
+  # @@ Disk rundown @@
+  #   - Partitions, root disk
+  #     - /boot
+  #     - [ZFS], pool zroot
+  #       - encryptionroot, native ZFS encryption
+  #         - / (root)
+  #         - /nix
+  #         - /var/cache
+  #         - /var/log
+  #         - /persist
+  #           - **
+  #
+  # ** ZFS datasets are optimized per application and mounted straight into the state directory location.
+
   disko.devices = {
     disk.main = {
       type = "disk";
@@ -17,75 +58,104 @@
               mountOptions = [ "umask=0077" ];
             };
           };
-          # NOTE; LUKS container
-          #     => contains Pyhysical Volume (PV [LVM])
-          #       => contains Volume Group (VG [LVM])
-          #         => contains logical volume/raw block device for swap writeback
-          #         => contains logical volume/ext4 filesystem for root filesystem
-          luks = {
+          # NOTE; ZFS pool
+          #   => contains encrypted dataset (zroot/encryptionroot)
+          #     => contains root filesystem
+          #     => contains nix filesystem (split on inode DOS)
+          #     => contains user data to replicate
+          #       SEEALSO; disko.devices.zpool.zroot.datasets
+          zfs = {
             size = "100%";
             content = {
-              type = "luks";
-              # Refer to this virtual block device by "/dev/mapper/crypted".
-              # Partitions within are named "/dev/mapper/cryptedN" with N being 1-indexed partition counter
-              name = "crypted";
-              extraFormatArgs = [
-                "--type luks2"
-                "--hash sha256"
-                "--pbkdf argon2i"
-                "--iter-time 10000" # 10 seconds before key-unlock
-                # Best performance according to cryptsetup benchmark
-                "--cipher aes-xts-plain64" # [cipher]-[mode]-[iv] format
-                # NOTE; I'm considering AES-128 (~126 bit randomness) secure with global (world) hashrate being less than
-                # 2^81 hashes per second.
-                "--key-size 256" # SPLITS IN TWO (xts) !!
-                "--use-urandom"
-              ];
-              # Generate and store a new key using;
-              # tr -dc '[:alnum:]' </dev/urandom | head -c64
-              #
-              # WARN; Path hardcoded in tasks.py !
-              passwordFile = "/tmp/deployment-luks.key"; # Path only used when formatting !
-              # askPassword = true;
-              settings.allowDiscards = true;
-              settings.bypassWorkqueues = true;
-              content = {
-                # NOTE; We're following the example here with LVM on top of LUKS.
-                # THE REASON IS BECAUSE OF SECTOR ALIGNMENT AND EXPECTATIONS ! LVM provides flexible sector sizes detached from
-                # underlying systems.
-                # Using GPT inside the LUKS container makes the situation complicated, I'm not grasping this entirely myself, but
-                # default sector sizes for GPT partition layouts is 512B and LUKS by default has a minimum sector size of 4096B (4K)
-                # and you cannot go below that sector size on top (sector size is the minimum addressable unit).
-                # For some reason the stage-1 environment doesn't like GPT sectors of 4096 bytes (in the current setup) and fails
-                # to load its partitions. There are no issues with 4K sectors on physical hard disks though.. /shrug
-                type = "lvm_pv";
-                vg = "pool";
-              };
+              type = "zfs";
+              pool = "zroot";
             };
           };
         };
       };
     };
-    lvm_vg = {
-      pool = {
-        type = "lvm_vg";
-        lvs = {
-          raw = {
-            # Refer to this partition by "/dev/pool/zram-backing-device"
-            name = "zram-backing-device";
-            size = "2G";
-          };
-          root = {
-            size = "100%";
-            content = {
-              type = "filesystem";
-              format = "ext4";
-              mountpoint = "/";
-              mountOptions = [ "defaults" ];
-            };
-          };
-        };
+    zpool.zroot = {
+      type = "zpool";
+      # NOTE; Single partition, in a single vdev, in pool
+      mode = "";
+      options.ashift = "12";
+      options.autotrim = "on";
+      rootFsOptions = {
+        canmount = "off";
+        mountpoint = "none";
+        # HELP; Doesn't require overwriting on sub-datasets unless for specific data optimization
+        compression = "zstd-fast-1";
+        acltype = "posixacl";
+        xattr = "sa";
+        # NOTE; Increase inode size, if ad-hoc necessary, from the default 512-byte
+        dnodesize = "auto";
+        # NOTE; Enable optimized access time writes
+        # HELP; Disable access time selectively per dataset
+        relatime = "on";
+        # NOTE; Make standard record size explicit
+        # NOTE; Within hard disk pools it's better to go for bigger recordsizes to optimize away the static seek time latency.
+        # But this _only_ improves the ratio of latency to retrieval bandwidth while increasing the average latency.
+        # HELP; Change record size per dataset, there are various online sources with information
+        # HELP; If application level caching is present, increase the recordsize
+        recordsize = "128K";
+        # NOTE; Compare filenames after normalizing using KC unicode conversion table. This turns characters into
+        # equivalent characters; fullwidth "Ａ" (U+FF21) -> "A" (U+0041) [lossy conversion!!]
+        # HELP; Do not overwrite unless good reason to
+        normalization = "formKC";
+        # NOTE; Enable record sizes larger than 128KiB
+        "org.open-zfs:large_blocks" = "enabled";
+        "com.sun:auto-snapshot" = "false";
+        # Restrict privilege elevation in both directions of host<->guest through file sharing.
+        devices = "off";
+        setuid = "off";
+        exec = "off";
       };
+
+      # Datasets are filesystems, those are defined in ./filesystems.nix for readability.
+      datasets = { };
     };
   };
+
+  # ## Enable the ZFS mount generator ##
+  #
+  # This makes sure that units are properly ordered if filesystem paths inside unitconfig "RequiresMountsFor" are pointing
+  # to ZFS datasets.
+  #
+  # REF; https://openzfs.github.io/openzfs-docs/man/master/8/zfs-mount-generator.8.html#EXAMPLES
+  # REF; https://github.com/NixOS/nixpkgs/issues/62644#issuecomment-1479523469
+
+  systemd.tmpfiles.settings."00-zfs-pre-fs" = {
+    # WARN; The systemd generator phase is early in the boot process, and should add units that order before local-fs!
+    # To properly work it should see all mounted pools, but those could not exist.
+    # Imperatively discovered, the pool import during stage-1 and stage-2 are not enough for the generator to work due to unknown
+    # reason.
+
+    # According to the referenced resource, event caching must be enabled on a per pool basis. Caching is enabled when a file exists
+    # at a hardcoded path.
+    "/etc/zfs/zfs-list.cache/storage".f = {
+      user = "root";
+      group = "root";
+      mode = "0644";
+    };
+  };
+
+  systemd.generators."zfs-mount-generator" =
+    "${config.boot.zfs.package}/lib/systemd/system-generator/zfs-mount-generator";
+  environment.etc."zfs/zed.d/history_event-zfs-list-cacher.sh".source =
+    "${config.boot.zfs.package}/etc/zfs/zed.d/history_event-zfs-list-cacher.sh";
+  systemd.services.zfs-mount.enable = false;
+
+  services.zfs.zed.settings.PATH = lib.mkForce (
+    lib.makeBinPath [
+      pkgs.diffutils
+      config.boot.zfs.package
+      pkgs.coreutils
+      pkgs.curl
+      pkgs.gawk
+      pkgs.gnugrep
+      pkgs.gnused
+      pkgs.nettools
+      pkgs.util-linux
+    ]
+  );
 }

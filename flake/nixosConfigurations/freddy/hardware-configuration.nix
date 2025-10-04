@@ -1,6 +1,7 @@
 {
   lib,
   modulesPath,
+  config,
   ...
 }:
 {
@@ -24,9 +25,20 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
-  boot.tmp.useTmpfs = false; # Only have 1G RAM
-  boot.tmp.cleanOnBoot = true;
+  boot.loader.timeout = 1;
+  boot.tmp.useTmpfs = true; # More than enough RAM
 
+  boot.initrd.systemd = {
+    enable = true;
+    emergencyAccess = false;
+    network.wait-online.enable = true;
+    network.wait-online.anyInterface = true;
+    # Configure interfaces during boot the same as while the host runs.
+    network.networks = config.systemd.network.networks;
+    network.links = config.systemd.network.links;
+  };
+
+  networking.hostId = config.proesmans.facts.self.hostId;
   networking.useDHCP = true;
   networking.useNetworkd = true;
 }
