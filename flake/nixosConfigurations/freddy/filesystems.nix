@@ -35,12 +35,12 @@
         # tr -dc '[:alnum:]' </dev/urandom | head -c64
         #
         # WARN; Path hardcoded in tasks.py !
-        keylocation = "/tmp/deployment-luks.key"; # Path only used when formatting !
+        keylocation = "file:///tmp/deployment-disk.key"; # Path only used when formatting !
         pbkdf2iters = "500000";
       };
       postCreateHook = ''
         # zfs set keylocation="<url[http://|file://]>" "<fully qualified dataset path>"
-        zfs set keylocation="prompt" "zroot/encryptedroot"
+        zfs set keylocation="prompt" "zroot/encryptionroot"
       '';
     };
 

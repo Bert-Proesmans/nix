@@ -31,11 +31,11 @@ DEV_KEY = FLAKE / "development.age"
 # If the target host URL contains any of these values, assume a local/fast connection between build- and target host
 LOCAL_TARGETS_MARKER = ["localhost", "127.0.0.1", "192.168.", ".internal.proesmans.eu"]
 
-# Generate and store a new key using;
+# Generate and store a new disk encryption key using;
 # tr -dc '[:alnum:]' </dev/urandom | head -c64
 #
 # WARN; Path hardcoded in DISKO configuration !
-REMOTE_LUKS_SECRET_PATH = "/tmp/deployment-luks.key"
+REMOTE_LUKS_SECRET_PATH = "/tmp/deployment-disk.key"
 
 
 def alert_finish():
