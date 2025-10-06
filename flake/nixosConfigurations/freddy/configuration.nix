@@ -6,10 +6,12 @@
 {
   imports = [
     ./boot-unlock.nix
+    ./certificates.nix
     ./disks.nix
     ./filesystems.nix
     ./hardware-configuration.nix
     ./remote-builder.nix
+    ./wiki.nix
   ];
 
   proesmans.internationalisation.be-azerty.enable = true;
