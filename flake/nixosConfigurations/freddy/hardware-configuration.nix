@@ -42,4 +42,6 @@
   networking.hostId = config.proesmans.facts.self.hostId;
   networking.useDHCP = true;
   networking.useNetworkd = true;
+
+  systemd.shutdownRamfs.enable = false;
 }
