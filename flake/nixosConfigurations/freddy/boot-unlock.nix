@@ -36,7 +36,9 @@ in
         enable = true;
         # To prevent ssh clients from freaking out because a different host key is used,
         # a different port for ssh is useful (assuming the same host has also a regular sshd running)
-        port = 2222;
+        #
+        # WARN; Port must be the same as defined in tasks.py:unlock()!
+        port = 23;
         hostKeys = [
           # Doesn't work for shit, weird documentation and general lack of affordance.
           # Key is provided out-of-band.

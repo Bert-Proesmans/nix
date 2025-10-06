@@ -419,6 +419,59 @@ def dev_rebuild(c: Any) -> None:
 
 
 @task
+# USAGE; invoke unlock freddy
+def unlock(c: Any, flake_attr: str) -> None:
+    print(f"Evaluating machine facts to find {flake_attr}..")
+    text_machines = subprocess.run(
+        [
+            "nix",
+            "eval",
+            "--json",
+            f"{FLAKE}#facts",
+            "--apply",
+            # ERROR; The evalModule system asserts when accessing a config value for unset option.
+            # Cannot use attrset.name [or expression] because v is a config object, not a plain attrset!
+            'builtins.mapAttrs (host: v: if (v.ipAddress != null) then v.ipAddress else "${host}.${v.domainName}")',
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+    ).stdout.strip()
+
+    machines = json.loads(text_machines)
+    ssh_connection_string = next(
+        (
+            host_name
+            for moniker, host_name in machines.items()
+            if flake_attr == moniker or host_name.startswith(flake_attr)
+        ),
+        None,
+    )
+
+    assert ssh_connection_string, """
+        There is no ssh moniker found for the provided hostname.
+        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+    """
+    subprocess.run(
+        [
+            "ssh",
+            # Disable storing host keys, the host key is dynamic
+            "-o",
+            "StrictHostKeyChecking=no",
+            # Skip verifying against known host keys, the host key is dynamic
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            # WARN; Hardcoded port in priviledged range
+            "-p",
+            "23",
+            # WARN; Assumed root user during boot phase-1
+            f"root@{ssh_connection_string}",
+        ],
+        check=True,
+    )
+
+
+@task
 # USAGE; invoke rebuild development
 def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     host_attr_path = (
@@ -426,12 +479,12 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     )
 
     if not yes:
-        print(f"Checking if host {flake_attr} builds..")
+        print(f"==Checking if host {flake_attr} builds==")
         subprocess.run(
             ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
         )
 
-    print(f"Evaluating machine facts to find {flake_attr}..")
+    print(f"==Evaluating machine facts to find {flake_attr}==")
     text_machines = subprocess.run(
         [
             "nix",
@@ -490,20 +543,31 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         check=True,
     )
 
-    print("Pinning host closure as garbage root (nix gcroot)")
-    # The machine builds and is deployed succesfully, pinning should always succeed
+    print("==Pinning host closure as garbage root (nix gcroot)==")
+    # The machine builds and is deployed succesfully, pinning should succeed IF we have the closure downloaded locally
+    realised_path_exec = subprocess.run(
+        ["nix", "path-info", host_attr_path], text=True, capture_output=True
+    )
+    if realised_path_exec != 0:
+        # There is no local copy of the system closure, build it first (implies copy to local system if remote-builder is used)..
+        subprocess.run(
+            ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
+        )
+        # ..then retry capturing the path of the built closure
+        realised_path_exec = subprocess.run(
+            ["nix", "path-info", host_attr_path],
+            check=True, # Fails if there is still no local copy
+            text=True,
+            capture_output=True,
+        )
+
     subprocess.run(
         [
             "nix-store",
             "--add-root",
             f"{CACHE_DIR}/{flake_attr}.pin",
             "--realise",
-            subprocess.run(
-                ["nix", "path-info", host_attr_path],
-                check=True,
-                text=True,
-                capture_output=True,
-            ).stdout.strip(),
+            realised_path_exec.stdout.strip(),
         ],
         check=True,
     )
