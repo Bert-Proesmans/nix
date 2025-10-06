@@ -58,6 +58,13 @@
         acltype = "off";
         atime = "off";
         relatime = "off";
+        # ERROR; Disko create/mount uses ZFS dataset properties while booting nix uses filesystem mount options
+        #
+        # ERROR; During deploy the error below pops up;
+        #        error: executing '/nix/store/<hash>-bash-5.3p3/bin/bash': Permission denied
+        # Permission denied because noexec is enabled on the mount!
+        # The workaround is to re-enable exec on this dataset
+        exec = "on";
       };
       mountpoint = "/nix";
       mountOptions = [
