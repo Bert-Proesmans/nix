@@ -196,7 +196,7 @@ def deploy(
     host_configuration_dir = FLAKE / "nixosConfigurations" / hostname
     encrypted_file = host_configuration_dir / decryptor_encrypted_filename_default()
     # Development host is x86, but these systems are aarch64!
-    mismatched_architecture = hostname in ['freddy']
+    mismatched_architecture = hostname in ["freddy"]
 
     assert host_configuration_dir.is_dir(), f"""
         There is no configuration folder found for host {hostname}.
@@ -479,12 +479,12 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
     )
 
     if not yes:
-        print(f"==Checking if host {flake_attr} builds==")
+        print(f"== Checking if host {flake_attr} builds ==")
         subprocess.run(
             ["nix-fast-build", "--flake", host_attr_path, "--no-link"], check=True
         )
 
-    print(f"==Evaluating machine facts to find {flake_attr}==")
+    print(f"== Evaluating machine facts to find {flake_attr} ==")
     text_machines = subprocess.run(
         [
             "nix",
@@ -543,7 +543,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         check=True,
     )
 
-    print("==Pinning host closure as garbage root (nix gcroot)==")
+    print("== Pinning host closure as garbage root (nix gcroot) ==")
     # The machine builds and is deployed succesfully, pinning should succeed IF we have the closure downloaded locally
     realised_path_exec = subprocess.run(
         ["nix", "path-info", host_attr_path], text=True, capture_output=True
@@ -556,7 +556,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         # ..then retry capturing the path of the built closure
         realised_path_exec = subprocess.run(
             ["nix", "path-info", host_attr_path],
-            check=True, # Fails if there is still no local copy
+            check=True,  # Fails if there is still no local copy
             text=True,
             capture_output=True,
         )
