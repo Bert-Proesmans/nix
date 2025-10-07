@@ -37,8 +37,9 @@ in
       # echo "base64:$(head -c 32 /dev/urandom | base64)"
       APP_KEY_FILE = config.sops.secrets.bookstack-key-file.path;
       #
-      DB_HOST = "unix(${databaseSocket})";
+      # DB_HOST = "";
       # DB_PORT = "";
+      DB_SOCKET = databaseSocket;
       DB_DATABASE = bookstackUser;
       DB_USERNAME = bookstackUser;
       # DB_PASSWORD_FILE = "";
@@ -98,14 +99,18 @@ in
     };
 
     nginx = {
-      forceSSL = true;
+      onlySSL = true;
       useACMEHost = "omega.proesmans.eu";
     };
   };
 
+  systemd.services.bookstack-setup = {
+    after = [ "mysql.service" ];
+  };
+
   services.nginx.virtualHosts = {
     "wiki.proesmans.eu" = {
-      forceSSL = true;
+      onlySSL = true;
       useACMEHost = "omega.proesmans.eu";
       globalRedirect = "omega.wiki.proesmans.eu";
     };

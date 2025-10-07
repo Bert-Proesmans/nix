@@ -15,11 +15,12 @@
     "haproxy"
   ];
 
-  # security.acme = {
-  #   certs."omega.proesmans.eu".group = "haproxy";
-  #   certs."omega.proesmans.eu".reloadServices = [ config.systemd.services.haproxy.name ];
-  # };
+  security.acme = {
+    certs."omega.proesmans.eu".group = "nginx";
+    certs."omega.proesmans.eu".reloadServices = [ config.systemd.services.nginx.name ];
+  };
 
+  # NOTE; Haproxy only does TLS muxing, it's not serving sites. Nginx is serving sites.
   services.haproxy =
     let
       # NOT YET
@@ -105,25 +106,24 @@
             lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
               [ upstream.local-nginx.hostname ] ++ upstream.local-nginx.aliases
             )
-          }}
+          } }
           
           # anything else → drop
-          default_backend drop_connection
+        #   default_backend drop_connection
 
-        backend drop_connection
-          description drop unmatched tls connections
-          mode tcp
-          # immediately close on connect
-          tcp-request connection reject
+        # backend drop_connection
+        #   description drop unmatched tls connections
+        #   mode tcp
+        #   # immediately close on connect
+        #   tcp-request connection reject
 
         backend passthrough_local_nginx
-          description raw tcp passthrough without(?) proxy protocol
+          description raw tcp passthrough with proxy protocol v1 (nginx community doesn\'t support v2)
           mode tcp
-          server local_nginx unix@${upstream.local-nginx.server} check
+          server local_nginx unix@${upstream.local-nginx.server} check send-proxy
       '';
     };
 
-  # NOTE; Haproxy only does TLS muxing, it's not serving sites. Nginx is serving sites.
   services.nginx = {
     enable = true;
     package = pkgs.nginxMainline;
@@ -132,20 +132,20 @@
     recommendedProxySettings = true;
     recommendedGzipSettings = true;
     recommendedBrotliSettings = true;
-    sslDhparam = config.security.dhparams.params.haproxy.path;
+    sslDhparam = config.security.dhparams.params.nginx.path;
 
     defaultListen = [
       {
         addr = "unix:/run/nginx-sockets/virtualhosts.sock";
         port = null;
-        ssl = false;
+        ssl = true;
+        proxyProtocol = true;
       }
     ];
 
     virtualHosts = {
       "default" = {
         default = true;
-        rejectSSL = true;
         locations."/".return = "404";
       };
     };

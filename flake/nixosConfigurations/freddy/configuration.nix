@@ -11,6 +11,7 @@
     ./filesystems.nix
     ./hardware-configuration.nix
     ./remote-builder.nix
+    ./tls-termination.nix
     ./wiki.nix
   ];
 
