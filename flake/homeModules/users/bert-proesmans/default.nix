@@ -68,14 +68,20 @@
   };
 
   programs.ssh.enable = true;
-  programs.ssh.hashKnownHosts = true;
-  programs.ssh.forwardAgent = false;
+  programs.ssh.enableDefaultConfig = false;
   programs.ssh.matchBlocks =
     let
       inherit (nixosConfig.networking) hostName;
       other-facts = lib.filterAttrs (k: _v: k != "self" && k != hostName) nixosConfig.proesmans.facts;
+
+      defaultSSHConfig = {
+        hashKnownHosts = false;
+        forwardAgent = false;
+      };
     in
-    lib.mapAttrs (k: v: { hostname = v.ipAddress or "${k}.${v.domainName}"; }) other-facts;
+    lib.mapAttrs (
+      k: v: defaultSSHConfig // { hostname = v.ipAddress or "${k}.${v.domainName}"; }
+    ) other-facts;
 
   programs.atuin.enable = true;
   programs.atuin.settings = {
