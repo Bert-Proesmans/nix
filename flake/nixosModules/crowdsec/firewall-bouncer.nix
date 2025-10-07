@@ -45,9 +45,7 @@ in
     systemd.targets.crowdsec = {
       description = lib.mkDefault "Crowdsec";
       wantedBy = [ "multi-user.target" ];
-      requires = [
-        "crowdsec-firewall-bouncer.service"
-      ];
+      requires = [ config.systemd.services.crowdsec-firewall-bouncer.name ];
     };
 
     systemd.services.crowdsec-firewall-bouncer =
@@ -55,6 +53,24 @@ in
         runtime-config-path = "/run/crowdsec-firewall-bouncer/config.yaml";
       in
       {
+        partOf = [ config.systemd.targets.crowdsec.name ];
+
+        wants =
+          (lib.optionals (config.systemd.services.crowdsec.enable) [
+            config.systemd.services.crowdsec.name
+          ])
+          ++ (lib.optionals (config.systemd.services.crowdsec-lapi-setup.enable) [
+            config.systemd.services.crowdsec-lapi-setup.name
+          ]);
+
+        after =
+          (lib.optionals (config.systemd.services.crowdsec.enable) [
+            config.systemd.services.crowdsec.name
+          ])
+          ++ (lib.optionals (config.systemd.services.crowdsec-lapi-setup.enable) [
+            config.systemd.services.crowdsec-lapi-setup.name
+          ]);
+
         serviceConfig = {
           RuntimeDirectory = [ "crowdsec-firewall-bouncer" ];
           RuntimeDirectoryMode = "0700";

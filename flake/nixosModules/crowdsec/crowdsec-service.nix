@@ -167,19 +167,17 @@ in
     systemd.targets.crowdsec = {
       description = lib.mkDefault "Crowdsec";
       wantedBy = [ "multi-user.target" ];
-      requires = [
-        "crowdsec.service"
-      ]
-      ++ (lib.optionals (config.systemd.services.crowdsec-lapi-setup.enable) [
-        "crowdsec-lapi-setup.service"
-      ]);
+      requires = [ config.systemd.services.crowdsec.name ];
+      wants = lib.optionals (config.systemd.services.crowdsec-lapi-setup.enable) [
+        config.systemd.services.crowdsec-lapi-setup.name
+      ];
     };
 
     systemd.services.crowdsec-update-hub = {
       enable = cfg.autoUpdateService;
       # NOTE; Reload configuration is disabled upstream due to database connection leaks
       # NOTE; Must restart as root, because service is running as low priviliged user (crowdsec)
-      serviceConfig.ExecStartPost = lib.mkForce "+systemctl restart crowdsec.service";
+      serviceConfig.ExecStartPost = lib.mkForce "+systemctl restart crowdsec.target";
     };
 
     systemd.services.crowdsec = {

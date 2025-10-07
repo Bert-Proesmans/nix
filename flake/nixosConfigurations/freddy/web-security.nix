@@ -86,6 +86,8 @@ in
       general = {
         api.server.enable = true;
         api.server.listen_uri = "0.0.0.0:10124";
+        # ERROR; Must set path to R/W location to dynamically update console properties at registration
+        api.server.console_path = (lib.strings.normalizePath "${stateDir}/console.yaml");
         prometheus.enabled = false;
         cscli.output = "human";
       };
