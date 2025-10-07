@@ -58,6 +58,7 @@ in
 
         services.openssh.enable = lib.mkDefault true;
         services.openssh.settings.PasswordAuthentication = lib.mkDefault false;
+        services.openssh.settings.PermitRootLogin = lib.mkDefault "no";
         services.openssh.hostKeys = [
           {
             path = "/etc/ssh/ssh_host_ed25519_key";
