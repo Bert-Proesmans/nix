@@ -12,6 +12,7 @@
     ./hardware-configuration.nix
     ./remote-builder.nix
     ./tls-termination.nix
+    ./web-security.nix
     ./wiki.nix
   ];
 

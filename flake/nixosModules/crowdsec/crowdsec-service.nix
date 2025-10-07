@@ -23,6 +23,13 @@ let
 in
 {
   options.services.crowdsec = {
+    cscliPackage = lib.mkOption {
+      type = lib.types.package;
+      default = cscli;
+      description = "The package with binary to invoke the crowdsec CLI";
+      readOnly = true;
+    };
+
     sensors = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule (
