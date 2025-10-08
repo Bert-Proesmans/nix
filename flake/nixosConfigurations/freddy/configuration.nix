@@ -7,6 +7,7 @@
   imports = [
     ./boot-unlock.nix
     ./certificates.nix
+    ./database.nix
     ./disks.nix
     ./filesystems.nix
     ./hardware-configuration.nix

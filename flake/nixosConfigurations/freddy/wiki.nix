@@ -16,8 +16,6 @@ in
   # sops.secrets.bookstack-oidc-secret.owner = config.services.bookstack.user;
 
   services.mysql = {
-    enable = true;
-    package = pkgs.mariadb;
     ensureDatabases = [ bookstackUser ];
     ensureUsers = [
       {
