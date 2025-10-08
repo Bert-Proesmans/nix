@@ -142,5 +142,47 @@
     #   # Optional dataset configuration here
     #   # };
     # };
+
+    "encryptionroot/mysql" = {
+      # NOTE; Base dataset for storage data managed by a mysql database server.
+      type = "zfs_fs";
+      options = {
+        canmount = "off";
+        mountpoint = "none";
+        atime = "off";
+
+        # Performance notes for mysql itself;
+        #   - Disable database checksumming
+        #   - Disable double-write
+
+        # Mysql page size is fixed 16K (hardcoded).
+        # The recordsize is set to match the application because we're using virtual disks.
+        recordsize = "16K";
+        # Assumes all mysql state fits in RAM, so no double caching of data files.
+        # Caches metadata for lower latency retrieval of non-cached records.
+        primarycache = "metadata";
+        # No fragmented writes from ZIL to data pool
+        logbias = "latency";
+      };
+    };
+
+    "encryptionroot/sqlite" = {
+      # NOTE; Base dataset for storage data managed by a sqlite database program.
+      type = "zfs_fs";
+      options = {
+        canmount = "off";
+        mountpoint = "none";
+        atime = "off";
+
+        # Performance notes for sqlite itself;
+        #   - Set page size to 64KiB
+        # SEEALSO; dataset options for postgres
+
+        recordsize = "64K";
+        primarycache = "metadata";
+        logbias = "latency";
+      };
+    };
+
   };
 }

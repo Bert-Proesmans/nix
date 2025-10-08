@@ -19,6 +19,13 @@
     # It defaults to 50% of total RAM, but we fix the amount of RAM used.
     # 8 GiB (bytes)
     options zfs zfs_arc_max=8589934592
+
+    # Disable prefetcher. Zfs could proactively read data expecting inflight, or future requests, into the ARC.
+    # This system has a cloud drive with ~low IOPS, including high random access load from databases.
+    # I choose to not introduce additional I/O latency when the potential for random access is high!
+    #
+    # HELP; Re-enable prefetch on system with fast pools (like full ssd-array)
+    options zfs zfs_prefetch_disable=1
   '';
 
   services.zfs = {
@@ -102,6 +109,8 @@
         # equivalent characters; fullwidth "Ａ" (U+FF21) -> "A" (U+0041) [lossy conversion!!]
         # HELP; Do not overwrite unless good reason to
         normalization = "formKC";
+        # Pool consists of virtual storage, so we're not considering negative ZIL or double write effects.
+        logbias = "throughput";
         # NOTE; Enable record sizes larger than 128KiB
         "org.open-zfs:large_blocks" = "enabled";
         "com.sun:auto-snapshot" = "false";
@@ -131,8 +140,8 @@
     # reason.
 
     # According to the referenced resource, event caching must be enabled on a per pool basis. Caching is enabled when a file exists
-    # at a hardcoded path.
-    "/etc/zfs/zfs-list.cache/storage".f = {
+    # at a hardcoded path _with the poolname as filename_.
+    "/etc/zfs/zfs-list.cache/zroot".f = {
       user = "root";
       group = "root";
       mode = "0644";
