@@ -72,6 +72,7 @@ in
       postgresStatePath
       postgresWalPath
     ];
+
     serviceConfig = {
       StateDirectory =
         assert postgresStatePath == "/var/lib/postgresql";
@@ -83,6 +84,7 @@ in
           "postgresql-wal"
           "postgresql-wal/${postgresSchemaVersion}"
         ];
+      StateDirectoryMode = "0700";
     };
   };
 }
