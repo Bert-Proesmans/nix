@@ -96,7 +96,8 @@
         outline = import ./overlays/outline/default.nix;
         haproxy-build-fix = _final: previous: {
           # The Haproxy recipe currently applies fixes for a CVE twice.
-          # TODO; Remove the overlay once recipe has been fixed.
+          # TODO; Remove the overlay once PR lands on nixos-unstable.
+          # REF; https://github.com/NixOS/nixpkgs/pull/449347 # <-- this PR
           # REF; https://github.com/NixOS/nixpkgs/pull/448677#issuecomment-3378349488
           haproxy = previous.haproxy.overrideAttrs (old: {
             patches = [ ];
