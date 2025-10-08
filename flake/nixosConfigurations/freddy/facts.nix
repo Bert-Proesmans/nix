@@ -9,4 +9,5 @@
     "vps"
   ];
   encryptedDisks = true;
+  services."100.106.207.116".tags = [ "tailscale" ];
 }

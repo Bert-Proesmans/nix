@@ -11,6 +11,7 @@
     ./disks.nix
     ./filesystems.nix
     ./hardware-configuration.nix
+    ./private-network.nix
     ./remote-builder.nix
     ./tls-termination.nix
     ./web-security.nix
