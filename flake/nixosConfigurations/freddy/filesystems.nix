@@ -35,7 +35,8 @@
         # tr -dc '[:alnum:]' </dev/urandom | head -c64
         #
         # WARN; Path hardcoded in tasks.py !
-        keylocation = "file:///tmp/deployment-disk.key"; # Path only used when formatting !
+        # keylocation = "file:///tmp/deployment-disk.key"; # Path only used when formatting !
+        keylocation = "prompt";
         pbkdf2iters = "500000";
       };
       postCreateHook = ''
