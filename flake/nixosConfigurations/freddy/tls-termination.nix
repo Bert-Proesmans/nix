@@ -133,6 +133,14 @@
     recommendedGzipSettings = true;
     recommendedBrotliSettings = true;
     sslDhparam = config.security.dhparams.params.nginx.path;
+    appendHttpConfig = ''
+      # Enable access logging for crowdsec
+      access_log syslog:server=unix:/dev/log;
+
+      # trust proxy protocol and correctly represent client IP
+      set_real_ip_from unix:;
+      real_ip_header proxy_protocol;
+    '';
 
     defaultListen = [
       {

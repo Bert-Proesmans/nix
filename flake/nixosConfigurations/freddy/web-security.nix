@@ -41,10 +41,16 @@ in
           journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
           labels.type = "ssh";
         })
+        # WARN; Haproxy sees no traffic because it's a TLS mux
+        # ({
+        #   source = "journalctl";
+        #   journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
+        #   labels.type = "haproxy";
+        # })
         ({
           source = "journalctl";
-          journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
-          labels.type = "haproxy";
+          journalctl_filter = [ "_SYSTEMD_UNIT=nginx.service" ];
+          labels.type = "nginx";
         })
       ];
 
@@ -70,7 +76,8 @@ in
     hub = {
       collections = [
         "crowdsecurity/linux"
-        "crowdsecurity/haproxy"
+        # "crowdsecurity/haproxy" # Sees no traffic
+        "crowdsecurity/nginx"
       ];
       scenarios = [ ];
       parsers = [ ];
