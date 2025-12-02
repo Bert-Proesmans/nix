@@ -4,13 +4,9 @@
   ...
 }:
 let
-  # NOTE; sudo -u crowdsec cscli lapi register --url 'http://buddy.tailaac73.ts.net'
-  controller-url-crowdsec = lib.pipe config.proesmans.facts.freddy.services [
-    # Want the service endpoint over tailscale
-    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
-    (lib.mapAttrsToList (ip: _: "http://${ip}:10124"))
-    (lib.flip builtins.elemAt 0)
-  ];
+  freddy = config.proesmans.facts.freddy;
+  # NOTE; sudo -u crowdsec cscli lapi register --url '<uri>'
+  controller-url-crowdsec = freddy.service.crowdsec-lapi.uri freddy.host.tailscale.address;
 in
 {
   sops.secrets."02-fart-sensor-crowdsec-key" = { };
@@ -98,10 +94,9 @@ in
   services.crowdsec-firewall-bouncer = {
     # NOTE; Setup as remote bouncer
     enable = true;
+    # NOTE; ROOT ownership is OK due to SystemD LoadCredential.
+    secrets.apiKeyPath = config.sops.secrets."02-fart-bouncer-crowdsec-key".path;
     settings = {
-      api_key = {
-        _secret = config.sops.secrets."02-fart-bouncer-crowdsec-key".path;
-      };
       api_url = controller-url-crowdsec;
       log_mode = "stdout";
       update_frequency = "10s";

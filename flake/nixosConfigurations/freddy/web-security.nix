@@ -169,11 +169,9 @@ in
 
   services.crowdsec-firewall-bouncer = {
     enable = true;
+    # NOTE; ROOT ownership is OK due to SystemD LoadCredential.
+    secrets.apiKeyPath = config.sops.secrets."local-bouncer-crowdsec-key".path;
     settings = {
-      api_key = {
-        # NOTE; Service runs as root so has access to the key regardless of ownership(?)
-        _secret = config.sops.secrets."local-bouncer-crowdsec-key".path;
-      };
       api_url = crowdsec-lapi.uri "127.0.0.1";
       log_mode = "stdout";
       update_frequency = "10s";

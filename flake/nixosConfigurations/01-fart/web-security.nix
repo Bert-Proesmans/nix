@@ -5,7 +5,7 @@
 }:
 let
   freddy = config.proesmans.facts.freddy;
-  # NOTE; sudo -u crowdsec cscli lapi register --url 'http://buddy.tailaac73.ts.net'
+  # NOTE; sudo -u crowdsec cscli lapi register --url '<uri>'
   controller-url-crowdsec = freddy.service.crowdsec-lapi.uri freddy.host.tailscale.address;
 in
 {
@@ -73,10 +73,9 @@ in
   services.crowdsec-firewall-bouncer = {
     # NOTE; Setup as remote bouncer
     enable = true;
+    # NOTE; ROOT ownership is OK due to SystemD LoadCredential.
+    secrets.apiKeyPath = config.sops.secrets."01-fart-bouncer-crowdsec-key".path;
     settings = {
-      api_key = {
-        _secret = config.sops.secrets."01-fart-bouncer-crowdsec-key".path;
-      };
       api_url = controller-url-crowdsec;
       log_mode = "stdout";
       update_frequency = "10s";
