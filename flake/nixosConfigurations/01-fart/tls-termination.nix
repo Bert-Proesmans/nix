@@ -22,7 +22,7 @@ in
         # Always forward these domains to buddy
         aliases = [ ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-        server = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}"; # Tailscale forward
+        server = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}";
       };
       upstream.pictures = {
         # NOTE; Upstream is local varnish webcache
