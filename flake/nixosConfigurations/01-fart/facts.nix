@@ -1,11 +1,16 @@
 { ... }:
 {
-  ipAddress = "158.101.202.58";
-  # IPv6 not handled currently
+  hostName = "01-fart";
   domainName = "omega.proesmans.eu";
+  encryptedDisks = true;
   tags = [
     "fart"
   ];
-  encryptedDisks = true;
-  services."100.127.116.49".tags = [ "tailscale" ];
+
+  # hardware = {};
+
+  host.global.address = "158.101.202.58";
+  host.tailscale.address = "100.127.116.49";
+
+  ## FREEFORM ##
 }

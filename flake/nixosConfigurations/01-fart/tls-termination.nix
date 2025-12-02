@@ -1,11 +1,6 @@
 { lib, config, ... }:
 let
-  buddy-tailscale-ip = lib.pipe config.proesmans.facts.buddy.services [
-    # Want the service endpoint over tailscale
-    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
-    (lib.mapAttrsToList (ip: _: ip))
-    (lib.flip builtins.elemAt 0)
-  ];
+  buddy = config.proesmans.facts.buddy;
 in
 {
   networking.firewall.allowedTCPPorts = [
@@ -27,7 +22,7 @@ in
         # Always forward these domains to buddy
         aliases = [ ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-        server = "${buddy-tailscale-ip}:443"; # Tailscale forward
+        server = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}"; # Tailscale forward
       };
       upstream.pictures = {
         # NOTE; Upstream is local varnish webcache

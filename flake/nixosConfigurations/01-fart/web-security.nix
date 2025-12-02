@@ -4,13 +4,9 @@
   ...
 }:
 let
+  freddy = config.proesmans.facts.freddy;
   # NOTE; sudo -u crowdsec cscli lapi register --url 'http://buddy.tailaac73.ts.net'
-  controller-url-crowdsec = lib.pipe config.proesmans.facts.freddy.services [
-    # Want the service endpoint over tailscale
-    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
-    (lib.mapAttrsToList (ip: _: "http://${ip}:10124"))
-    (lib.flip builtins.elemAt 0)
-  ];
+  controller-url-crowdsec = freddy.service.crowdsec-lapi.uri freddy.host.tailscale.address;
 in
 {
   sops.secrets."01-fart-sensor-crowdsec-key" = { };

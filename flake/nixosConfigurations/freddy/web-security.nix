@@ -5,9 +5,7 @@
   ...
 }:
 let
-  localAPIUrl =
-    assert config.services.crowdsec.settings.general.api.server.listen_uri == "0.0.0.0:10124";
-    "http://127.0.0.1:10124";
+  inherit (config.proesmans.facts.self.service) crowdsec-lapi;
 
   # Hardcoded upstream
   rootDir = "/var/lib/crowdsec";
@@ -92,7 +90,7 @@ in
     settings = {
       general = {
         api.server.enable = true;
-        api.server.listen_uri = "0.0.0.0:10124";
+        api.server.listen_uri = "0.0.0.0:${toString crowdsec-lapi.port}";
         # ERROR; Must set path to R/W location to dynamically update console properties at registration
         api.server.console_path = (lib.strings.normalizePath "${stateDir}/console.yaml");
         prometheus.enabled = false;
@@ -176,7 +174,7 @@ in
         # NOTE; Service runs as root so has access to the key regardless of ownership(?)
         _secret = config.sops.secrets."local-bouncer-crowdsec-key".path;
       };
-      api_url = localAPIUrl;
+      api_url = crowdsec-lapi.uri "127.0.0.1";
       log_mode = "stdout";
       update_frequency = "10s";
     };
