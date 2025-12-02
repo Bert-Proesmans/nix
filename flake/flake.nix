@@ -6,7 +6,7 @@
 
   inputs = {
     nixpkgs.follows = "nixpkgs-unstable";
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.05";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # WARN; Seems like everybody is using flake-utils, but this dependency does not bring anything
@@ -36,9 +36,6 @@
     nix-topology.url = "github:oddlama/nix-topology";
     nix-topology.inputs.nixpkgs.follows = "nixpkgs";
     nix-topology.inputs.flake-utils.follows = "flake-utils";
-    crowdsec.url = "git+https://codeberg.org/kampka/nix-flake-crowdsec.git";
-    crowdsec.inputs.nixpkgs.follows = "nixpkgs";
-    crowdsec.inputs.flake-utils.follows = "flake-utils";
   };
 
   outputs =
