@@ -84,7 +84,8 @@ in
           "postgresql-wal"
           "postgresql-wal/${postgresSchemaVersion}"
         ];
-      StateDirectoryMode = "0700";
+      # NOTE(2025-12-02); I don't remember why I set this explicitly, causes conflicting definition now.
+      # StateDirectoryMode = "0700";
     };
   };
 }

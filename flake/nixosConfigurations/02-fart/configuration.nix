@@ -7,7 +7,7 @@
     ./certificates.nix
     ./disks.nix
     ./hardware-configuration.nix
-    ./identity.nix
+    #./identity.nix
     ./memory-handling.nix
     ./monitor.nix
     ./private-network.nix
