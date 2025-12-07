@@ -127,15 +127,10 @@
 
   programs.git = {
     enable = true;
-    userName = "Bert Proesmans";
-    userEmail = "bproesmans@hotmail.com";
 
-    delta.enable = true;
-    delta.options = {
-      interactive.keep-plus-minus-markers = false;
-    };
-
-    extraConfig = {
+    settings = {
+      user.name = "Bert Proesmans";
+      user.email = "bproesmans@hotmail.com";
       log.date = "iso";
       init.defaultBranch = "master";
       commit.verbose = true;
@@ -201,6 +196,14 @@
       "debug/"
       "target/"
     ];
+  };
+
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
+    options = {
+      interactive.keep-plus-minus-markers = false;
+    };
   };
 
   editorconfig.enable = true;
