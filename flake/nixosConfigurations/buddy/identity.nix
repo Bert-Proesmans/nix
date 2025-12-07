@@ -137,7 +137,7 @@ in
           # Renew certificate manually using command; kanidmd renew-replication-certificate
           #
           # NOTE; Hopefully the replication coordinator feature is finished soon!
-          consumer_cert = "<TODO>";
+          consumer_cert = "MIIB9jCCAZygAwIBAgIBATAKBggqhkjOPQQDAjBMMRswGQYDVQQKDBJLYW5pZG0gUmVwbGljYXRpb24xLTArBgNVBAMMJDRhOTAyYzQxLWQwZGMtNGFmYy05Mzk4LWVlNjU1MzVhNDkwYzAeFw0yNTEyMDcyMTQwMjZaFw0yOTEyMDcyMTQwMjZaMEwxGzAZBgNVBAoMEkthbmlkbSBSZXBsaWNhdGlvbjEtMCsGA1UEAwwkNGE5MDJjNDEtZDBkYy00YWZjLTkzOTgtZWU2NTUzNWE0OTBjMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQrDNQOF2bGUqHSoLMERd-ik2lNVCAN61bIdtL5ZGBjsFd6U7Dj6eKHU-7UUPsIuodh1-ZaO9ay6sYG3NijDj8qNvMG0wDAYDVR0TAQH_BAIwADAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB0GA1UdDgQWBBTaOaPuXmtLDTJVv--VYBiQr9gHCTAPBgNVHREECDAGhwRkas90MAoGCCqGSM49BAMCA0gAMEUCIQDTbD5-yuqI4El3afCKy7afZAyE_GTfKqe_ePapEm6DXgIgfs99olCFJUaxjdiGi5POl7MWGJ_bTgnHS__i-wI-gvo=";
         };
       };
     };

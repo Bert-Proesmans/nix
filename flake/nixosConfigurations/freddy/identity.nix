@@ -1,4 +1,9 @@
-{ ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   replication-origin = builtins.mapAttrs (
     _: fact: fact.service.kanidm-replication.uri fact.host.tailscale.address
@@ -19,7 +24,7 @@ in
     # WARN; Setting http_client_address_info requires settings format version 2+
     serverSettings.version = "2";
     serverSettings = {
-      bindaddress = "127.204.0.1:8443";
+      bindaddress = "127.0.0.1:8443";
       # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       # ERROR; These hostnames cannot be used as web resources under the openid specification
       # NOTE; These hostnames can be used as web resources under the webauthn+cookies specification
@@ -55,7 +60,7 @@ in
           # Renew certificate manually using command; kanidmd renew-replication-certificate
           #
           # NOTE; Hopefully the replication coordinator feature is finished soon!
-          supplier_cert = "<TODO>";
+          supplier_cert = "MIIB9jCCAZygAwIBAgIBATAKBggqhkjOPQQDAjBMMRswGQYDVQQKDBJLYW5pZG0gUmVwbGljYXRpb24xLTArBgNVBAMMJGE5Yzc5NThiLWRkNmEtNDI0YS05MTkzLWMzMmM1MGU1MmEyMzAeFw0yNTA5MTgwOTEyNTlaFw0yOTA5MTgwOTEyNTlaMEwxGzAZBgNVBAoMEkthbmlkbSBSZXBsaWNhdGlvbjEtMCsGA1UEAwwkYTljNzk1OGItZGQ2YS00MjRhLTkxOTMtYzMyYzUwZTUyYTIzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHF26qqDTEiNslJCum36ALaz-59UbrbpUxdTnxPzSEsQg59LXALvOyMq6ri_Cs8-SL4-MOFimiyWWsYXigxylMqNvMG0wDAYDVR0TAQH_BAIwADAOBgNVHQ8BAf8EBAMCBaAwHQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB0GA1UdDgQWBBTaOaPuXmtLDTJVv--VYBiQr9gHCTAPBgNVHREECDAGhwRkdFQdMAoGCCqGSM49BAMCA0gAMEUCIQCLgHEOzUa6In7Arqdx5wbv2YR4aANsTo7FCQHiHYdvsAIgNPj8qPQe4cYhZTFqj1NHKvy6Wd7tDDZ5qrFJn4aZZB0=";
           # How to resolve local database conflicts
           # true: partner changes win in conflict
           #
