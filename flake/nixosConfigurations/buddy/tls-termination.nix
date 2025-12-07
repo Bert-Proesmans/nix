@@ -240,7 +240,10 @@
           description raw tcp/tls passthrough for kanidm with proxy protocol
           mode tcp
           # client → haproxy(:443) → 127.204.0.1:8443 (send PROXY v2 as required by Kanidm)
-          server idm ${upstream.idm.server} send-proxy-v2 check
+          # WARN; Explicitly enable ssl verification during check to prevent logspam (logged) at kanidm
+          option tcp-check
+          tcp-check send QUIT\r\n
+          server idm ${upstream.idm.server} send-proxy-v2 check check-ssl verify none
       '';
     };
 

@@ -19,7 +19,7 @@ in
   services.kanidm = {
     enableServer = true;
     enableClient = true;
-    package = pkgs.kanidm_1_7;
+    package = pkgs.kanidm_1_8;
 
     # WARN; Setting http_client_address_info requires settings format version 2+
     serverSettings.version = "2";

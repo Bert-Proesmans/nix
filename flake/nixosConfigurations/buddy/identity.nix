@@ -96,12 +96,12 @@ in
   services.kanidm = {
     enableServer = true;
     enableClient = true;
-    package = pkgs.kanidm_1_7.withSecretProvisioning;
+    package = pkgs.kanidm_1_8.withSecretProvisioning;
 
     # WARN; Setting http_client_address_info requires settings format version 2+
     serverSettings.version = "2";
     serverSettings = {
-      bindaddress = "127.204.0.1:8443";
+      bindaddress = "127.0.0.1:8443";
       # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       # ERROR; These hostnames cannot be used as web resources under the openid specification
       # NOTE; These hostnames can be used as web resources under the webauthn+cookies specification
