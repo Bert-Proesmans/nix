@@ -1,11 +1,6 @@
 { lib, config, ... }:
 let
-  buddy-tailscale-ip = lib.pipe config.proesmans.facts.buddy.services [
-    # Want the service endpoint over tailscale
-    (lib.filterAttrs (_ip: v: builtins.elem "tailscale" v.tags))
-    (lib.mapAttrsToList (ip: _: ip))
-    (lib.flip builtins.elemAt 0)
-  ];
+  buddy-tailscale-ip = config.proesmans.facts.buddy.host.tailscale.address;
 
   # Hardcoded upstream
   statePath = "/var/lib/gatus";
