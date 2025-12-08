@@ -32,6 +32,8 @@
       extraDomainNames = lib.mkForce [
         "wiki.proesmans.eu"
         "omega.wiki.proesmans.eu"
+        "passwords.proesmans.eu"
+        "omega.passwords.proesmans.eu"
       ];
     };
   };

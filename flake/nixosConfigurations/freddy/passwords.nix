@@ -7,7 +7,7 @@ let
   vaultwardenStatePath = "/var/lib/bitwarden_rs";
 in
 {
-  disko.devices.zpool.storage.datasets."sqlite/vaultwarden" = {
+  disko.devices.zpool.zroot.datasets."encryptionroot/sqlite/vaultwarden" = {
     type = "zfs_fs";
     # WARN; To be backed up !
     options.mountpoint = vaultwardenStatePath;
@@ -25,8 +25,9 @@ in
   sops.templates."sensitive-vaultwarden.env" = {
     owner = "vaultwarden";
     restartUnits = [ config.systemd.services."vaultwarden".name ];
+    # ${config.sops.placeholder."password-smtp"}
     content = ''
-      SMTP_PASSWORD = ${config.sops.placeholder."password-smtp"}
+      SMTP_PASSWORD = 
       PUSH_INSTALLATION_ID = ${config.sops.placeholder.id-installation-bitwarden}
       PUSH_INSTALLATION_KEY = ${config.sops.placeholder.key-installation-bitwarden}
     '';
@@ -41,7 +42,7 @@ in
     # Sensitive values must be loaded into the service using a secure environment file.
     environmentFile = config.sops.templates."sensitive-vaultwarden.env".path;
     config = {
-      ROCKET_ADDRESS = "127.99.66.1";
+      ROCKET_ADDRESS = "127.0.0.1";
       ROCKET_PORT = 8222;
       IP_HEADER = "X-Forwarded-For";
 
@@ -56,7 +57,7 @@ in
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
 
-      DOMAIN = "https://alpha.passwords.proesmans.eu";
+      DOMAIN = "https://passwords.proesmans.eu";
       SIGNUPS_ALLOWED = false; # SEEALSO; SIGNUPS_DOMAINS_WHITELIST
       WEBSOCKET_ENABLED = true;
       WEB_VAULT_ENABLED = true;

@@ -22,14 +22,6 @@
           "alpha.idm.proesmans.eu";
         server = bindaddress;
       };
-      upstream.passwords = rec {
-        inherit (config.services.vaultwarden.config) ROCKET_ADDRESS ROCKET_PORT DOMAIN;
-        aliases = [ "passwords.proesmans.eu" ];
-        hostname =
-          assert DOMAIN == "https://alpha.passwords.proesmans.eu";
-          "alpha.passwords.proesmans.eu";
-        server = "${ROCKET_ADDRESS}:${toString ROCKET_PORT}";
-      };
       upstream.pictures = rec {
         inherit (config.services.immich) host port;
         inherit (config.services.immich.settings.server) externalDomain;
@@ -172,9 +164,6 @@
           http-request redirect prefix https://${upstream.pictures.hostname} code 302 if { ${
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
           } }
-          http-request redirect prefix https://${upstream.passwords.hostname} code 302 if { ${
-            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.passwords.aliases
-          } }
           http-request redirect prefix https://${upstream.wiki.hostname} code 302 if { ${
             lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.wiki.aliases
           } }
@@ -183,7 +172,6 @@
           #
           # WARN; Add assignment for BACKEND NAME when adding a new host!
           acl host_pictures  req.hdr(Host) -i ${upstream.pictures.hostname}
-          acl host_passwords req.hdr(Host) -i ${upstream.passwords.hostname}
           acl host_wiki      req.hdr(Host) -i ${upstream.wiki.hostname}
 
           http-request set-header X-Forwarded-Proto https
@@ -198,8 +186,6 @@
 
           http-request set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures
           http-request set-var(txn.max_body) str("500m") if host_pictures
-
-          http-request set-var(txn.backend_name) str(upstream_passwords_app) if host_passwords
           
           http-request set-var(txn.backend_name) str(upstream_wiki_app) if host_wiki
 
@@ -221,13 +207,6 @@
           # ERROR; forwardfor doesn't work in default section, reason unknown
           option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
           server app ${upstream.pictures.server} check
-
-        backend upstream_passwords_app
-          description forward to passwords app
-          mode http
-          # ERROR; forwardfor doesn't work in default section, reason unknown
-          option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
-          server app ${upstream.passwords.server} check
 
         backend upstream_wiki_app
           description forward to wiki app

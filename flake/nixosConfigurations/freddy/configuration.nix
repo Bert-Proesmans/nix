@@ -12,6 +12,7 @@
     ./filesystems.nix
     ./hardware-configuration.nix
     ./identity.nix
+    ./passwords.nix
     ./private-network.nix
     ./remote-builder.nix
     ./tls-termination.nix

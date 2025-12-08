@@ -34,8 +34,6 @@
       extraDomainNames = lib.mkForce [
         "pictures.proesmans.eu"
         "alpha.pictures.proesmans.eu"
-        "passwords.proesmans.eu"
-        "alpha.passwords.proesmans.eu"
         "wiki.proesmans.eu"
         "alpha.wiki.proesmans.eu"
       ];
