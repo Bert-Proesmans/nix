@@ -10,6 +10,89 @@
     certs."alpha.proesmans.eu".group = "haproxy";
   };
 
+  security.dhparams = {
+    enable = true;
+    # NOTE; Suggested by Mozilla TLS config generator
+    defaultBitSize = 2048;
+    # Name of parameter set must match the systemd service name!
+    params.haproxy = {
+      # Defaults are used.
+      # Use 'params.haproxy.path' to retrieve the parameters.
+    };
+  };
+
+  # Ensure no other modules enable nginx, only Haproxy is deployed!
+  services.nginx.enable = lib.mkForce false;
+
+  # TODO; WIP
+  services.haproxy = {
+    enable = true;
+    settings = {
+      global = {
+        recommendedTlsSettings = true;
+        sslDhparam = config.security.dhparams.params.haproxy.path;
+        extraConfig = ''
+          # Workarounds
+          #
+          # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
+          # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
+          #
+          # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
+          # both programs with haproxy strictly applying standards and firefox farting all over.
+          h2-workaround-bogus-websocket-clients
+        '';
+      };
+      defaults = {
+        mode = "http";
+        options = [
+          "httplog"
+          "dontlognull"
+          "forwarded" # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
+          "http-server-close" # Allow server-side websocket connection termination
+        ];
+        timeout = {
+          connect = "5s";
+          client = "65s";
+          server = "65s";
+          tunnel = "1h"; # long-lived websocket/tunnel support
+        };
+        compression.algo = [
+          "gzip"
+          "deflate"
+        ];
+        compression.type = [
+          "text/html"
+          "text/plain"
+          "text/css"
+          "text/javascript"
+          "application/javascript"
+          "application/x-javascript"
+          "application/json"
+          "application/ld+json"
+          "application/wasm"
+          "application/xml"
+          "application/xhtml+xml"
+          "application/rss+xml"
+          "application/atom+xml"
+          "text/xml"
+          "text/markdown"
+          "text/vtt"
+          "text/cache-manifest"
+          "text/calendar"
+          "text/csv"
+          "font/ttf"
+          "font/otf"
+          "image/svg+xml"
+          "application/vnd.ms-fontobject"
+        ];
+        extraConfig = ''
+          # Side-effect free use and reuse of upstream connections
+          http-reuse safe
+        '';
+      };
+    };
+  };
+
   services.haproxy =
     let
       upstream.idm = rec {
@@ -231,17 +314,4 @@
     after = [ "acme-alpha.proesmans.eu.service" ];
   };
 
-  # Ensure no other modules enable nginx, only Haproxy is deployed!
-  services.nginx.enable = false;
-
-  security.dhparams = {
-    enable = true;
-    # NOTE; Suggested by Mozilla TLS config generator
-    defaultBitSize = 2048;
-    # Name of parameter set must match the systemd service name!
-    params.haproxy = {
-      # Defaults are used.
-      # Use 'params.haproxy.path' to retrieve the parameters.
-    };
-  };
 }
