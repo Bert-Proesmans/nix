@@ -23,17 +23,18 @@
   # NOTE; Haproxy only does TLS muxing, it's not serving sites. Nginx is serving sites.
   services.haproxy =
     let
-      # NOT YET
-      # upstream.idm = rec {
-      #   inherit (config.services.kanidm.serverSettings) origin bindaddress;
-      #   aliases = [ "idm.proesmans.eu" ];
-      #   # WARN; Domain and Origin are separate values from the effective DNS hostname.
-      #   # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
-      #   hostname =
-      #     assert origin == "https://idm.proesmans.eu";
-      #     "alpha.idm.proesmans.eu";
-      #   server = bindaddress;
-      # };
+      services.idm =
+        assert config.services.kanidm.serverSettings.bindaddress == "127.0.0.1:8443";
+        {
+          # WARN; Domain and Origin are separate values from the effective DNS hostname.
+          # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
+          hostname =
+            assert config.services.kanidm.serverSettings.origin == "https://idm.proesmans.eu";
+            "omega.idm.proesmans.eu";
+          aliases = [ "idm.proesmans.eu" ];
+          address = "127.0.0.1";
+          port = 8443;
+        };
       upstream.local-nginx = rec {
         aliases = [
           "wiki.proesmans.eu"
@@ -42,6 +43,11 @@
         hostname = "omega.proesmans.eu";
         server = "/run/nginx-sockets/virtualhosts.sock";
       };
+      downstream.proxies.addresses = [
+        # IP-Addresses of all hosts that proxy to us
+        config.proesmans.facts."01-fart".host.oracle.address
+        config.proesmans.facts."02-fart".host.oracle.address
+      ];
     in
     {
       enable = true;
@@ -91,7 +97,7 @@
           bind :443 v4v6
 
           # Conditionally accept proxy protocol from tunnel hosts
-          acl trusted_proxies src 100.127.116.49 # add others separated by space eg, 100.0.0.2
+          acl trusted_proxies src ${lib.concatStringsSep " " downstream.proxies.addresses}
           tcp-request connection expect-proxy layer4 if trusted_proxies
           
           # inspect clienthello to get SNI
@@ -102,6 +108,12 @@
           # tcp-request content capture req.ssl_sni len 100
 
           # route by SNI
+          use_backend passthrough_idm if { ${
+            lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
+              [ services.idm.hostname ] ++ services.idm.aliases
+            )
+          } }
+
           use_backend passthrough_local_nginx if { ${
             lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
               [ upstream.local-nginx.hostname ] ++ upstream.local-nginx.aliases
@@ -109,18 +121,22 @@
           } }
           
           # anything else → drop
-        #   default_backend drop_connection
+          # tcp-request connection reject if !{ var(txn.backend_name) -m found }
+          # There is not explicit command to terminate the connection (?)
 
-        # backend drop_connection
-        #   description drop unmatched tls connections
-        #   mode tcp
-        #   # immediately close on connect
-        #   tcp-request connection reject
+        backend passthrough_idm
+          description raw tcp/tls passthrough for kanidm with proxy protocol
+          mode tcp
+          # client → haproxy(:443) → local instance (send PROXY v2 as required by Kanidm)
+          # WARN; Explicitly enable ssl verification during check to prevent logspam (logged) at kanidm
+          option tcp-check
+          tcp-check send QUIT\r\n
+          server idm ${services.idm.address}:${toString services.idm.port} send-proxy-v2 check check-sni ${services.idm.hostname} check-ssl verify none
 
         backend passthrough_local_nginx
           description raw tcp passthrough with proxy protocol v1 (nginx community doesn\'t support v2)
           mode tcp
-          server local_nginx unix@${upstream.local-nginx.server} check send-proxy
+          server local_nginx unix@${upstream.local-nginx.server} send-proxy check
       '';
     };
 

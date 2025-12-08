@@ -1,6 +1,6 @@
 { lib, config, ... }:
 let
-  buddy = config.proesmans.facts.buddy;
+  inherit (config.proesmans.facts) buddy freddy;
 in
 {
   networking.firewall.allowedTCPPorts = [
@@ -18,23 +18,22 @@ in
 
   services.haproxy =
     let
-      upstream.buddy = {
-        # Always forward these domains to buddy
-        aliases = [ ];
-        # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-        server = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}";
-      };
-      upstream.idm = rec {
-        aliases = [ "idm.proesmans.eu" ];
+      services.omega.idm = {
         hostname = "omega.idm.proesmans.eu";
-        server = "<TODO>";
+        aliases = [ "idm.proesmans.eu" ];
+        inherit (freddy.host.oracle) address;
+        inherit (freddy.service.kanidm) port;
       };
-      upstream.status = rec {
-        inherit (config.services.gatus.settings.web) address port;
-        # NOTE; Upstream is local varnish webcache
-        aliases = [ "status.proesmans.eu" ];
+      services.alpha.idm = {
+        hostname = "alpha.idm.proesmans.eu";
+        aliases = [ "idm.proesmans.eu" ];
+        inherit (buddy.host.tailscale) address;
+        inherit (buddy.service.kanidm) port;
+      };
+      services.status = {
         hostname = "omega.status.proesmans.eu";
-        server = "${address}:${toString port}";
+        aliases = [ "status.proesmans.eu" ];
+        inherit (config.services.gatus.settings.web) address port;
       };
     in
     {
@@ -121,7 +120,14 @@ in
           # route by SNI
           use_backend passthrough_idm if { ${
             lib.concatMapStringsSep " || " (sni: "req.ssl_sni -i ${sni}") (
-              [ upstream.idm.hostname ] ++ upstream.idm.aliases
+              lib.unique (
+                [
+                  services.omega.idm.hostname
+                  services.alpha.idm.hostname
+                ]
+                ++ services.omega.idm.aliases
+                ++ services.alpha.idm.aliases
+              )
             )
           } }
           
@@ -131,20 +137,22 @@ in
         backend passthrough_idm
           description raw tcp passthrough with proxy protocol v2
           mode tcp
-          # Always prefer local instance of kanidm, if local instance is not available attempt
-          # connecting to alpha master node.
+          
+          # client → haproxy(:443) → kanidm(:443) (send PROXY v2 as required by Kanidm)
+
+          # Always prefer omega instance(s) of kanidm, otherwise alpha master node.
           balance first
-          
-          # client → haproxy(:443) → omega(local)_kanidm(:8443) (send PROXY v2 as required by Kanidm)
-          server local_idm ${upstream.idm.server} id 1 send-proxy-v2 check
-          
-          # client → haproxy(:443) → buddy(:443) -> alpha_kanidm(:8443) (send PROXY v2)
-          server buddy_tailscale ${upstream.buddy.server} id 2 send-proxy-v2 check
+
+          # WARN; Explicitly enable ssl verification during check to prevent logspam (logged) at kanidm
+          option tcp-check
+          tcp-check send QUIT\r\n
+          server omega_idm ${services.omega.idm.address}:${toString services.omega.idm.port} id 1 send-proxy-v2 check # check-sni ${services.omega.idm.hostname} check-ssl verify none
+          server alpha_idm ${services.alpha.idm.address}:${toString services.alpha.idm.port} id 2 send-proxy-v2 check # check-sni ${services.alpha.idm.hostname} check-ssl verify none
 
         frontend https_terminator
           description accept TLS handshakes and mangle packets
           mode http
-          bind unix@/run/haproxy/local-https.sock accept-proxy ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/local-https.sock ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
 
           log global
           # DEBUG
@@ -160,14 +168,14 @@ in
           #http-request set-var-fmt(txn.debug) "alpn=%[ssl_fc_alpn] ws=%[var(txn.is_ws)] h1_ws=%[var(txn.is_ws_h1)] h2_ws=%[var(txn.is_ws_h2)] host='%[capture.req.hdr(0)]' up='%[capture.req.hdr(1)]' conn='%[capture.req.hdr(2)]' m='%[capture.req.hdr(3)]' protohdr='%[capture.req.hdr(4)]'"
 
           # do alias redirects
-          http-request redirect prefix https://${upstream.status.hostname} code 302 if { ${
-            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.status.aliases
+          http-request redirect prefix https://${services.status.hostname} code 302 if { ${
+            lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") services.status.aliases
           } }
 
           # host routing, use "host_xx" for specific overrides
           #
           # HELP; Add flags for new proxied hosts below!
-          acl host_status req.hdr(Host) -i ${upstream.status.hostname}
+          acl host_status req.hdr(Host) -i ${services.status.hostname}
 
           http-request set-header X-Forwarded-Proto https
           http-request set-header X-Forwarded-Host  %[req.hdr(Host)]
@@ -191,7 +199,7 @@ in
           mode http
           # ERROR; forwardfor doesn't work in default section, reason unknown
           option forwardfor     # adds X-Forwarded-For with client ip (non-standardized btw)
-          server app ${upstream.status.server} check
+          server app ${services.status.address}:${toString services.status.port} check
       '';
     };
 
