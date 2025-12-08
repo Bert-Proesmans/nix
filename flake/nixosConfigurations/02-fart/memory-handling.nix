@@ -31,7 +31,7 @@
     enable = true;
     enableRootSlice = true;
     enableUserSlices = true;
-    extraConfig.DefaultMemoryPressureDurationSec = "30s"; # Default
+    settings.OOM.DefaultMemoryPressureDurationSec = "30s"; # Default
   };
 
   zramSwap = {
