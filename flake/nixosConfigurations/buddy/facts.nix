@@ -25,7 +25,12 @@
   };
   host.tailscale.address = "100.116.84.29";
 
-  service.reverse-proxy = rec {
+  service.reverse-proxy = {
+    port = 443;
+    uri = addr: "https://${addr}";
+  };
+
+  service.kanidm = {
     port = 443;
     uri = addr: "https://${addr}";
   };

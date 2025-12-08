@@ -11,6 +11,15 @@
 
   host.global.address = "152.70.63.72";
   host.tailscale.address = "100.127.116.49";
+  host.oracle = {
+    address = "10.0.84.220";
+    fqdn = "02-fart.default.omega.oraclevcn.com";
+  };
+
+  service.gatus = {
+    port = 443;
+    uri = addr: "https://${addr}";
+  };
 
   ## FREEFORM ##
 }

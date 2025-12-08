@@ -11,10 +11,19 @@
 
   host.global.address = "141.148.244.144";
   host.tailscale.address = "100.106.207.116";
+  host.oracle = {
+    address = "10.0.84.105";
+    fqdn = "freddy.default.omega.oraclevcn.com";
+  };
 
   service.crowdsec-lapi = rec {
     port = 10124;
     uri = addr: "http://${addr}:${toString port}";
+  };
+
+  service.kanidm = {
+    port = 443;
+    uri = addr: "https://${addr}";
   };
 
   service.kanidm-replication = rec {

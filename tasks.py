@@ -387,7 +387,7 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
 
     assert ssh_connection_string, """
         There is no ssh moniker found for the provided host attribute.
-        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+        Make sure the desired host returns the expected option host-facts.<moniker>.hostName using the nixos configuration options `proesmans.facts.hostName = "<TODO>";`
     """
 
     if not ask_user_input(
@@ -452,7 +452,7 @@ def unlock(c: Any, flake_attr: str) -> None:
 
     assert ssh_connection_string, """
         There is no ssh moniker found for the provided hostname.
-        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+        Make sure the desired host returns the expected option host-facts.<moniker>.hostName using the nixos configuration options `proesmans.facts.hostName = "<TODO>";`
     """
     subprocess.run(
         [
@@ -516,7 +516,7 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
 
     assert ssh_connection_string, """
         There is no ssh moniker found for the provided hostname.
-        Make sure the desired host returns the expected option host-facts.<moniker>.host-name using the nixos configuration options `proesmans.facts.host-name = "<TODO>";`
+        Make sure the desired host returns the expected option host-facts.<moniker>.hostName using the nixos configuration options `proesmans.facts.hostName = "<TODO>";`
     """
 
     if not yes:
