@@ -65,6 +65,7 @@
     pkgs.socat
     pkgs.nmap # ncat
     pkgs.resilio-sync # rslsync
+    pkgs.hydra-check
   ];
 
   nixpkgs.config.allowUnfreePredicate =
