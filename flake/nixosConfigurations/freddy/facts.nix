@@ -16,6 +16,11 @@
     fqdn = "freddy.default.omega.oraclevcn.com";
   };
 
+  service.reverse-proxy = {
+    port = 443;
+    uri = addr: "https://${addr}";
+  };
+
   service.crowdsec-lapi = rec {
     port = 10124;
     uri = addr: "http://${addr}:${toString port}";

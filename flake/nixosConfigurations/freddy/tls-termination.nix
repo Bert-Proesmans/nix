@@ -39,7 +39,7 @@
         config.proesmans.facts."02-fart".host.oracle.address
       ];
 
-      upstream.local-nginx = rec {
+      upstream.local-nginx = {
         aliases = [
           "wiki.proesmans.eu"
           "omega.wiki.proesmans.eu"
@@ -71,6 +71,22 @@
     {
       enable = true;
       settings = {
+        recommendedTlsSettings = true;
+
+        global = {
+          sslDhparam = config.security.dhparams.params.haproxy.path;
+          extraConfig = ''
+            # Workarounds
+            #
+            # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
+            # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
+            #
+            # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
+            # both programs with haproxy strictly applying standards and firefox farting all over.
+            h2-workaround-bogus-websocket-clients
+          '';
+        };
+
         defaults."" = {
           # Anonymous defaults section.
           # Using anonymous defaults section is highly discouraged!
@@ -259,6 +275,11 @@
       };
     };
 
+  systemd.services.haproxy = {
+    requires = [ "acme-omega.passwords.proesmans.eu.service" ];
+    after = [ "acme-omega.passwords.proesmans.eu.service" ];
+  };
+
   services.nginx = {
     enable = true;
     package = pkgs.nginxMainline;
@@ -299,6 +320,10 @@
     # NOTE; Suggested by Mozilla TLS config generator
     defaultBitSize = 2048;
     # Name of parameter set must match the systemd service name!
+    params.haproxy = {
+      # Defaults are used.
+      # Use 'params.nginx.path' to retrieve the parameters.
+    };
     params.nginx = {
       # Defaults are used.
       # Use 'params.nginx.path' to retrieve the parameters.
