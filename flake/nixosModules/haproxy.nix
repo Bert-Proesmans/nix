@@ -275,6 +275,11 @@ let
       default = null;
     };
 
+    description = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+
     mode = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -338,6 +343,7 @@ let
   mkFrontend =
     frontend:
     noNewlines ''
+      ${lib.strings.optionalString (frontend.description != null) "description ${frontend.description}"}
       ${lib.strings.optionalString (frontend.mode != null) "mode ${frontend.mode}"}
       ${lib.strings.concatMapStringsSep "\n" mkBind frontend.bind}
       ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") frontend.option}
@@ -394,6 +400,11 @@ let
       default = null;
     };
 
+    description = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+
     mode = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -446,6 +457,7 @@ let
   mkBackend =
     backend:
     noNewlines ''
+      ${lib.strings.optionalString (backend.description != null) "description ${backend.description}"}
       ${lib.strings.optionalString (backend.mode != null) "mode ${backend.mode}"}
       ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") backend.option}
       ${lib.strings.optionalString (backend.balance != null) "balance ${backend.balance}"}
