@@ -84,6 +84,9 @@
             # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
             # both programs with haproxy strictly applying standards and firefox farting all over.
             h2-workaround-bogus-websocket-clients
+
+            # DEBUG
+            log stdout format raw local0 notice
           '';
         };
 
@@ -120,15 +123,15 @@
         listen.tls_mux = {
           mode = "tcp";
           bind = [ ":443 v4v6" ];
-          option = [ ];
+          option = [ "tcplog" ];
           # No logging here because duplicate logs introduced by hairpin into https_terminator
           extraConfig = ''
-            no log
+            # no log
           '';
 
           acl.trusted_proxies = "src ${lib.concatStringsSep " " downstream.proxies.addresses}";
           request = [
-            "connection expect-proxy layer4 if trusted_proxies"
+            # "connection expect-proxy layer4 if trusted_proxies"
             "inspect-delay 5s"
             "content accept if { req_ssl_hello_type 1 }"
           ];
