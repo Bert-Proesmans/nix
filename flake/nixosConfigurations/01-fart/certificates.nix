@@ -19,23 +19,14 @@
       dnsResolver = "1.1.1.1:53";
     };
 
-    # NOTE; No local instance of kanidm yet(?)
-    # certs."omega.idm.proesmans.eu" = {
-    #   domain = lib.mkForce "omega.idm.proesmans.eu";
-    #   # NOTE; Certificate split to limit eavesdropping by proxy
-    #   extraDomainNames = lib.mkForce [
-    #     "idm.proesmans.eu"
-    #   ];
-    # };
-
     certs."omega.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = lib.mkForce "*.omega.proesmans.eu";
       extraDomainNames = lib.mkForce [
         "pictures.proesmans.eu"
         "omega.pictures.proesmans.eu"
-        "passwords.proesmans.eu"
-        "omega.passwords.proesmans.eu"
+        "status.proesmans.eu"
+        "omega.status.proesmans.eu"
       ];
     };
   };
