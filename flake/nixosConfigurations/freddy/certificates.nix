@@ -26,14 +26,19 @@
       ];
     };
 
+    certs."omega.passwords.proesmans.eu" = {
+      domain = lib.mkForce "omega.passwords.proesmans.eu";
+      extraDomainNames = lib.mkForce [
+        "passwords.proesmans.eu"
+      ];
+    };
+
     certs."omega.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = lib.mkForce "omega.proesmans.eu";
       extraDomainNames = lib.mkForce [
         "wiki.proesmans.eu"
         "omega.wiki.proesmans.eu"
-        "passwords.proesmans.eu"
-        "omega.passwords.proesmans.eu"
       ];
     };
   };
