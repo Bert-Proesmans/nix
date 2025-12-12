@@ -425,6 +425,16 @@ let
       default = [ ];
     };
 
+    acl = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = { };
+    };
+
+    request = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+    };
+
     balance = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -460,10 +470,12 @@ let
       ${lib.strings.optionalString (backend.description != null) "description ${backend.description}"}
       ${lib.strings.optionalString (backend.mode != null) "mode ${backend.mode}"}
       ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") backend.option}
-      ${lib.strings.optionalString (backend.balance != null) "balance ${backend.balance}"}
+      ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "acl ${name} ${x}") backend.acl}
+      ${lib.strings.concatMapStringsSep "\n" (x: "${backend.mode}-request ${x}") backend.request}
       ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "timeout ${name} ${x}") (
         lib.filterAttrs (_: v: v != null) backend.timeout
       )}
+      ${lib.strings.optionalString (backend.balance != null) "balance ${backend.balance}"}
       ${backend.extraConfig}
       ${lib.strings.concatMapAttrsStringSep "\n" mkBackendServer backend.server}
     '';
@@ -473,6 +485,7 @@ let
     noNewlines ''
       ${lib.strings.optionalString (listen.mode != null) "mode ${listen.mode}"}
       ${lib.strings.concatMapStringsSep "\n" mkBind listen.bind}
+      ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") listen.option}
       ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "acl ${name} ${x}") listen.acl}
       ${lib.strings.concatMapStringsSep "\n" (x: "${listen.mode}-request ${x}") listen.request}
       ${listen.extraConfig}
