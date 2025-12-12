@@ -42,6 +42,9 @@ let
     global
     ${indentStr (mkGlobal cfg.global)}
     ${lib.strings.concatMapAttrsStringSep "" (
+      name: x: "defaults ${name}\n${indentStr (mkDefault x)}"
+    ) cfg.defaults}
+    ${lib.strings.concatMapAttrsStringSep "" (
       name: x: "crt-store ${name}\n${indentStr (mkCertificateStore x)}"
     ) cfg.crt-stores}
     ${lib.strings.concatMapAttrsStringSep "" (
@@ -420,8 +423,8 @@ let
           "first"
         ]
       );
-      example = "roundrobin";
       default = null;
+      example = "roundrobin";
     };
 
     extraConfig = lib.mkOption {
@@ -501,6 +504,11 @@ in
 
         global = lib.mkOption {
           type = globalModule;
+        };
+
+        defaults = lib.mkOption {
+          type = lib.types.attrsOf defaultsModule;
+          default = { };
         };
 
         extraConfig = lib.mkOption {

@@ -75,6 +75,25 @@
           '';
         };
 
+        defaults."" = {
+          # Anonymous defaults section.
+          # Using anonymous defaults section is highly discouraged!
+          timeout = {
+            connect = "15s";
+            client = "65s";
+            server = "65s";
+            tunnel = "1h";
+          };
+
+          option = [
+            "dontlognull"
+          ];
+
+          extraConfig = ''
+            log global
+          '';
+        };
+
         crt-stores.alpha.extraConfig = ''
           crt-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
           key-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
@@ -89,28 +108,16 @@
             "httplog"
             "dontlognull"
           ];
-          timeout.connect = "5s";
           # This is a stub that redirects the client to https
           request = [ "redirect scheme https code 301 unless { ssl_fc }" ];
-          extraConfig = ''
-            log global
-          '';
         };
 
         listen.tls_mux = {
           mode = "tcp";
           bind = [ ":443 v4v6" ];
-          option = [
-            "tcplog"
-          ];
-          timeout = {
-            connect = "5s";
-            # client = "65s";
-            # server = "65s";
-            # tunnel = "1h";
-          };
+          option = [ ];
           extraConfig = ''
-            log global
+            no log
           '';
 
           # TODO; Finish proxy addresses
@@ -145,15 +152,8 @@
           option = [
             "httplog"
             "dontlognull"
-            "forwarded" # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
             "http-server-close" # Allow server-side websocket connection termination
           ];
-          timeout = {
-            connect = "5s";
-            # client = "65s";
-            # server = "65s";
-            # tunnel = "1h";
-          };
           compression = {
             algo = [
               "gzip"
@@ -185,9 +185,6 @@
               "application/vnd.ms-fontobject"
             ];
           };
-          extraConfig = ''
-            log global
-          '';
           acl.host_pictures = "req.hdr(host) -i ${upstream.pictures.hostname}";
           acl.alias_pictures = lib.concatMapStringsSep " || " (
             fqdn: "req.hdr(host) -i ${fqdn}"
@@ -242,7 +239,10 @@
 
         backend.outline_app = {
           mode = "http";
-          option = [ ];
+          option = [
+            # adds forwarded with forwarding information (Preferred over forwardfor, IETF RFC7239)
+            "forwarded"
+          ];
           server.outline = {
             inherit (upstream.wiki) location;
             extraOptions = "check";
