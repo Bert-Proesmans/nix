@@ -10,7 +10,7 @@
   # hardware = {};
 
   host.global.address = "152.70.63.72";
-  host.tailscale.address = "100.127.116.49";
+  host.tailscale.address = "100.97.91.109";
   host.oracle = {
     address = "10.0.84.220";
     fqdn = "02-fart.default.omega.oraclevcn.com";
