@@ -35,7 +35,7 @@
         hostname =
           assert origin == "https://idm.proesmans.eu";
           "alpha.idm.proesmans.eu";
-        server = bindaddress;
+        location = bindaddress;
       };
       upstream.pictures = rec {
         inherit (config.services.immich) host port;
@@ -44,7 +44,7 @@
         hostname =
           assert externalDomain == "https://pictures.proesmans.eu";
           "alpha.pictures.proesmans.eu";
-        server = "${host}:${toString port}";
+        location = "${host}:${toString port}";
       };
       upstream.wiki = rec {
         inherit (config.services.outline) publicUrl port;
@@ -53,15 +53,13 @@
         hostname =
           #assert publicUrl == "https://wiki.proesmans.eu"; # DEBUG
           "alpha.wiki.proesmans.eu";
-        server = "localhost:${toString port}";
+        location = "127.0.0.1:${toString port}";
       };
     in
     {
       enable = true;
       settings = {
-        recommendedTimeoutSettings = true;
         recommendedTlsSettings = true;
-        recommendedCompressionSettings = true;
 
         global = {
           sslDhparam = config.security.dhparams.params.haproxy.path;
@@ -77,20 +75,6 @@
           '';
         };
 
-        defaults = {
-          mode = "http";
-          options = [
-            "httplog"
-            "dontlognull"
-            "forwarded" # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
-            "http-server-close" # Allow server-side websocket connection termination
-          ];
-          extraConfig = ''
-            # Side-effect free use and reuse of upstream connections
-            http-reuse safe
-          '';
-        };
-
         crt-stores.alpha.extraConfig = ''
           crt-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
           key-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
@@ -101,14 +85,35 @@
         frontend.http_plain = {
           mode = "http";
           bind = [ ":80 v4v6" ];
+          option = [
+            "httplog"
+            "dontlognull"
+          ];
+          timeout.connect = "5s";
           # This is a stub that redirects the client to https
           request = [ "redirect scheme https code 301 unless { ssl_fc }" ];
+          extraConfig = ''
+            log global
+          '';
         };
 
         listen.tls_mux = {
           mode = "tcp";
           bind = [ ":443 v4v6" ];
+          option = [
+            "tcplog"
+          ];
+          timeout = {
+            connect = "5s";
+            # client = "65s";
+            # server = "65s";
+            # tunnel = "1h";
+          };
+          extraConfig = ''
+            log global
+          '';
 
+          # TODO; Finish proxy addresses
           acl.trusted_proxies = "src 100.127.116.49";
           request = [
             "connection expect-proxy layer4 if trusted_proxies"
@@ -116,8 +121,9 @@
             "content accept if { req_ssl_hello_type 1 }"
           ];
 
-          # TODO; Complete ACL
-          acl.kanidm_request = "req.ssl_sni -i ${upstream.idm.hostname}";
+          acl.kanidm_request = lib.concatMapStringsSep " || " (fqdn: "req.ssl_sni -i ${fqdn}") (
+            [ upstream.idm.hostname ] ++ upstream.idm.aliases
+          );
           backend = [
             {
               name = "passthrough_kanidm";
@@ -132,28 +138,76 @@
           mode = "http";
           bind = [
             {
-              address = "unix@/run/haproxy/local-https.sock";
+              location = "unix@/run/haproxy/local-https.sock";
               extraOptions = "ssl crt '@alpha/fullchain.pem' alpn h2,http/1.1 accept-proxy";
             }
           ];
-          acl.host_pictures = "req.hdr(Host) -i ${upstream.pictures.hostname}";
-          acl.host_wiki = "req.hdr(Host) -i ${upstream.wiki.hostname}";
+          option = [
+            "httplog"
+            "dontlognull"
+            "forwarded" # adds forwarded with forwarding information (Preferred to forwardfor, IETF RFC7239)
+            "http-server-close" # Allow server-side websocket connection termination
+          ];
+          timeout = {
+            connect = "5s";
+            # client = "65s";
+            # server = "65s";
+            # tunnel = "1h";
+          };
+          compression = {
+            algo = [
+              "gzip"
+              "deflate"
+            ];
+            type = [
+              "text/html"
+              "text/plain"
+              "text/css"
+              "text/javascript"
+              "application/javascript"
+              "application/x-javascript"
+              "application/json"
+              "application/ld+json"
+              "application/wasm"
+              "application/xml"
+              "application/xhtml+xml"
+              "application/rss+xml"
+              "application/atom+xml"
+              "text/xml"
+              "text/markdown"
+              "text/vtt"
+              "text/cache-manifest"
+              "text/calendar"
+              "text/csv"
+              "font/ttf"
+              "font/otf"
+              "image/svg+xml"
+              "application/vnd.ms-fontobject"
+            ];
+          };
+          extraConfig = ''
+            log global
+          '';
+          acl.host_pictures = "req.hdr(host) -i ${upstream.pictures.hostname}";
+          acl.alias_pictures = lib.concatMapStringsSep " || " (
+            fqdn: "req.hdr(host) -i ${fqdn}"
+          ) upstream.pictures.aliases;
+          acl.host_wiki = "req.hdr(host) -i ${upstream.wiki.hostname}";
+          acl.alias_wiki = lib.concatMapStringsSep " || " (
+            fqdn: "req.hdr(host) -i ${fqdn}"
+          ) upstream.wiki.aliases;
           request = [
-            "redirect prefix https://${upstream.pictures.hostname} code 302 if { ${
-              lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.pictures.aliases
-            } }"
-            "redirect prefix https://${upstream.wiki.hostname} code 302 if { ${
-              lib.concatMapStringsSep " || " (alias: "hdr(host) -i ${alias}") upstream.wiki.aliases
-            } }"
+            "redirect prefix https://${upstream.pictures.hostname} code 302 if alias_pictures"
+            "redirect prefix https://${upstream.wiki.hostname} code 302 if alias_wiki"
             "set-header X-Forwarded-Proto https"
             "set-header X-Forwarded-Host %[req.hdr(Host)]"
             "set-header X-Forwarded-Server %[hostname]"
             "set-header Strict-Transport-Security max-age=63072000"
             # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
             "set-var(txn.max_body) str(\"10m\")"
-            "set-var(txn.backend_name) str(upstream_pictures_app) if host_pictures"
+            "set-var(txn.backend_name) str(immich_app) if host_pictures"
             "set-var(txn.max_body) str(\"500m\") if host_pictures"
-            "set-var(txn.backend_name) str(upstream_wiki_app) if host_wiki"
+            "set-var(txn.backend_name) str(outline_app) if host_wiki"
 
             # enforce payload size, units in bytes
             "set-var(txn.max_body_bytes) var(txn.max_body_str),bytes"
@@ -168,6 +222,47 @@
           backend = [
             "%[var(txn.backend_name)]"
           ];
+        };
+
+        backend.immich_app = {
+          mode = "http";
+          option = [
+            # adds X-Forwarded-For with client ip (non-standardized btw)
+            "forwardfor"
+          ];
+          server.immich = {
+            inherit (upstream.pictures) location;
+            extraOptions = "check";
+          };
+          extraConfig = ''
+            # Side-effect free use and reuse of upstream connections
+            http-reuse safe
+          '';
+        };
+
+        backend.outline_app = {
+          mode = "http";
+          option = [ ];
+          server.outline = {
+            inherit (upstream.wiki) location;
+            extraOptions = "check";
+          };
+          extraConfig = ''
+            # Side-effect free use and reuse of upstream connections
+            http-reuse safe
+          '';
+        };
+
+        backend.passthrough_kanidm = {
+          mode = "tcp";
+          extraConfig = ''
+            option tcp-check
+            tcp-check send QUIT\r\n
+          '';
+          server.app = {
+            inherit (upstream.idm) location;
+            extraOptions = "send-proxy-v2 check check-ssl verify none";
+          };
         };
       };
     };

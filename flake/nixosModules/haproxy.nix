@@ -40,20 +40,27 @@ let
   # NOTE; Stanzas do not need newline separator because each mkXXXX value ends with a newline!
   mkHAProxyConfig = cfg: ''
     global
-    ${indentStr (mkGlobal cfg.global)}      
-    defaults
-    ${indentStr (mkDefault cfg.defaults)}
+    ${indentStr (mkGlobal cfg.global)}
     ${lib.strings.concatMapAttrsStringSep "" (
       name: x: "crt-store ${name}\n${indentStr (mkCertificateStore x)}"
     ) cfg.crt-stores}
     ${lib.strings.concatMapAttrsStringSep "" (
-      name: x: "listen ${name}\n${indentStr (mkListen x)}"
+      name: x:
+      "listen ${name}${
+        lib.strings.optionalString (x.defaultsFrom != null) " from ${x.defaultsFrom}"
+      }\n${indentStr (mkListen x)}"
     ) cfg.listen}
     ${lib.strings.concatMapAttrsStringSep "" (
-      name: x: "frontend ${name}\n${indentStr (mkFrontend x)}"
+      name: x:
+      "frontend ${name}${
+        lib.strings.optionalString (x.defaultsFrom != null) " from ${x.defaultsFrom}"
+      }\n${indentStr (mkFrontend x)}"
     ) cfg.frontend}
     ${lib.strings.concatMapAttrsStringSep "" (
-      name: x: "backend ${name}\n${indentStr (mkBackend x)}"
+      name: x:
+      "backend ${name}${
+        lib.strings.optionalString (x.defaultsFrom != null) " from ${x.defaultsFrom}"
+      }\n${indentStr (mkBackend x)}"
     ) cfg.backend}
     ${cfg.extraConfig}
   '';
@@ -102,7 +109,7 @@ let
           default = null;
         };
 
-        options = lib.mkOption {
+        option = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ ];
         };
@@ -173,21 +180,20 @@ let
   );
 
   mkDefault =
-    cfg:
+    default:
     noNewlines ''
-      log global
-      ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") cfg.options}
+      ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") default.option}
       ${lib.strings.concatStringsSep "\n" (
         lib.attrsets.mapAttrsToList (name: x: "timeout ${name} ${x}") (
-          lib.filterAttrs (_: v: v != null) cfg.timeout
+          lib.filterAttrs (_: v: v != null) default.timeout
         )
       )}
       ${lib.strings.concatStringsSep "\n" (
         lib.attrsets.mapAttrsToList (name: x: "compression ${name} ${builtins.concatStringsSep " " x}") (
-          lib.filterAttrs (_: v: v != null) cfg.compression
+          lib.filterAttrs (_: v: v != null) default.compression
         )
       )}
-      ${cfg.extraConfig}
+      ${default.extraConfig}
     '';
 
   certificateModule = lib.types.submodule (
@@ -206,14 +212,9 @@ let
 
   bindModule = lib.types.submodule {
     options = {
-      address = lib.mkOption {
+      location = lib.mkOption {
         type = lib.types.str;
-        default = "";
-      };
-
-      port = lib.mkOption {
-        type = lib.types.nullOr lib.types.port;
-        default = null;
+        example = "127.0.0.1:8500";
       };
 
       interface = lib.mkOption {
@@ -233,9 +234,7 @@ let
     if (builtins.isString bind) then
       "bind ${bind}"
     else
-      "bind ${bind.address}${
-        lib.strings.optionalString (bind.port != null) ":${toString bind.bind.port}"
-      }${
+      "bind ${bind.location}${
         lib.strings.optionalString (bind.interface != null) " interface ${bind.interface}"
       } ${bind.extraOptions}";
 
@@ -263,11 +262,16 @@ let
     else
       ''
         ${if backend.isDefault then "default" else "use"}_backend ${backend.name}${
-          lib.strings.optionalString (!backend.isDefault) "if ${backend.condition}"
+          lib.strings.optionalString (!backend.isDefault) " if ${backend.condition}"
         }
       '';
 
   frontendSpecification = {
+    defaultsFrom = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+
     mode = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -287,6 +291,16 @@ let
       );
     };
 
+    timeout = lib.mkOption {
+      type = timeoutModule;
+      default = { };
+    };
+
+    option = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+    };
+
     acl = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = { };
@@ -295,6 +309,11 @@ let
     request = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       default = [ ];
+    };
+
+    compression = lib.mkOption {
+      type = compressionModule;
+      default = { };
     };
 
     extraConfig = lib.mkOption {
@@ -318,8 +337,17 @@ let
     noNewlines ''
       ${lib.strings.optionalString (frontend.mode != null) "mode ${frontend.mode}"}
       ${lib.strings.concatMapStringsSep "\n" mkBind frontend.bind}
+      ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") frontend.option}
+      ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "timeout ${name} ${x}") (
+        lib.filterAttrs (_: v: v != null) frontend.timeout
+      )}
       ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "acl ${name} ${x}") frontend.acl}
       ${lib.strings.concatMapStringsSep "\n" (x: "${frontend.mode}-request ${x}") frontend.request}
+      ${lib.strings.concatStringsSep "\n" (
+        lib.attrsets.mapAttrsToList (name: x: "compression ${name} ${builtins.concatStringsSep " " x}") (
+          lib.filterAttrs (_: v: v != null) frontend.compression
+        )
+      )}
       ${frontend.extraConfig}
       ${lib.strings.concatMapStringsSep "\n" mkBackendReference frontend.backend}
     '';
@@ -328,19 +356,20 @@ let
     { ... }:
     {
       options = {
-        address = lib.mkOption {
+        location = lib.mkOption {
           type = lib.types.str;
           example = "127.0.0.1:8080";
         };
 
         id = lib.mkOption {
-          type = lib.types.int;
+          type = lib.types.nullOr lib.types.int;
           example = 1;
+          default = null;
         };
 
         extraOptions = lib.mkOption {
           type = lib.types.separatedString " ";
-          example = "send-proxy-v2";
+          example = "send-proxy-v2 check";
           default = "";
         };
       };
@@ -352,11 +381,16 @@ let
     if builtins.isString server then
       "server ${name} ${server}"
     else
-      "server ${name} ${server.address} ${
-        lib.strings.optionalString (server.id != null) "id ${server.id}"
-      } ${server.extraArgs}";
+      "server ${name} ${server.location}${
+        lib.strings.optionalString (server.id != null) " id ${server.id}"
+      } ${server.extraOptions}";
 
   backendSpecification = {
+    defaultsFrom = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+
     mode = lib.mkOption {
       type = lib.types.nullOr (
         lib.types.enum [
@@ -372,14 +406,22 @@ let
       default = { };
     };
 
+    option = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+    };
+
     balance = lib.mkOption {
-      type = lib.types.enum [
-        "roundrobin"
-        "leastconn"
-        "source"
-        "first"
-      ];
-      default = "roundrobin";
+      type = lib.types.nullOr (
+        lib.types.enum [
+          "roundrobin"
+          "leastconn"
+          "source"
+          "first"
+        ]
+      );
+      example = "roundrobin";
+      default = null;
     };
 
     extraConfig = lib.mkOption {
@@ -402,6 +444,7 @@ let
     backend:
     noNewlines ''
       ${lib.strings.optionalString (backend.mode != null) "mode ${backend.mode}"}
+      ${lib.strings.concatMapStringsSep "\n" (opt: "option ${opt}") backend.option}
       ${lib.strings.optionalString (backend.balance != null) "balance ${backend.balance}"}
       ${lib.strings.concatMapAttrsStringSep "\n" (name: x: "timeout ${name} ${x}") (
         lib.filterAttrs (_: v: v != null) backend.timeout
@@ -451,17 +494,13 @@ in
       };
 
       settings = {
-        recommendedTimeoutSettings = lib.mkEnableOption "recommended timeout configuration";
+        # recommendedTimeoutSettings = lib.mkEnableOption "recommended timeout configuration";
         recommendedTlsSettings = lib.mkEnableOption "recommended ssl configuration";
-        recommendedCompressionSettings = lib.mkEnableOption "recommended compression configuration";
+        # recommendedCompressionSettings = lib.mkEnableOption "recommended compression configuration";
         # recommendedProxySettings = lib.mkEnableOption "recommended proxy configuration";
 
         global = lib.mkOption {
           type = globalModule;
-        };
-
-        defaults = lib.mkOption {
-          type = defaultsModule;
         };
 
         extraConfig = lib.mkOption {
@@ -511,45 +550,6 @@ in
         ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
         ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
       '';
-
-      defaults.timeout = lib.mkIf cfg.settings.recommendedTimeoutSettings {
-        connect = "5s";
-        client = "65s";
-        server = "65s";
-        tunnel = "1h";
-      };
-
-      defaults.compression = lib.mkIf cfg.settings.recommendedCompressionSettings ({
-        algo = [
-          "gzip"
-          "deflate"
-        ];
-        type = [
-          "text/html"
-          "text/plain"
-          "text/css"
-          "text/javascript"
-          "application/javascript"
-          "application/x-javascript"
-          "application/json"
-          "application/ld+json"
-          "application/wasm"
-          "application/xml"
-          "application/xhtml+xml"
-          "application/rss+xml"
-          "application/atom+xml"
-          "text/xml"
-          "text/markdown"
-          "text/vtt"
-          "text/cache-manifest"
-          "text/calendar"
-          "text/csv"
-          "font/ttf"
-          "font/otf"
-          "image/svg+xml"
-          "application/vnd.ms-fontobject"
-        ];
-      });
     };
 
     systemd.services.haproxy = {
