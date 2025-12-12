@@ -28,8 +28,8 @@
     let
       downstream.proxies.addresses = [
         # IP-Addresses of all hosts that proxy to us
-        config.proesmans.facts."01-fart".host.oracle.address
-        config.proesmans.facts."02-fart".host.oracle.address
+        config.proesmans.facts."01-fart".host.tailscale.address
+        config.proesmans.facts."02-fart".host.tailscale.address
       ];
       service.idm =
         assert config.services.kanidm.serverSettings.bindaddress == "127.0.0.1:8443";
@@ -204,11 +204,13 @@
             "set-header X-Forwarded-Host %[req.hdr(Host)]"
             "set-header X-Forwarded-Server %[hostname]"
             "set-header Strict-Transport-Security max-age=63072000"
+
+            "set-var(txn.backend_name) str(immich_app) if host_pictures"
+            "set-var(txn.backend_name) str(outline_app) if host_wiki"
+
             # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
             "set-var(txn.max_body) str(\"10m\")"
-            "set-var(txn.backend_name) str(immich_app) if host_pictures"
             "set-var(txn.max_body) str(\"500m\") if host_pictures"
-            "set-var(txn.backend_name) str(outline_app) if host_wiki"
 
             # enforce payload size, units in bytes
             "set-var(txn.max_body_bytes) var(txn.max_body_str),bytes"
