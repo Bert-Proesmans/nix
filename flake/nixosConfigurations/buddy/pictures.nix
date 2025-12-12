@@ -81,7 +81,7 @@ in
 
   services.immich = {
     enable = true;
-    host = "127.175.0.1";
+    host = "127.0.0.1";
     port = 8080;
     openFirewall = false; # Use reverse proxy
     mediaLocation = immichStatePath;
