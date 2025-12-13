@@ -39,16 +39,20 @@ in
           journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
           labels.type = "ssh";
         })
-        # WARN; Haproxy sees no traffic because it's a TLS mux
-        # ({
-        #   source = "journalctl";
-        #   journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
-        #   labels.type = "haproxy";
-        # })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=haproxy.service" ];
+          labels.type = "haproxy";
+        })
         ({
           source = "journalctl";
           journalctl_filter = [ "_SYSTEMD_UNIT=nginx.service" ];
           labels.type = "nginx";
+        })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=kanidm.service" ];
+          labels.type = "kanidm";
         })
       ];
 
@@ -57,15 +61,13 @@ in
         s00Raw = [ ];
         # WARN; These parsers are added to a stateful directory! Changing the contents will add duplicates!
         # Regularly clean /etc/crowdsec/* when iterating.
-        # s01Parse = import ./crowdsec/s01-parsers.nix;
-        s01Parse = [ ];
+        s01Parse = import ./crowdsec/s01-parsers.nix;
         s02Enrich = [ ];
       };
       # postOverflows = { };
       # WARN; These scenarios are added to a stateful directory! Changing the contents will add duplicates!
       # Regularly clean /etc/crowdsec/* when iterating.
-      # scenarios = import ./crowdsec/scenarios.nix;
-      scenarios = [ ];
+      scenarios = import ./crowdsec/scenarios.nix;
       # contexts = [ ];
       # notifications = [ ];
       # profiles = [ ];
@@ -74,7 +76,7 @@ in
     hub = {
       collections = [
         "crowdsecurity/linux"
-        # "crowdsecurity/haproxy" # Sees no traffic
+        "crowdsecurity/haproxy"
         "crowdsecurity/nginx"
       ];
       scenarios = [ ];
