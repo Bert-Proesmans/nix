@@ -66,6 +66,7 @@
     pkgs.nmap # ncat
     pkgs.resilio-sync # rslsync
     pkgs.hydra-check
+    pkgs.swaks # smtp client test-tool
   ];
 
   nixpkgs.config.allowUnfreePredicate =
