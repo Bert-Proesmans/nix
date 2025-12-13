@@ -35,8 +35,10 @@
     let
       downstream.proxies.addresses = [
         # IP-Addresses of all hosts that proxy to us
-        config.proesmans.facts."01-fart".host.oracle.address
-        config.proesmans.facts."02-fart".host.oracle.address
+        # NOTE; Using the tailscale address to tunnel between nodes.
+        # Tailscale should link over oracle subnet.
+        config.proesmans.facts."01-fart".host.tailscale.address
+        config.proesmans.facts."02-fart".host.tailscale.address
       ];
 
       upstream.local-nginx = {
@@ -86,7 +88,7 @@
             h2-workaround-bogus-websocket-clients
 
             # DEBUG
-            log stdout format raw local0 notice
+            # log stdout format raw local0 notice
           '';
         };
 
@@ -131,7 +133,7 @@
 
           acl.trusted_proxies = "src ${lib.concatStringsSep " " downstream.proxies.addresses}";
           request = [
-            # "connection expect-proxy layer4 if trusted_proxies"
+            "connection expect-proxy layer4 if trusted_proxies"
             "inspect-delay 5s"
             "content accept if { req_ssl_hello_type 1 }"
           ];

@@ -24,6 +24,7 @@ in
           "alpha.idm.proesmans.eu"
         ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
+        # NOTE; Using the tailscale address to tunnel between nodes.
         location = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}";
       };
       upstream.freddy = {
@@ -37,7 +38,8 @@ in
           "omega.wiki.proesmans.eu"
         ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
-        location = "${freddy.host.oracle.address}:${toString freddy.service.reverse-proxy.port}";
+        # NOTE; Using the tailscale address to tunnel between nodes.
+        location = "${freddy.host.tailscale.address}:${toString freddy.service.reverse-proxy.port}";
       };
       service.pictures = {
         hostname = "omega.pictures.proesmans.eu";
@@ -71,7 +73,7 @@ in
             h2-workaround-bogus-websocket-clients
 
             # DEBUG
-            log stdout format raw local0 notice
+            # log stdout format raw local0 notice
           '';
         };
 
@@ -150,12 +152,15 @@ in
           mode = "tcp";
           server.freddy = {
             inherit (upstream.freddy) location;
+            # WARN; DO NOT check TLS certificate because Haproxy cannot handle PROXY + TLS. The below options DO NOT work!
+            # The TCP proxy node is also not the right location for TLS verification, only the end nodes are proper.
+            # Use the tailscale peer IP for mutual TLS verification if MITM is a fear.
+            # "ssl verify required"
+            # "ca-file /etc/ssl/certs/ca-bundle.crt"
+            # "check-sni ${builtins.head upstream.freddy.aliases}"
             extraOptions = lib.concatStringsSep " " [
-              # "send-proxy-v2"
-              # "check"
-              # "ssl verify required"
-              # "ca-file /etc/ssl/certs/ca-bundle.crt"
-              # "check-sni ${builtins.head upstream.freddy.aliases}"
+              "send-proxy-v2"
+              "check"
             ];
           };
         };
@@ -167,9 +172,8 @@ in
             extraOptions = lib.concatStringsSep " " [
               "send-proxy-v2"
               "check"
-              "ssl verify required"
-              "ca-file /etc/ssl/certs/ca-bundle.crt"
-              "check-sni ${builtins.head upstream.buddy.aliases}"
+              # WARN; DO NOT check TLS certificate because Haproxy cannot handle PROXY + TLS.
+              # Use the tailscale peer IP for mutual TLS verification if MITM is a fear.
             ];
           };
         };
@@ -309,7 +313,7 @@ in
             };
         };
 
-        backend.status_app = {
+        backend.gatus_app = {
           mode = "http";
           request = [ ];
           server.gatus = {
@@ -353,6 +357,7 @@ in
               "alpn h2,http/1.1"
               "send-proxy-v2"
               "check"
+              # In HTTP proxy mode we _must_ verify the endpoint certificate!
               "ssl verify required"
               "ca-file /etc/ssl/certs/ca-bundle.crt"
               "sni req.hdr(host)"
