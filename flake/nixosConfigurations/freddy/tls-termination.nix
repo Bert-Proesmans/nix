@@ -139,7 +139,11 @@
           ];
 
           acl.kanidm_request = lib.concatMapStringsSep " || " (fqdn: "req.ssl_sni -i ${fqdn}") (
-            [ service.idm.hostname ] ++ service.idm.aliases
+            [
+              service.idm.hostname
+              "alpha.passwords.proesmans.eu" # Backwards compatibility
+            ]
+            ++ service.idm.aliases
           );
           acl.local_nginx_request = lib.concatMapStringsSep " || " (
             fqdn: "req.ssl_sni -i ${fqdn}"

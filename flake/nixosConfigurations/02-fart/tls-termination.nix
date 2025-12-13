@@ -33,6 +33,7 @@ in
           "omega.idm.proesmans.eu"
           "idm.proesmans.eu"
           "omega.passwords.proesmans.eu"
+          "alpha.passwords.proesmans.eu" # Backwards compatibility
           "passwords.proesmans.eu"
           "wiki.proesmans.eu"
           "omega.wiki.proesmans.eu"
