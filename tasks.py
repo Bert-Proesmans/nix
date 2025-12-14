@@ -422,6 +422,9 @@ def dev_rebuild(c: Any) -> None:
 @task
 # USAGE; invoke unlock freddy
 def unlock(c: Any, flake_attr: str) -> None:
+    """
+    Open an interactive session into the pre-boot environment of the host to provide disk decryption password.
+    """
     print(f"Evaluating machine facts to find {flake_attr}..")
     text_machines = subprocess.run(
         [
@@ -476,6 +479,9 @@ def unlock(c: Any, flake_attr: str) -> None:
 @task
 # USAGE; invoke rebuild development
 def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
+    """
+    Build a host configuration and activate it on the machine.
+    """
     host_attr_path = (
         f"{FLAKE}#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
     )
