@@ -54,6 +54,11 @@ in
           journalctl_filter = [ "_SYSTEMD_UNIT=kanidm.service" ];
           labels.type = "kanidm";
         })
+        ({
+          source = "journalctl";
+          journalctl_filter = [ "_SYSTEMD_UNIT=vaultwarden.service" ];
+          labels.type = "vaultwarden";
+        })
       ];
 
       # patterns = [ ];
@@ -78,6 +83,7 @@ in
         "crowdsecurity/linux"
         "crowdsecurity/haproxy"
         "crowdsecurity/nginx"
+        "Dominic-Wagner/vaultwarden"
       ];
       scenarios = [ ];
       parsers = [ ];
