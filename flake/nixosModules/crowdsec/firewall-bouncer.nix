@@ -41,6 +41,15 @@ in
 
       crowdsec-firewall-bouncer = {
         partOf = [ config.systemd.targets.crowdsec.name ];
+
+        # Bouncer is effectively not working. Workaround can be removed when PR below is merged.
+        # REF; https://github.com/NixOS/nixpkgs/pull/459188
+        serviceConfig = rec {
+          AmbientCapabilities = lib.optional (
+            (cfg.settings.mode == "iptables") || (cfg.settings.mode == "ipset")
+          ) "CAP_NET_RAW";
+          CapabilityBoundingSet = AmbientCapabilities;
+        };
       };
     };
   });
