@@ -24,6 +24,8 @@
     certs."omega.passwords.proesmans.eu" = {
       group = config.users.groups.haproxy.name;
       reloadServices = [
+        # WARN; Haproxy doesn't always reload certificates on service reload!
+        # Reason and circumstances so far unknown 🤔
         config.systemd.services.haproxy.name
       ];
     };
