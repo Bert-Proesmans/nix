@@ -12,22 +12,6 @@ let
   immichExternalStatePath = "/var/lib/immich-external";
 in
 {
-  assertions =
-    let
-      # NOTE; This is supposed to throw an error if extension pgvecto-rs is missing.
-      pgVectors = lib.findFirst (
-        x: x.pname == "pgvecto-rs"
-      ) null config.services.postgresql.finalPackage.installedExtensions;
-    in
-    [
-      {
-        assertion = (builtins.compareVersions pgVectors.version "0.4.0") == -1;
-        message = ''
-          Version of 'pgvecto-rs' must remain below 0.4.0, detected version is '${pgVectors.version}.
-        '';
-      }
-    ];
-
   # @@ IMMICH media location @@
   # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
   # "library" => Originals are stored here => main dataset
@@ -71,12 +55,9 @@ in
   };
 
   sops.secrets = {
-    password-smtp.restartUnits = [ config.systemd.services.immich-server.name ];
-    immich-oauth-secret = {
-      # NOTE; The secret is embedded inside a sops-template, this always works.
-      # The output of the template itself is access controlled instead.
-      restartUnits = [ config.systemd.services.immich-server.name ];
-    };
+    # NOTE; Secrets are loaded through the SystemD LoadCredential system, so they can remain owned by root!
+    "password-smtp".restartUnits = [ config.systemd.services.immich-server.name ];
+    "immich-oauth-secret".restartUnits = [ config.systemd.services.immich-server.name ];
   };
 
   services.immich = {
@@ -92,6 +73,10 @@ in
       enable = true;
       name = "immich";
       createDB = true;
+      enableVectorChord = true; # New vector extension
+      # Backwards compatibility, should be disabled after migration
+      # REF; https://docs.immich.app/administration/postgres-standalone#migrating-from-pgvectors
+      enableVectors = false; # Migration DONE
     };
 
     environment = {
@@ -195,7 +180,7 @@ in
           host = "localhost";
           ignoreCert = false;
           username = "alpha@proesmans.eu";
-          password = config.sops.placeholder.password-smtp;
+          password._secret = config.sops.secrets."password-smtp".path;
           port = 587; # TODO; Fix STARTLS -> TLS ON
           # ERROR; Immich performs protocol detection based on the port. The local mailproxy does not support SMTP over TLS,
           # but emulates STARTLS
@@ -208,7 +193,7 @@ in
         buttonText = "Login met Proesmans account";
         clientId = "photos";
         # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
-        clientSecret = config.sops.placeholder.immich-oauth-secret;
+        clientSecret._secret = config.sops.secrets."immich-oauth-secret".path;
         defaultStorageQuota = 500;
         # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
         # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
@@ -239,19 +224,8 @@ in
     };
   };
 
-  # ERROR; Upstream did not make configuring oauth2 secrets composeable.
-  # The immich configuration settings is configured as 'SOPS template'. At system activation, the placeholders inside the template
-  # will be overwritten with secret values.
-  sops.templates."immich-config.json" = {
-    file = (pkgs.formats.json { }).generate "immich.json" config.services.immich.settings;
-    owner = "immich";
-    restartUnits = [ config.systemd.services.immich-server.name ];
-  };
-
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
     environment = {
-      # Force apply the configuration with overwritten secret data
-      IMMICH_CONFIG_FILE = lib.mkForce config.sops.templates."immich-config.json".path;
       # Force overwrite custom URL for the machine learning service
       IMMICH_MACHINE_LEARNING_URL =
         let
