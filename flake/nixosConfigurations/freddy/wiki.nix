@@ -11,9 +11,20 @@ let
   databaseSocket = "/run/mysqld/mysqld.sock";
 in
 {
-  sops.secrets.bookstack-key-file.owner = config.services.bookstack.user;
-  # sops.secrets.bookstack-mail-user-password.owner = config.services.bookstack.user;
-  # sops.secrets.bookstack-oidc-secret.owner = config.services.bookstack.user;
+  sops.secrets = {
+    # NOTE; Secrets are loaded through the SystemD LoadCredential system, so they can remain owned by root!
+    "bookstack-key-file" = {
+      inherit (config.services.bookstack) group;
+      mode = "0440";
+      restartUnits = [ "phpfpm-bookstack.service" ];
+    };
+    "bookstack-oauth-secret" = {
+      inherit (config.services.bookstack) group;
+      mode = "0440";
+      restartUnits = [ "phpfpm-bookstack.service" ];
+    };
+    # bookstack-mail-user-password.restartUnits = [];
+  };
 
   services.mysql = {
     ensureDatabases = [ bookstackUser ];
@@ -83,17 +94,23 @@ in
 
       # ERROR; Cannot use the combination of password/oidc login, decided by the developers.
       #AUTH_METHOD = "standard"; # username/pass login only
-      # AUTH_METHOD = "oidc"; # oidc login only
-      # AUTH_AUTO_INITIATE = true; # auto-login
-      # OIDC_NAME = "e-power";
-      # OIDC_CLIENT_ID = "ff46d6e5-6bcd-4233-85bd-d025cce99347";
-      # OIDC_CLIENT_SECRET = {
-      #   _secret = config.sops.secrets.bookstack-oidc-secret.path;
-      # };
-      # OIDC_ISSUER = "https://login.microsoftonline.com/6a9ed677-1cf6-44d7-b466-259903d6fc0b/v2.0";
-      # OIDC_ISSUER_DISCOVER = true; # Use .well-known standard to find resource URLs
-      # # ERROR; Not working yet as of 25.05.2 because Graph API requires authentication for downloading profile picture
-      # OIDC_FETCH_AVATAR = true;
+      AUTH_METHOD = "oidc"; # oidc login only
+      AUTH_AUTO_INITIATE = true; # auto-login
+      OIDC_NAME = "Proesmans account";
+      OIDC_CLIENT_ID = "bookstack";
+      OIDC_CLIENT_SECRET_FILE = config.sops.secrets."bookstack-oauth-secret".path;
+      OIDC_ISSUER = "https://idm.proesmans.eu/oauth2/openid/bookstack";
+      OIDC_ISSUER_DISCOVER = true; # Use .well-known standard to find resource URLs
+      # ERROR; Not working yet as of 25.05.2 because Graph API requires authentication for downloading profile picture
+      OIDC_FETCH_AVATAR = true;
+      # Additional scopes to send with the authentication request.
+      # Many platforms require specific scopes to be requested for group data.
+      # Multiple scopes can be added via comma separation.
+      OIDC_ADDITIONAL_SCOPES = lib.concatStringsSep "," [ "groups" ];
+      # Remove the user from roles that don't match OIDC groups upon login.
+      # Note: While this is enabled the "Default Registration Role", editable within the
+      # BookStack settings view, will be considered a matched role and assigned to the user.
+      OIDC_REMOVE_FROM_GROUPS = false;
     };
 
     nginx = {

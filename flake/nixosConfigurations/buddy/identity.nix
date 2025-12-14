@@ -66,6 +66,11 @@ in
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
+    bookstack-oauth-secret = {
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
+
     gatus-oauth-secret = {
       owner = "kanidm";
       restartUnits = [ config.systemd.services.kanidm.name ];
@@ -230,7 +235,7 @@ in
 
       systems.oauth2."wiki" = {
         displayName = "Wiki";
-        basicSecretFile = config.sops.secrets.outline-oauth-secret.path;
+        basicSecretFile = config.sops.secrets."outline-oauth-secret".path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://wiki.proesmans.eu/";
         imageFile = "${flake.documentationAssets}/outline-logo.png";
@@ -244,6 +249,28 @@ in
           "openid"
           "email"
           "profile"
+        ];
+      };
+
+      systems.oauth2."bookstack" = {
+        displayName = "Wiki";
+        basicSecretFile = config.sops.secrets."bookstack-oauth-secret".path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://wiki.proesmans.eu/";
+        imageFile = "${flake.documentationAssets}/bookstack-logo.png";
+
+        # ERROR; Bookstack only accepts RS256 signing algorithm
+        enableLegacyCrypto = true;
+        originUrl = [
+          # NOTE; Global url redirects to specific instance URLs
+          "https://wiki.proesmans.eu/oidc/callback"
+          "https://omega.wiki.proesmans.eu/oidc/callback"
+        ];
+        scopeMaps."idm_all_persons" = [
+          "openid"
+          "email"
+          "profile"
+          "groups"
         ];
       };
 
