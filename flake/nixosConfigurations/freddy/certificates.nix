@@ -35,7 +35,6 @@
       domain = lib.mkForce "omega.passwords.proesmans.eu";
       extraDomainNames = lib.mkForce [
         "passwords.proesmans.eu"
-        "alpha.passwords.proesmans.eu" # Backwards compatibility
       ];
     };
 

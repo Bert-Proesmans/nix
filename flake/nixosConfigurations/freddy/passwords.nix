@@ -14,24 +14,25 @@ in
     options.refquota = "10G";
   };
 
-  users.groups.mail = {
-    # Members of this group have access to secret "password-smtp"
-    members = [ "vaultwarden" ];
+  sops.secrets = {
+    # Root ownership because used in template
+    "vaultwarden-smtp" = { };
+    "id-installation-bitwarden" = { };
+    "key-installation-bitwarden" = { };
   };
-
-  sops.secrets.id-installation-bitwarden.owner = "vaultwarden";
-  sops.secrets.key-installation-bitwarden.owner = "vaultwarden";
 
   sops.templates."sensitive-vaultwarden.env" = {
     owner = "vaultwarden";
     restartUnits = [ config.systemd.services."vaultwarden".name ];
-    # ${config.sops.placeholder."password-smtp"}
     content = ''
-      SMTP_PASSWORD = 
-      PUSH_INSTALLATION_ID = ${config.sops.placeholder.id-installation-bitwarden}
-      PUSH_INSTALLATION_KEY = ${config.sops.placeholder.key-installation-bitwarden}
+      SMTP_PASSWORD = ${config.sops.placeholder."vaultwarden-smtp"}
+      PUSH_INSTALLATION_ID = ${config.sops.placeholder."id-installation-bitwarden"}
+      PUSH_INSTALLATION_KEY = ${config.sops.placeholder."key-installation-bitwarden"}
     '';
   };
+
+  # Keep mail traffic local
+  networking.hosts."127.0.0.1" = [ "freddy.omega.proesmans.eu" ];
 
   services.vaultwarden = {
     enable = true;
@@ -113,14 +114,11 @@ in
       # directly instead.
       # HIBP_API_KEY=
 
-      # HELO_NAME = "alpha.passwords.proesmans.eu";
-      SMTP_HOST = "localhost";
-      SMTP_PORT = 587;
+      SMTP_HOST = "freddy.omega.proesmans.eu"; # Should be 127.0.0.1, see hosts above
+      SMTP_PORT = 465;
       SMTP_FROM = "passwords@proesmans.eu"; # Passwords | Proesmans.eu <passwords@proesmans.eu>
-      SMTP_SECURITY = "off";
-      # TODO; Enable TLS email connections
-      #SMTP_SECURITY = "force_tls"; # TODO; fix STARTTLS -> TLS on
-      SMTP_USERNAME = "alpha@proesmans.eu";
+      SMTP_SECURITY = "force_tls"; # force_tls | starttls | off
+      SMTP_USERNAME = "vaultwarden";
       # SMTP_PASSWORD = # see environmentFile
 
       ## Enables push notifications (requires key and id from https://bitwarden.com/host)
