@@ -36,6 +36,11 @@
     uri = addr: "repl://${addr}:${toString port}";
   };
 
+  service.mail = rec {
+    port = 465;
+    uri = addr: "smtps://${addr}:${toString port}";
+  };
+
   ## FREEFORM ##
   # Generated with `head -c4 /dev/urandom | od -A none -t x4`
   hostId = "0a73b940";

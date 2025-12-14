@@ -11,10 +11,20 @@ let
   settingsFormatIni = pkgs.formats.iniWithGlobalSection {
     listToValue = builtins.concatStringsSep " ";
   };
+
   smptprelay_ini = settingsFormatIni.generate "smtprelay.ini" {
     sections = { };
     globalSection = cfg.settings;
   };
+  alias_ini = settingsFormatIni.generate "aliases.ini" {
+    sections = { };
+    globalSection = cfg.aliases_file;
+  };
+  allowed_users_conf = pkgs.writeText "allowed_users.config" (
+    lib.concatMapAttrsStringSep "\n" (
+      _: v: "${v.username} ${v.bcrypt-hash} ${v.email}"
+    ) cfg.allowed_users
+  );
 in
 {
   options.services.smtprelay = {
@@ -33,54 +43,96 @@ in
       description = "Group account under which smtprelay runs.";
     };
 
-    tls.listener = {
-      certificate = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
-        description = ''
-          Server certificate (chain) of the smtprelay listener for encrypted connections.
+    tls.listener = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          certificate = lib.mkOption {
+            type = lib.types.externalPath;
+            description = ''
+              Server certificate (chain) of the smtprelay listener for encrypted connections.
 
-          Use this option instead of `settings.local_cert` to prevent the mentioned file from 
-          being copied into the world-readable nix-store!
-        '';
+              Use this option instead of `settings.local_cert` to prevent the mentioned file from 
+              being copied into the world-readable nix-store!
+            '';
+          };
+
+          key = lib.mkOption {
+            type = lib.types.externalPath;
+            description = ''
+              Secret to encrypt connections on the listening side of smtprelay.
+
+              Use this option instead of `settings.local_key` to prevent the mentioned file from 
+              being copied into the world-readable nix-store!
+            '';
+          };
+        };
       };
-
-      key = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
-        default = null;
-        description = ''
-          Secret to encrypt connections on the listening side of smtprelay.
-
-          Use this option instead of `settings.local_key` to prevent the mentioned file from 
-          being copied into the world-readable nix-store!
-        '';
-      };
+      default = { };
     };
 
-    tls.relay = {
-      certificate = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
-        description = ''
-          Server certificate (chain) of the smtprelay listener for encrypted connections.
+    tls.relay = lib.mkOption {
+      type = lib.types.submodule {
+        options = {
+          certificate = lib.mkOption {
+            type = lib.types.externalPath;
+            description = ''
+              Server certificate (chain) of the smtprelay listener for encrypted connections.
 
-          Use this option instead of `settings.local_cert` to prevent the mentioned file from 
-          being copied into the world-readable nix-store!
-        '';
+              Use this option instead of `settings.remote_certificate` to prevent the mentioned file from 
+              being copied into the world-readable nix-store!
+            '';
+          };
+
+          key = lib.mkOption {
+            type = lib.types.externalPath;
+            description = ''
+              Secret to encrypt connections on the listening side of smtprelay.
+
+              Use this option instead of `settings.remote_key` to prevent the mentioned file from 
+              being copied into the world-readable nix-store!
+            '';
+          };
+        };
       };
-
-      key = lib.mkOption {
-        type = lib.types.nullOr lib.types.path;
-        default = null;
-        description = ''
-          Secret to encrypt connections on the listening side of smtprelay.
-
-          Use this option instead of `settings.local_key` to prevent the mentioned file from 
-          being copied into the world-readable nix-store!
-        '';
-      };
+      default = { };
     };
 
     allowed_users = lib.mkOption {
-      type = lib.types.attrsOf (lib.types.submodule { }); # TODO
+      type = lib.types.attrsOf (
+        lib.types.submodule (
+          { name, ... }:
+          {
+            options = {
+              username = lib.mkOption {
+                type = lib.types.str;
+                description = "SMTP auth username.";
+              };
+              bcrypt-hash = lib.mkOption {
+                type = lib.types.str;
+                description = ''
+                  Bcrypt hash of the password for SMTP auth.
+
+                  ! Use securely random generated strings of sufficient length as password !
+
+                  Create a bcrypt hash with the `htpasswd` program, eg `htpasswd -nBC12 "" | tr -d ':'`
+                    - htpasswd is available in nixpkgs#apacheHttpd
+                    - -n : do not update file, just output to stdout
+                    - -B : use bcrypt algorithm
+                    - -C12 : set bcrypt cost to 10 (default is 5, increase for more security but slower)
+                    - Empty username "" because we only want the hash, not the username.
+                '';
+              };
+              email = lib.mkOption {
+                type = lib.types.separatedString ",";
+                description = "Comma-separated list of of allowed \"from\" addresses.";
+              };
+            };
+            config = {
+              username = name;
+            };
+          }
+        )
+      );
       default = { };
       description = ''
         Attribute set containing combinations username, passwords and email addresses that are verified
@@ -88,7 +140,7 @@ in
       '';
     };
 
-    aliases_file = lib.mkOption {
+    aliases = lib.mkOption {
       type = lib.types.attrsOf (lib.types.separatedString " ");
       default = { };
       example = {
@@ -96,7 +148,7 @@ in
       };
       description = ''
         Attribute set containing combinations of alias-address with resolved-addresses.
-        Basically pseudo distribution-lists.
+        This option automatically configures `settings.aliases_file` with an auto-generated ini file.
       '';
     };
 
@@ -306,7 +358,24 @@ in
 
       serviceConfig = {
         Type = "simple";
-        ExecStart = [ "${lib.getExe cfg.package} -config ${smptprelay_ini}" ];
+        ExecStart = [
+          (lib.concatStringsSep " " (
+            [
+              (lib.getExe cfg.package)
+              "-config ${smptprelay_ini}"
+            ]
+            ++ (lib.optionals (cfg.tls.listener != { }) [
+              "-local_cert ${cfg.tls.listener.certificate}"
+              "-local_key ${cfg.tls.listener.key}"
+            ])
+            ++ (lib.optionals (cfg.tls.relay != { }) [
+              "-remote_certificate ${cfg.tls.relay.certificate}"
+              "-remote_key ${cfg.tls.relay.key}"
+            ])
+            ++ (lib.optionals (cfg.allowed_users != { }) [ "-allowed_users ${allowed_users_conf}" ])
+            ++ (lib.optionals (cfg.aliases != { }) [ "-aliases_file ${alias_ini}" ])
+          ))
+        ];
 
         User = cfg.user;
         Group = cfg.group;

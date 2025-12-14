@@ -21,29 +21,38 @@
   #     WARN; Exchange online only supports EXPLICIT TLS (aka STARTTLS) and the relay client will choke on SMTPS
   # 4. Send test e-mail using swaks (nixpkgs#swaks)
   #    swaks --server localhost:<25> --from <anything>@proesmans.eu --to <anything>
-  services.smtprelay = {
-    enable = true;
-    settings = {
-      log_level = "trace";
-      hostname = "freddy.omega.proesmans.eu";
-      listen = [
-        "127.0.0.1:25"
-        "[::1]:25"
-      ];
-      max_connections = 10;
-      max_recipients = 5;
-      allowed_sender = "^(.*)@proesmans.eu$";
+  services.smtprelay =
+    let
+      certificate = "${config.security.acme.certs."freddy.omega.proesmans.eu".directory}/fullchain.pem";
+      key = "${config.security.acme.certs."freddy.omega.proesmans.eu".directory}/key.pem";
+    in
+    assert config.proesmans.facts.self.service.mail.port == 465;
+    {
+      enable = true;
 
-      remotes = [
-        "starttls://proesmans-eu.mail.protection.outlook.com:25"
-      ];
+      tls.listener = { inherit certificate key; };
+      tls.relay = { inherit certificate key; };
+      allowed_users.vaultwarden = {
+        bcrypt-hash = "$2y$12$.h4mk0uw1Qr43/z.y1MjhuO2Am0PEPyGmzAaJtdFDYR9IsOxg7hcy";
+        email = "passwords@proesmans.eu";
+      };
 
-      remote_certificate = "${
-        config.security.acme.certs."freddy.omega.proesmans.eu".directory
-      }/fullchain.pem";
-      remote_key = "${config.security.acme.certs."freddy.omega.proesmans.eu".directory}/key.pem";
+      settings = {
+        log_level = "trace";
+        hostname = "freddy.omega.proesmans.eu";
+        listen = [
+          "tls://127.0.0.1:465"
+          "tls://[::1]:465"
+        ];
+        max_connections = 10;
+        max_recipients = 5;
+        allowed_sender = "^(.*)@proesmans.eu$";
+
+        remotes = [
+          "starttls://proesmans-eu.mail.protection.outlook.com:25"
+        ];
+      };
     };
-  };
 
   systemd.services.smtprelay = {
     requires = [ "acme-freddy.omega.proesmans.eu.service" ];
