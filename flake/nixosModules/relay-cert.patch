@@ -1,0 +1,164 @@
+diff --git a/config.go b/config.go
+index 4103742..1118f57 100644
+--- a/config.go
++++ b/config.go
+@@ -46,6 +46,8 @@ var (
+ 	command          = flagset.String("command", "", "Path to pipe command")
+ 	remotesStr       = flagset.String("remotes", "", "Outgoing SMTP servers")
+ 	strictSender     = flagset.Bool("strict_sender", false, "Use only SMTP servers with Sender matches to From")
++	remoteCert       = flagset.String("remote_certificate", "", "Client SSL certificate for remote STARTTLS/TLS")
++	remoteKey        = flagset.String("remote_key", "", "Client SSL private key for remote STARTTLS/TLS")
+ 
+ 	// additional flags
+ 	_           = flagset.String("config", "", "Path to config file (ini format)")
+@@ -67,6 +69,36 @@ func localAuthRequired() bool {
+ 	return *allowedUsers != ""
+ }
+ 
++func remoteCertAndKeyReadable() bool {
++	certSet := *remoteCert != ""
++	keySet := *remoteKey != ""
++	
++	// Both must be set or both must be unset
++	if certSet != keySet {
++		return false
++	}
++	
++	// If both are set, verify files exist and are accessible
++	if certSet && keySet {
++		if _, err := os.Stat(*remoteCert); err != nil {
++			log.Error().
++				Str("cert", *remoteCert).
++				Err(err).
++				Msg("cannot access remote client certificate file")
++			return false
++		}
++		if _, err := os.Stat(*remoteKey); err != nil {
++			log.Error().
++				Str("key", *remoteKey).
++				Err(err).
++				Msg("cannot access remote client key file")
++			return false
++		}
++	}
++	
++	return true
++}
++
+ func setupAliases() {
+ 	if *aliasFile != "" {
+ 		aliases := make(AliasMap)
+@@ -138,6 +170,11 @@ func setupRemotes() {
+ 				logger.Fatal().Msg(fmt.Sprintf("error parsing url: '%s': %v", remoteURL, err))
+ 			}
+ 
++			if *remoteCert != "" && *remoteKey != "" && (r.Scheme == "smtps" || r.Scheme == "starttls") {
++				r.ClientCertPath = *remoteCert
++				r.ClientKeyPath = *remoteKey
++			}
++
+ 			remotes = append(remotes, r)
+ 		}
+ 	}
+@@ -254,6 +291,13 @@ func ConfigLoad() {
+ 		log.Warn().Msg("no remotes or command set; mail will not be forwarded!")
+ 	}
+ 
++	if !remoteCertAndKeyReadable() {
++		log.Fatal().
++			Str("remote_certificate", *remoteCert).
++			Str("remote_key", *remoteKey).
++			Msg("remote_certificate and remote_key must both be set or both be empty")
++	}
++
+ 	setupAllowedNetworks()
+ 	setupAllowedPatterns()
+ 	setupAliases()
+diff --git a/remotes.go b/remotes.go
+index 8e7ba80..486bef5 100644
+--- a/remotes.go
++++ b/remotes.go
+@@ -7,13 +7,15 @@ import (
+ )
+ 
+ type Remote struct {
+-	SkipVerify bool
+-	Auth       smtp.Auth
+-	Scheme     string
+-	Hostname   string
+-	Port       string
+-	Addr       string
+-	Sender     string
++	SkipVerify      bool
++	Auth            smtp.Auth
++	Scheme          string
++	Hostname        string
++	Port            string
++	Addr            string
++	Sender          string
++	ClientCertPath  string
++	ClientKeyPath   string
+ }
+ 
+ // ParseRemote creates a remote from a given url in the following format:
+diff --git a/smtp.go b/smtp.go
+index 628e124..ec33385 100644
+--- a/smtp.go
++++ b/smtp.go
+@@ -340,6 +340,14 @@ func SendMail(r *Remote, from string, to []string, msg []byte) error {
+ 			ServerName:         r.Hostname,
+ 			InsecureSkipVerify: r.SkipVerify,
+ 		}
++		// Load client certificate on-demand, just before connection
++		if r.ClientCertPath != "" && r.ClientKeyPath != "" {
++			cert, err := tls.LoadX509KeyPair(r.ClientCertPath, r.ClientKeyPath)
++			if err != nil {
++				return err
++			}
++			config.Certificates = []tls.Certificate{cert}
++		}
+ 		conn, err := tls.Dial("tcp", r.Addr, config)
+ 		if err != nil {
+ 			return err
+@@ -366,6 +374,14 @@ func SendMail(r *Remote, from string, to []string, msg []byte) error {
+ 				ServerName:         c.serverName,
+ 				InsecureSkipVerify: r.SkipVerify,
+ 			}
++			// Load client certificate on-demand, just before use
++			if r.ClientCertPath != "" && r.ClientKeyPath != "" {
++				cert, err := tls.LoadX509KeyPair(r.ClientCertPath, r.ClientKeyPath)
++				if err != nil {
++					return err
++				}
++				config.Certificates = []tls.Certificate{cert}
++			}
+ 			if testHookStartTLS != nil {
+ 				testHookStartTLS(config)
+ 			}
+diff --git a/smtprelay.ini b/smtprelay.ini
+index 72942e4..2334be5 100644
+--- a/smtprelay.ini
++++ b/smtprelay.ini
+@@ -119,6 +119,10 @@
+ ; Mailjet.com
+ ;remotes = starttls://user:pass@in-v3.mailjet.com:587
+ 
++; Exchange Online (O365) SMTP relay
++; (Change netloc to your own Exchange MX endpoint)
++; remotes = starttls://contoso-com.mail.protection.outlook.com:25
++
+ ; Ignore remote host certificates
+ ;remotes = starttls://user:pass@server:587?skipVerify
+ 
+@@ -131,5 +135,11 @@
+ ; Multiple remotes, space delimited
+ ;remotes = smtp://127.0.0.1:1025 starttls://user:pass@smtp.mailgun.org:587
+ 
++; Client SSL certificate for remote STARTTLS/TLS
++; remote_certificate = /path/to/certificate-chain.pem
++
++; Client SSL private key for remote STARTTLS/TLS
++; remote_key = /path/to/private-key.pem
++
+ ; Pipe messages to external command
+ ;command = /usr/local/bin/script

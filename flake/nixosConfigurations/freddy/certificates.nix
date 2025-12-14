@@ -19,6 +19,11 @@
       dnsResolver = "1.1.1.1:53";
     };
 
+    certs."freddy.omega.proesmans.eu" = {
+      domain = lib.mkForce "freddy.omega.proesmans.eu";
+      extraDomainNames = lib.mkForce [ ];
+    };
+
     certs."omega.idm.proesmans.eu" = {
       domain = lib.mkForce "omega.idm.proesmans.eu";
       extraDomainNames = lib.mkForce [

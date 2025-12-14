@@ -7,7 +7,7 @@
 let
   cfg = config.services.smtprelay;
 
-  # WARN; iniWithGlobalSection instead of ini because "ini" cannot handle options without first-level section!
+  # WARN; iniWithGlobalSection instead of ini because "ini" cannot handle options without top-level section!
   settingsFormatIni = pkgs.formats.iniWithGlobalSection {
     listToValue = builtins.concatStringsSep " ";
   };
@@ -108,7 +108,9 @@ in
       '';
       default = { };
       type = lib.types.submodule {
-        freeformType = settingsFormatIni.type;
+        # ERROR; INI format expects all option values below toplevel attribute-set! eg mySection.myOption = [value]
+        # freeformType = settingsFormatIni.type;
+        freeformType = lib.types.attrsOf lib.types.str;
         options = {
           log_level = lib.mkOption {
             type = lib.types.enum [
@@ -284,6 +286,17 @@ in
     users.groups = lib.optionalAttrs (cfg.group == "smtprelay") {
       smtprelay = { };
     };
+
+    # DEBUG
+    proesmans.nix.overlays = [
+      (final: prev: {
+        smtprelay = prev.smtprelay.overrideAttrs (oldAttrs: {
+          patches = [
+            ./relay-cert.patch
+          ];
+        });
+      })
+    ];
 
     systemd.services.smtprelay = {
       description = "SMTP relay/proxy server";
