@@ -19,6 +19,7 @@ in
     "vaultwarden-smtp" = { };
     "id-installation-bitwarden" = { };
     "key-installation-bitwarden" = { };
+    "vaultwarden-oauth-secret" = { };
   };
 
   sops.templates."sensitive-vaultwarden.env" = {
@@ -28,6 +29,7 @@ in
       SMTP_PASSWORD = ${config.sops.placeholder."vaultwarden-smtp"}
       PUSH_INSTALLATION_ID = ${config.sops.placeholder."id-installation-bitwarden"}
       PUSH_INSTALLATION_KEY = ${config.sops.placeholder."key-installation-bitwarden"}
+      SSO_CLIENT_SECRET= ${config.sops.placeholder."vaultwarden-oauth-secret"}
     '';
   };
 
@@ -131,17 +133,18 @@ in
       PUSH_RELAY_URI = "https://api.bitwarden.eu";
       PUSH_IDENTITY_URI = "https://identity.bitwarden.eu";
 
-      # TODO; Setup SSO (requires release >1.35?? to be available on nixpkgs)
-      SSO_ENABLED = false;
+      ## Single Sign-On (DOESN'T WORK, NOT IN STABLE YET)
+      # REF; https://github.com/dani-garcia/vaultwarden/wiki/Enabling-SSO-support-using-OpenId-Connect
+      ## This allows for self-service signup without invite.
+      ## This _does not_ prevent users from entering their master password, the master password is the encryption key of their vault data!
+      SSO_ENABLED = true;
       SSO_ONLY = false;
       ## On SSO Signup if a user with a matching email already exists make the association
       SSO_SIGNUPS_MATCH_EMAIL = true;
-      # ERROR; Enabling 'SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION' with `SSO_SIGNUPS_MATCH_EMAIL=true` open potential account takeover!
-      SSO_ALLOW_UNKNOWN_EMAIL_VERIFICATION = false;
       ## Base URL of the OIDC server (auto-discovery is used)
       ##  - Should not include the `/.well-known/openid-configuration` part and no trailing `/`
       ##  - ${SSO_AUTHORITY}/.well-known/openid-configuration should return a json document: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse
-      SSO_AUTHORITY = "https://idm.proesmans.eu";
+      SSO_AUTHORITY = "https://idm.proesmans.eu/oauth2/openid/passwords";
       ## Authorization request scopes. Optional SSO scopes, override if email and profile are not enough (`openid` is implicit).
       SSO_SCOPES = "email profile";
       ## Additional authorization url parameters (ex: to obtain a `refresh_token` with Google Auth).
@@ -149,14 +152,23 @@ in
       ## Activate PKCE for the Auth Code flow.
       SSO_PKCE = true;
       ## Set your Client ID and Client Key
-      # SSO_CLIENT_ID=11111
-      # SSO_CLIENT_SECRET=AAAAAAAAAAAAAAAAAAAAAAAA
-      ## Optional Master password policy (minComplexity=[0-4]), `enforceOnLogin` is not supported at the moment.
-      # SSO_MASTER_PASSWORD_POLICY='{"enforceOnLogin":false,"minComplexity":3,"minLength":12,"requireLower":false,"requireNumbers":false,"requireSpecial":false,"requireUpper":false}'
-      ## Use sso only for authentication not the session lifecycle
-      SSO_AUTH_ONLY_NOT_SESSION = true; # TODO; Experiment
+      SSO_CLIENT_ID = "passwords";
+      # SSO_CLIENT_SECRET = # see environmentFile
+
+      # WARN; JSON string is quoted with a single quote (')!
+      SSO_MASTER_PASSWORD_POLICY = "'${
+        builtins.toJSON {
+          enforceOnLogin = false; # `enforceOnLogin` is not supported at the moment
+          minComplexity = 3; # (minComplexity=[0-4])
+          minLength = 12;
+          requireLower = false;
+          requireNumbers = false;
+          requireSpecial = false;
+          requireUpper = false;
+        }
+      }'";
       ## Client cache for discovery endpoint. Duration in seconds (0 to disable).
-      SSO_CLIENT_CACHE_EXPIRATION = 86400; # 24h
+      SSO_CLIENT_CACHE_EXPIRATION = 600; # 10m
     };
   };
 

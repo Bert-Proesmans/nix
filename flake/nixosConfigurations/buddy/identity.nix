@@ -70,6 +70,11 @@ in
       owner = "kanidm";
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
+
+    vaultwarden-oauth-secret = {
+      owner = "kanidm";
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
   };
 
   # Allow kanidm user access to the idm certificate managed by the host
@@ -258,6 +263,26 @@ in
           "https://omega.status.proesmans.eu/authorization-code/callback"
         ];
         scopeMaps."idm_all_persons" = [ "openid" ];
+      };
+
+      systems.oauth2."passwords" = {
+        displayName = "Password manager";
+        basicSecretFile = config.sops.secrets.vaultwarden-oauth-secret.path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://passwords.proesmans.eu/";
+        imageFile = "${flake.documentationAssets}/vaultwarden-logo.png";
+        originUrl = [
+          # NOTE; Global url redirects to specific instance URLs
+          "https://passwords.proesmans.eu/identity/connect/oidc-signin"
+          "https://omega.passwords.proesmans.eu/identity/connect/oidc-signin"
+        ];
+        scopeMaps."idm_all_persons" = [
+          "openid"
+          "email"
+          "profile"
+          # Refresh token to link application session to kanidm account lifetime
+          "offline_access"
+        ];
       };
     };
   };
