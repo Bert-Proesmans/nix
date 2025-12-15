@@ -61,11 +61,6 @@ in
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
-    outline-oauth-secret = {
-      owner = "kanidm";
-      restartUnits = [ config.systemd.services.kanidm.name ];
-    };
-
     bookstack-oauth-secret = {
       owner = "kanidm";
       restartUnits = [ config.systemd.services.kanidm.name ];
@@ -183,7 +178,6 @@ in
 
         "immich.access" = { };
         "immich.quota.large" = { };
-        "outline.access" = { };
       };
       persons."bert" = {
         displayName = "Bert Proesmans";
@@ -194,7 +188,6 @@ in
           "household.alpha"
           "immich.access"
           "immich.quota.large"
-          "outline.access"
         ];
       };
 
@@ -231,25 +224,6 @@ in
             valuesByGroup."immich.quota.large" = [ "1000" ]; # 1000GB storage
           };
         };
-      };
-
-      systems.oauth2."wiki" = {
-        displayName = "Wiki";
-        basicSecretFile = config.sops.secrets."outline-oauth-secret".path;
-        # WARN; URLs must end with a forward slash if path element is empty!
-        originLanding = "https://wiki.proesmans.eu/";
-        imageFile = "${flake.documentationAssets}/outline-logo.png";
-        originUrl = [
-          # NOTE; Global url redirects to specific instance URLs
-          "https://wiki.proesmans.eu/auth/oidc.callback"
-          "https://alpha.wiki.proesmans.eu/auth/oidc.callback"
-          "https://omega.wiki.proesmans.eu/auth/oidc.callback"
-        ];
-        scopeMaps."outline.access" = [
-          "openid"
-          "email"
-          "profile"
-        ];
       };
 
       systems.oauth2."bookstack" = {

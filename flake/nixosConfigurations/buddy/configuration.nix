@@ -15,7 +15,6 @@
     ./private-network.nix
     ./tls-termination.nix
     # ./web-security.nix
-    ./wiki.nix
     flake.profiles.hypervisor
   ];
 
@@ -48,7 +47,6 @@
     pkg:
     builtins.elem (lib.getName pkg) [
       "resilio-sync"
-      "outline"
     ];
 
   # Ignore below

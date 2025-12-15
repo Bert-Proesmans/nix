@@ -51,14 +51,6 @@
           aliases = [ "pictures.proesmans.eu" ];
           location = "${config.services.immich.host}:${toString config.services.immich.port}";
         };
-      service.wiki = {
-        # TODO; Reintroduce check after figuring out proper domain settings for outline
-        hostname =
-          #assert config.services.outline.publicUrl == "https://wiki.proesmans.eu";
-          "alpha.wiki.proesmans.eu";
-        aliases = [ "wiki.proesmans.eu" ];
-        location = "127.0.0.1:${toString config.services.outline.port}";
-      };
     in
     {
       enable = true;
@@ -193,20 +185,14 @@
           acl.alias_pictures = lib.concatMapStringsSep " || " (
             fqdn: "req.hdr(host) -i ${fqdn}"
           ) service.pictures.aliases;
-          acl.host_wiki = "req.hdr(host) -i ${service.wiki.hostname}";
-          acl.alias_wiki = lib.concatMapStringsSep " || " (
-            fqdn: "req.hdr(host) -i ${fqdn}"
-          ) service.wiki.aliases;
           request = [
             "redirect prefix https://${service.pictures.hostname} code 302 if alias_pictures"
-            "redirect prefix https://${service.wiki.hostname} code 302 if alias_wiki"
             "set-header X-Forwarded-Proto https"
             "set-header X-Forwarded-Host %[req.hdr(Host)]"
             "set-header X-Forwarded-Server %[hostname]"
             "set-header Strict-Transport-Security max-age=63072000"
 
             "set-var(txn.backend_name) str(immich_app) if host_pictures"
-            "set-var(txn.backend_name) str(outline_app) if host_wiki"
 
             # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
             "set-var(txn.max_body) str(\"10m\")"
@@ -235,22 +221,6 @@
           ];
           server.immich = {
             inherit (service.pictures) location;
-            extraOptions = "check";
-          };
-          extraConfig = ''
-            # Side-effect free use and reuse of upstream connections
-            http-reuse safe
-          '';
-        };
-
-        backend.outline_app = {
-          mode = "http";
-          option = [
-            # adds forwarded with forwarding information (Preferred over forwardfor, IETF RFC7239)
-            "forwarded"
-          ];
-          server.outline = {
-            inherit (service.wiki) location;
             extraOptions = "check";
           };
           extraConfig = ''
