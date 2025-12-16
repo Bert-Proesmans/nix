@@ -64,6 +64,9 @@
       matchConfig.Name = "eth0";
       networkConfig.DHCP = "ipv4";
       networkConfig.LinkLocalAddressing = "no";
+      # ERROR; Hyper-V managed default switch provides a DNS IP that doesn't resolve
+      # Fucking broken Windows and Hyper-V bullshit
+      dhcpV4Config.UseDNS = false;
     };
 
     "30-hypervisor-connect" = {
