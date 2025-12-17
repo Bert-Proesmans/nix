@@ -26,11 +26,18 @@ in
     serverSettings = {
       bindaddress = "127.0.0.1:8443";
       # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
-      # ERROR; These hostnames cannot be used as web resources under the openid specification
-      # NOTE; These hostnames can be used as web resources under the webauthn+cookies specification
+      # NOTE; Regional hostnames can be used as web resources under the webauthn+cookies specification
       #
-      # HELP; Domain and origin must be the same for all regional instances of IDM.
+      # HELP; Domain must be the same for all regional instances of IDM.
       domain = "idm.proesmans.eu";
+      # HELP; Origin should be equal to hostname, and equal or subdomain to "domain".
+      # ERROR; The origin is reported in the OpenID discovery reply. Client applications perform an exact
+      # match on the dommain. This means that the entire OpenID authentication transaction must happen
+      # on ONE specific regional instance!
+      # eg application -openid-> omega.idm.proesmans.eu -user redirect-> omega.idm.proesmans.eu -token exchange-> omega.idm.proesmans.eu -> application
+      # The application won't validate tokens issues by alpha.idm.proesmans.eu!
+      # So the origin remains on idm.proesmans.eu, and webauthn-rs is configured to allow operations from subdomain.
+      # REF; https://github.com/kanidm/kanidm/blob/4cc9acaeb03c2ad15a7530328c71cc04f2454309/server/lib/src/idm/server.rs#L198-L203
       origin = "https://idm.proesmans.eu";
       # log_level = "debug";
       online_backup.enabled = false;

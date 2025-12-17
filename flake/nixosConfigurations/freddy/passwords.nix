@@ -60,7 +60,10 @@ in
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
 
-      DOMAIN = "https://passwords.proesmans.eu";
+      # WARN; Custom config, see overlays!
+      WEBAUTH_DOMAIN = "passwords.proesmans.eu";
+      DOMAIN = "https://omega.passwords.proesmans.eu"; # App URL
+
       SIGNUPS_ALLOWED = false; # SEEALSO; SIGNUPS_DOMAINS_WHITELIST
       WEBSOCKET_ENABLED = true;
       WEB_VAULT_ENABLED = true;

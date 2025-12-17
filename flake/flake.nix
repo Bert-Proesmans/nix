@@ -91,6 +91,7 @@
       #
       overlays = {
         outline = import ./overlays/outline/default.nix;
+        vaultwarden = import ./overlays/vaultwarden/default.nix;
         # example = final: previous: {
         #   hello = previous.hello.overrideAttrs (old: {
         #     version = "${old.version}-superior";

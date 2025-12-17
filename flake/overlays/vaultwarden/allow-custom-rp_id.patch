@@ -1,0 +1,60 @@
+diff --git a/src/api/core/two_factor/webauthn.rs b/src/api/core/two_factor/webauthn.rs
+index 3b88302c..567ea59b 100644
+--- a/src/api/core/two_factor/webauthn.rs
++++ b/src/api/core/two_factor/webauthn.rs
+@@ -30,13 +30,15 @@ use webauthn_rs_proto::{
+ };
+ 
+ static WEBAUTHN: LazyLock<Webauthn> = LazyLock::new(|| {
+-    let domain = CONFIG.domain();
++    let domain = Url::parse(&CONFIG.domain()).map(|u| u.domain().map(str::to_owned)).ok().flatten().unwrap_or_default();
+     let domain_origin = CONFIG.domain_origin();
+-    let rp_id = Url::parse(&domain).map(|u| u.domain().map(str::to_owned)).ok().flatten().unwrap_or_default();
++    let rp_id = CONFIG.webauth_domain();
+     let rp_origin = Url::parse(&domain_origin).unwrap();
+ 
+     let webauthn = WebauthnBuilder::new(&rp_id, &rp_origin)
+         .expect("Creating WebauthnBuilder failed")
++        // Vault is very likely running on custom subdomain(s) if the admin set a custom rp_id
++        .allow_subdomains(rp_id != domain)
+         .rp_name(&domain)
+         .timeout(Duration::from_millis(60000));
+ 
+diff --git a/src/config.rs b/src/config.rs
+index 812b12f6..5e36277a 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -793,6 +793,9 @@ make_config! {
+         /// Prefer IPv6 (AAAA) resolving |> This settings configures the DNS resolver to resolve IPv6 first, and if not available try IPv4
+         /// This could be useful in IPv6 only environments.
+         dns_prefer_ipv6: bool, true, def, false;
++
++        /// Set a custom rp_id for webauthn keys |> More info here; https://github.com/dani-garcia/vaultwarden/discussions/6567
++        webauth_domain: String, true, auto, |c| extract_webauthn_rp_id(&c.domain);
+     },
+ 
+     /// OpenID Connect SSO settings
+@@ -1309,6 +1312,23 @@ fn extract_url_origin(url: &str) -> String {
+     }
+ }
+ 
++fn extract_webauthn_rp_id(domain: &str) -> String {
++    let origin = match Url::parse(domain) {
++        Ok(u) => u.origin().ascii_serialization(),
++        Err(e) => {
++            println!("Error validating domain: {e}");
++            String::new()
++        }
++    };
++    match Url::parse(&origin) {
++        Ok(u) => u.domain().unwrap_or("").to_string(),
++        Err(e) => {
++            println!("Error validating origin: {e}");
++            String::new()
++        }
++    }
++}
++
+ /// Extracts the path from a URL.
+ /// All trailing '/' chars are trimmed, even if the path is a lone '/'.
+ fn extract_url_path(url: &str) -> String {
