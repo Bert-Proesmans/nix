@@ -5,6 +5,7 @@
 }:
 {
   imports = [
+    ./backup.nix
     ./boot-unlock.nix
     ./certificates.nix
     ./database.nix
