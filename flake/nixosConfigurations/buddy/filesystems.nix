@@ -157,6 +157,14 @@
       options.mountpoint = "legacy";
     };
 
+    "backup" = {
+      # NOTE; This is the backup landing spot!
+      # TODO; Check if the target dataset needs to exist?
+      type = "zfs_fs";
+      mountpoint = null;
+      options.canmount = "off";
+    };
+
     "maintenance" = {
       # Reserved space to allow copy-on-write deletes.
       # WARN; When the storage is full-full it's impossible to impose new limits because every property write is written to the pool.
