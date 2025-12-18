@@ -30,7 +30,7 @@
       import directors; # Upstream balancer
       import cookie; # Cookie string manipulation
 
-      backend upstream {
+      backend pictures {
         # ERROR; Varnish community does NOT support tls upstream connections!
         # NOTE; Varnish enterprise does..
         .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
@@ -44,7 +44,6 @@
           #.url = "/"; # short easy way (GET /)
           
           # Debug with; varnishadm backend.list
-          # Picked pictures endpoint because that one came first, but this backend/configuration is actually hostname agnostic!
           .request =
             "GET / HTTP/1.1"
             "Host: alpha.pictures.proesmans.eu"
@@ -59,30 +58,38 @@
       }
 
       sub vcl_recv {
-        # Parametrize backend selection to abstract later procedures
-        # ERROR; No string, but backend type value
-        set req.backend_hint = upstream;
-
         # Remove the proxy header (see https://httpoxy.org/#mitigate-varnish)
         unset req.http.proxy;
-        
+
+        if (req.http.X-Forwarded-Host ~ "^\s*$") {
+          return (synth(404));
+        }
+
         # Normalize host value for easy matching
-        if (req.http.host ~ "[[:upper:]]") {
-          set req.http.host = req.http.host.lower();
+        if (req.http.X-Forwarded-Host ~ "[[:upper:]]") {
+          set req.http.X-Forwarded-Host = req.http.X-Forwarded-Host.lower();
+        }
+
+        # --- Backend selection ---
+        if (req.http.X-Forwarded-Host ~ "pictures\.proesmans\.eu$") {
+          set req.http.X-Backend = "pictures";
+          set req.backend_hint = pictures;
+        } else {
+          return (synth(404));
         }
 
         # --- Skip caching status endpoints ---
         if(req.url ~ "^/status") {
           return (pass);
         }
-        if(req.http.host ~ "pictures\.proesmans\.eu$" && req.url ~ "^/api/server/ping") {
+        if(req.http.X-Backend == "pictures" && req.url ~ "^/api/server/ping") {
           return (pass);
         }
 
+        # --- Some generic URL manipulation ---
         # Normalize the query arguments
         set req.url = std.querysort(req.url);
-
-        # --- Some generic URL manipulation ---
+        
         # Strip hash, improving cache hitrate
         if (req.url ~ "\#") {
           set req.url = regsub(req.url, "\#.*$", "");
@@ -104,21 +111,11 @@
           #
           set req.http.cookie = cookie.get_string();
 
-          if(req.http.host ~ "pictures\.proesmans\.eu$" && req.url ~ "^/api/assets/") {
+          if(req.http.X-Backend == "pictures" && req.url ~ "^/api/assets/") {
             # Ignore all cookies for immich assets, but keep them for the backend request on cache-miss.
             # SECURITY; This path must use secure randomly generated asset ids to not leak assets!
             #
             # WARN; Upstream requires following cookies; immich_access_token,immich_auth_type,immich_is_authenticated
-            set req.http.X-Upstream-Cookies = req.http.cookie;
-            unset req.http.cookie;
-          }
-
-          # NOTE; '/s/' is the prefix of public share links.
-          if(req.http.host ~ "wiki\.proesmans\.eu$" && (req.url ~ "^/s/" || req.url ~ "^/static/assets/" || req.url ~ "^/fonts/")) {
-            # Ignore all cookies for public wiki resources, but keep them for the backend request on cache-miss.
-            # SECURITY; The public share path must use secure randomly generated resource ids to not leak page contents!
-            #
-            # WARN; Upstream requires following cookies; <none>
             set req.http.X-Upstream-Cookies = req.http.cookie;
             unset req.http.cookie;
           }
@@ -136,7 +133,7 @@
         }
 
         # Set headers for request-response debugging
-        set req.http.grace = "none"; # DEBUG, see sub vcl_hit
+        set req.http.grace = "none"; # DEBUG, see sub vcl_deliver
 
         # builtin.vcl handles HTTP host normalization
         # builtin.vcl handles HTTP method filtering
@@ -244,21 +241,13 @@
           }
         }
 
-        if (bereq.http.host ~ "pictures\.proesmans\.eu$" && bereq.url ~ "^/api/assets/") {
+        if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
           set beresp.ttl = 1w; # serving from cache
           set beresp.grace = 6w; # serving from cache with attempting refresh on client request
           set beresp.keep = 1w; # no serving, best case refresh if no metadata change
-        }
-
-        if (bereq.http.host ~ "wiki\.proesmans\.eu$" && bereq.url ~ "^/s/") {
-          # Force enable caching because immich returns HTTP "cache-control: no-cache, must revalidate"
-          unset beresp.http.cache-control;
-          unset beresp.http.Set-Cookie;
-          set beresp.ttl = 1h;
-          set beresp.grace = 2w; # Keep public page url alive for a long time
         }
 
         # builtin.vcl handles HTTP content-range normalization

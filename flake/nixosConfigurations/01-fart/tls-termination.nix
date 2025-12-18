@@ -169,6 +169,11 @@ in
           option httplog
           option dontlognull
 
+          # Let Varnish know about the original client request
+          http-request set-header X-Forwarded-Proto https
+          http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+          http-request set-header X-Forwarded-Server %[hostname]
+
           server local-varnish unix@/run/varnishd/frontend.sock send-proxy-v2
 
         listen forward_to_buddy
