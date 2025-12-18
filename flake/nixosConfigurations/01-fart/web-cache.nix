@@ -321,22 +321,4 @@
       IPAddressDeny = "any"; # WORKAROUND
     };
   };
-
-  services.nginx.virtualHosts."omega.pictures.proesmans.eu" = {
-    serverAliases = [ "pictures.proesmans.eu" ];
-    useACMEHost = "omega-services.proesmans.eu";
-    onlySSL = true;
-    locations."/" = {
-      proxyPass = "http://unix:/run/varnishd/frontend.sock";
-    };
-  };
-
-  systemd.services.nginx = {
-    serviceConfig = {
-      SupplementaryGroups = [
-        # Allow nginx access to /run/varnishd/frontend.sock
-        config.users.groups.varnish.name
-      ];
-    };
-  };
 }

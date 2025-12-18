@@ -42,6 +42,12 @@ in
       loadbalance.idm = {
         aliases = [ "idm.proesmans.eu" ];
       };
+      service.cache = {
+        aliases = [
+          "pictures.proesmans.eu"
+          "omega.pictures.proesmans.eu"
+        ];
+      };
     in
     {
       enable = true;
@@ -101,6 +107,9 @@ in
           use_backend passthrough_freddy if { req.ssl_sni -i ${
             lib.concatMapStringsSep " " lib.escapeShellArg upstream.freddy.aliases
           } }
+          use_backend redirect_tls_cache if { req.ssl_sni -i ${
+            lib.concatMapStringsSep " " lib.escapeShellArg service.cache.aliases
+          } }
 
           # Default backend
           server local-nginx unix@/run/nginx/virtualhosts.sock send-proxy-v2
@@ -137,9 +146,34 @@ in
 
           server freddy ${upstream.freddy.location} send-proxy-v2 check
 
+        backend redirect_tls_cache
+          description Hairpin from tls handler into http(s) handler
+          mode tcp
+
+          server haproxy unix@/run/haproxy/tls_cache.sock send-proxy-v2
+
+        ## CACHING BACKEND ##
+
+        crt-store omega
+          crt-base '${config.security.acme.certs."omega-services.proesmans.eu".directory}'
+          key-base '${config.security.acme.certs."omega-services.proesmans.eu".directory}'
+          # NOTE; Wildcard + multiple domains certificate
+          load crt 'fullchain.pem' key 'key.pem'
+
+        listen tls_cache
+          description Terminate TLS before forwarding to Varnish
+          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
+          mode http
+          
+          log global
+          option httplog
+          option dontlognull
+
+          server local-varnish unix@/run/varnishd/frontend.sock send-proxy-v2
+
         listen forward_to_buddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
-          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 accept-proxy
+          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
           mode http
 
           no log
@@ -163,11 +197,16 @@ in
     };
 
   systemd.services.haproxy = {
+    requires = [ "acme-omega-services.proesmans.eu.service" ];
+    after = [ "acme-omega-services.proesmans.eu.service" ];
     serviceConfig = {
       RestartSec = "5s";
       SupplementaryGroups = [
         # Allow Haproxy access to /run/nginx/virtualhosts.sock
+        # Allow access to the ACME cert "omega-services.proesmans.eu"
         config.users.groups.nginx.name
+        # Allow Haproxy access to /run/varnishd/frontend.sock
+        config.users.groups.varnish.name
       ];
     };
   };
@@ -220,7 +259,10 @@ in
   security.acme = {
     certs."omega-services.proesmans.eu" = {
       group = config.users.groups.nginx.name;
-      reloadServices = [ config.systemd.services.nginx.name ];
+      reloadServices = [
+        config.systemd.services.haproxy.name
+        config.systemd.services.nginx.name
+      ];
     };
   };
 
