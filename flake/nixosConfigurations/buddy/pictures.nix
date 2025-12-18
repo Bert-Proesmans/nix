@@ -234,6 +234,21 @@ in
         "http://127.0.0.1:${toString config.services.immich.port}";
       proxyWebsockets = true;
     };
+    extraConfig = ''
+      # allow large file uploads
+      client_max_body_size 15G;
+
+      # disable buffering uploads to prevent OOM on reverse proxy server and make uploads twice as fast (no pause)
+      proxy_request_buffering off;
+
+      # increase body buffer to avoid limiting upload speed
+      client_body_buffer_size 1024k;
+
+      # increase timeouts for large uploads
+      proxy_read_timeout 10m; # Wait on upstream
+      proxy_send_timeout 10m; # Wait on client
+      send_timeout       1h; # Websocket tunnel timeouts
+    '';
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {

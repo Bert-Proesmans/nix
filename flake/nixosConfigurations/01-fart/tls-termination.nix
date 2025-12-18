@@ -78,6 +78,10 @@ in
           ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
           ssl-dh-param-file '${config.security.dhparams.params.haproxy.path}'
+          #
+          # Additional buffer tweaks for immich media streaming
+          tune.bufsize 32k
+          maxconn 100000
           
         defaults
           timeout connect 5s
@@ -174,12 +178,19 @@ in
 
         listen tls_cache
           description Terminate TLS before forwarding to Varnish
-          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
+          # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
+          # to workaround in haproxy.
+          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn http/1.1 accept-proxy
           mode http
           
           log global
           option httplog
           option dontlognull
+
+          option http-server-close
+          # Larger timeout for upload/download
+          timeout server 10m
+          timeout client 10m
 
           # Let Varnish know about the original client request
           http-request set-header X-Forwarded-Proto https
@@ -190,10 +201,17 @@ in
 
         listen forward_to_buddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
-          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
+          # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
+          # to workaround in haproxy.
+          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn http/1.1 accept-proxy
           mode http
 
           no log
+
+          option http-server-close
+          # Larger timeout for upload/download
+          timeout server 10m
+          timeout client 10m
 
           # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
           #
@@ -209,7 +227,7 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
       '';
     };
 

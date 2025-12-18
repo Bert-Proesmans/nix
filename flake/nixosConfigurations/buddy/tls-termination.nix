@@ -79,6 +79,10 @@
             lib.concatMapStringsSep " " lib.escapeShellArg downstream.proxies.addresses
           }
           tcp-request connection expect-proxy layer4 if trusted_proxies
+
+          # Larger timeout for immich upload/download
+          timeout server 10m
+          timeout client 10m
           
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
