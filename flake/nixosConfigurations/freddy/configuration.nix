@@ -1,12 +1,12 @@
 {
   lib,
+  flake,
   pkgs,
   ...
 }:
 {
   imports = [
     ./backup.nix
-    ./boot-unlock.nix
     ./certificates.nix
     ./database.nix
     ./disks.nix
@@ -20,6 +20,7 @@
     ./tls-termination.nix
     ./web-security.nix
     ./wiki.nix
+    flake.profiles.remote-machine
   ];
 
   proesmans.internationalisation.be-azerty.enable = true;
@@ -32,19 +33,6 @@
   security.sudo.enable = true;
   # Allow for passwordless sudo
   security.sudo.wheelNeedsPassword = false;
-
-  # Make me an admin!
-  users.users.bert-proesmans = {
-    isNormalUser = true;
-    description = "Bert Proesmans";
-    extraGroups = [
-      "wheel" # Allows sudo access
-      "systemd-journal" # Read the systemd service journal without sudo
-    ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
-    ];
-  };
 
   systemd.services = {
     memory-stress = {
