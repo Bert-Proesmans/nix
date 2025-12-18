@@ -28,14 +28,12 @@
       ];
     };
 
-    certs."alpha.proesmans.eu" = {
+    certs."alpha-services.proesmans.eu" = {
       # This block requests a wildcard certificate.
-      domain = lib.mkForce "*.alpha.proesmans.eu";
+      domain = lib.mkForce "alpha.proesmans.eu";
       extraDomainNames = lib.mkForce [
         "pictures.proesmans.eu"
         "alpha.pictures.proesmans.eu"
-        "wiki.proesmans.eu"
-        "alpha.wiki.proesmans.eu"
       ];
     };
   };

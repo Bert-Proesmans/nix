@@ -1,13 +1,146 @@
-{ lib, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 {
   networking.firewall.allowedTCPPorts = [
+    # TODO; Restrict port binding for haproxy user only
     80
     443
   ];
 
-  security.acme = {
-    defaults.reloadServices = [ config.systemd.services.haproxy.name ];
-    certs."alpha.proesmans.eu".group = "haproxy";
+  services.haproxy =
+    let
+      downstream.proxies.addresses = [
+        # IP-Addresses of all hosts that proxy to us
+        config.proesmans.facts."01-fart".host.tailscale.address
+        config.proesmans.facts."02-fart".host.tailscale.address
+      ];
+      services.idm =
+        assert config.services.kanidm.serverSettings.bindaddress == "127.0.0.1:8443";
+        {
+          # WARN; Domain and Origin are separate values from the effective DNS hostname.
+          # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
+          hostname =
+            assert config.services.kanidm.serverSettings.origin == "https://idm.proesmans.eu";
+            "alpha.idm.proesmans.eu";
+          location = "127.0.0.1:8443";
+        };
+    in
+    {
+      enable = true;
+      config = ''
+        global
+          log stdout format raw local0 info
+          # DEBUG
+          # log stdout format raw local0 notice
+          # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
+          # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
+          #
+          ssl-default-bind-curves X25519:prime256v1:secp384r1
+          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
+          ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-bind-options prefer-client-ciphers ssl-min-ver TLSv1.2 no-tls-tickets
+          ssl-default-server-curves X25519:prime256v1:secp384r1
+          ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
+          ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
+          ssl-dh-param-file '${config.security.dhparams.params.haproxy.path}'
+          
+        defaults
+          timeout connect 5s
+          timeout client 65s
+          timeout server 65s
+          timeout tunnel 1h
+
+        listen http_plain
+          description Redirect clients to https
+          mode http
+          bind :80 v4v6
+
+          log global
+          option httplog
+          option dontlognull
+
+          http-request redirect scheme https code 301 unless { ssl_fc }
+
+        listen tls_muxing
+          description Perform sni-tls routing, this mirrors nginx `stream { ... }` behavior but Haproxy has proxy-v2 support
+          mode tcp
+          bind :443 v4v6
+
+          # No logging here because of duplicate logs introduced by nginx which has more request context
+          no log
+
+          # Conditionally accept proxy protocol from tunnel hosts
+          acl trusted_proxies src ${
+            lib.concatMapStringsSep " " lib.escapeShellArg downstream.proxies.addresses
+          }
+          tcp-request connection expect-proxy layer4 if trusted_proxies
+          
+          # inspect clienthello to get SNI
+          tcp-request inspect-delay 5s
+          tcp-request content accept if { req_ssl_hello_type 1 }
+
+          # route by SNI
+          use_backend passthrough_kanidm if { req.ssl_sni -i ${lib.escapeShellArg services.idm.hostname} idm.proesmans.eu }
+          
+          # Default backend
+          server local-nginx unix@/run/nginx/virtualhosts.sock send-proxy-v2
+
+        backend passthrough_kanidm
+          description raw tcp/tls passthrough for kanidm with proxy protocol
+          mode tcp
+
+          server idm ${services.idm.location} send-proxy-v2
+      '';
+    };
+
+  systemd.services.haproxy = {
+    serviceConfig = {
+      RestartSec = "5s";
+      SupplementaryGroups = [
+        # Allow Haproxy access to /run/nginx/virtualhosts.sock
+        config.users.groups.nginx.name
+      ];
+    };
+  };
+
+  services.nginx = {
+    enable = true;
+    package = pkgs.nginxMainline;
+    recommendedOptimisation = true;
+    recommendedTlsSettings = true;
+    recommendedProxySettings = true;
+    recommendedGzipSettings = true;
+    recommendedBrotliSettings = true;
+    sslDhparam = config.security.dhparams.params.nginx.path;
+    appendHttpConfig = ''
+      # Enable access logging for crowdsec
+      access_log syslog:server=unix:/dev/log;
+
+      # trust proxy protocol and correctly represent client IP
+      set_real_ip_from unix:;
+      real_ip_header proxy_protocol;
+    '';
+
+    defaultListen = [
+      {
+        addr = "unix:/run/nginx/virtualhosts.sock";
+        port = null;
+        ssl = true;
+        proxyProtocol = true;
+      }
+    ];
+
+    virtualHosts = {
+      "default" = {
+        default = true;
+        locations."/".return = "404";
+      };
+    };
   };
 
   security.dhparams = {
@@ -19,233 +152,28 @@
       # Defaults are used.
       # Use 'params.haproxy.path' to retrieve the parameters.
     };
+    params.nginx = { };
   };
 
-  # Ensure no other modules enable nginx, only Haproxy is deployed!
-  services.nginx.enable = lib.mkForce false;
-
-  services.haproxy =
-    let
-      downstream.proxies.addresses = [
-        # IP-Addresses of all hosts that proxy to us
-        config.proesmans.facts."01-fart".host.tailscale.address
-        config.proesmans.facts."02-fart".host.tailscale.address
-      ];
-      service.idm =
-        assert config.services.kanidm.serverSettings.bindaddress == "127.0.0.1:8443";
-        {
-          # WARN; Domain and Origin are separate values from the effective DNS hostname.
-          # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
-          hostname =
-            assert config.services.kanidm.serverSettings.origin == "https://idm.proesmans.eu";
-            "alpha.idm.proesmans.eu";
-          aliases = [ "idm.proesmans.eu" ];
-          location = "127.0.0.1:8443";
-        };
-      service.pictures =
-        assert config.services.immich.host == "127.0.0.1";
-        {
-          hostname =
-            assert config.services.immich.settings.server.externalDomain == "https://pictures.proesmans.eu";
-            "alpha.pictures.proesmans.eu";
-          aliases = [ "pictures.proesmans.eu" ];
-          location = "${config.services.immich.host}:${toString config.services.immich.port}";
-        };
-    in
-    {
-      enable = true;
-      settings = {
-        recommendedTlsSettings = true;
-
-        global = {
-          sslDhparam = config.security.dhparams.params.haproxy.path;
-          extraConfig = ''
-            # Workarounds
-            #
-            # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
-            # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
-            #
-            # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
-            # both programs with haproxy strictly applying standards and firefox farting all over.
-            h2-workaround-bogus-websocket-clients
-          '';
-        };
-
-        defaults."" = {
-          # Anonymous defaults section.
-          # Using anonymous defaults section is highly discouraged!
-          timeout = {
-            connect = "15s";
-            client = "65s";
-            server = "65s";
-            tunnel = "1h";
-          };
-
-          option = [
-            "dontlognull"
-          ];
-
-          extraConfig = ''
-            log global
-          '';
-        };
-
-        crt-stores.alpha.extraConfig = ''
-          crt-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
-          key-base '${config.security.acme.certs."alpha.proesmans.eu".directory}'
-          # NOTE; Wildcard + multiple domains certificate
-          load crt 'fullchain.pem' key 'key.pem'
-        '';
-
-        frontend.http_plain = {
-          mode = "http";
-          bind = [ ":80 v4v6" ];
-          option = [
-            "httplog"
-            "dontlognull"
-          ];
-          # This is a stub that redirects the client to https
-          request = [ "redirect scheme https code 301 unless { ssl_fc }" ];
-        };
-
-        listen.tls_mux = {
-          mode = "tcp";
-          bind = [ ":443 v4v6" ];
-          option = [ ];
-          # No logging here because duplicate logs introduced by hairpin into https_terminator
-          extraConfig = ''
-            no log
-          '';
-
-          acl.trusted_proxies = "src ${lib.concatStringsSep " " downstream.proxies.addresses}";
-          request = [
-            "connection expect-proxy layer4 if trusted_proxies"
-            "inspect-delay 5s"
-            "content accept if { req_ssl_hello_type 1 }"
-          ];
-
-          acl.kanidm_request = lib.concatMapStringsSep " || " (fqdn: "req.ssl_sni -i ${fqdn}") (
-            [ service.idm.hostname ] ++ service.idm.aliases
-          );
-          backend = [
-            {
-              name = "passthrough_kanidm";
-              condition = "kanidm_request";
-            }
-          ];
-
-          server.local = "unix@/run/haproxy/local-https.sock send-proxy-v2";
-        };
-
-        frontend.https_terminator = {
-          mode = "http";
-          bind = [
-            {
-              location = "unix@/run/haproxy/local-https.sock";
-              extraOptions = "ssl crt '@alpha/fullchain.pem' alpn h2,http/1.1 accept-proxy";
-            }
-          ];
-          option = [
-            "httplog"
-            "dontlognull"
-            "http-server-close" # Allow server-side websocket connection termination
-          ];
-          compression = {
-            algo = [
-              "gzip"
-              "deflate"
-            ];
-            type = [
-              "text/html"
-              "text/plain"
-              "text/css"
-              "text/javascript"
-              "application/javascript"
-              "application/x-javascript"
-              "application/json"
-              "application/ld+json"
-              "application/wasm"
-              "application/xml"
-              "application/xhtml+xml"
-              "application/rss+xml"
-              "application/atom+xml"
-              "text/xml"
-              "text/markdown"
-              "text/vtt"
-              "text/cache-manifest"
-              "text/calendar"
-              "text/csv"
-              "font/ttf"
-              "font/otf"
-              "image/svg+xml"
-              "application/vnd.ms-fontobject"
-            ];
-          };
-          acl.host_pictures = "req.hdr(host) -i ${service.pictures.hostname}";
-          acl.alias_pictures = lib.concatMapStringsSep " || " (
-            fqdn: "req.hdr(host) -i ${fqdn}"
-          ) service.pictures.aliases;
-          request = [
-            "redirect prefix https://${service.pictures.hostname} code 302 if alias_pictures"
-            "set-header X-Forwarded-Proto https"
-            "set-header X-Forwarded-Host %[req.hdr(Host)]"
-            "set-header X-Forwarded-Server %[hostname]"
-            "set-header Strict-Transport-Security max-age=63072000"
-
-            "set-var(txn.backend_name) str(immich_app) if host_pictures"
-
-            # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
-            "set-var(txn.max_body) str(\"10m\")"
-            "set-var(txn.max_body) str(\"500m\") if host_pictures"
-
-            # enforce payload size, units in bytes
-            "set-var(txn.max_body_bytes) var(txn.max_body_str),bytes"
-            "set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)"
-            "set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)"
-            "deny status 413 if { var(txn.body_size_diff) -m int gt 0 }"
-            "deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }"
-
-            # reject if no backend set (optional hardening)
-            "deny status 421 if !{ var(txn.backend_name) -m found }"
-          ];
-          backend = [
-            "%[var(txn.backend_name)]"
-          ];
-        };
-
-        backend.immich_app = {
-          mode = "http";
-          option = [
-            # adds X-Forwarded-For with client ip (non-standardized btw)
-            "forwardfor"
-          ];
-          server.immich = {
-            inherit (service.pictures) location;
-            extraOptions = "check";
-          };
-          extraConfig = ''
-            # Side-effect free use and reuse of upstream connections
-            http-reuse safe
-          '';
-        };
-
-        backend.passthrough_kanidm = {
-          mode = "tcp";
-          extraConfig = ''
-            option tcp-check
-            tcp-check send QUIT\r\n
-          '';
-          server.app = {
-            inherit (service.idm) location;
-            extraOptions = "send-proxy-v2 check check-ssl verify none";
-          };
-        };
-      };
+  security.acme = {
+    certs."alpha-services.proesmans.eu" = {
+      group = config.users.groups.nginx.name;
+      reloadServices = [ config.systemd.services.nginx.name ];
     };
-
-  systemd.services.haproxy = {
-    requires = [ "acme-alpha.proesmans.eu.service" ];
-    after = [ "acme-alpha.proesmans.eu.service" ];
   };
 
+  systemd.services.nginx = {
+    requires = [ "acme-alpha-services.proesmans.eu.service" ];
+    after = [ "acme-alpha-services.proesmans.eu.service" ];
+
+    serviceConfig = {
+      # Restrict nginx from doing anything outside of muxing between unix socket and upstream services
+      RestrictAddressFamilies = lib.mkForce [
+        "AF_UNIX"
+        "AF_INET"
+      ];
+      IPAddressDeny = "any";
+      IPAddressAllow = "127.0.0.0/8";
+    };
+  };
 }

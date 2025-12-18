@@ -47,7 +47,7 @@ in
   };
 
   # Disable snapshots on the cache dataset
-  services.sanoid.datasets."storage/media/immich/cache".use_template = [ "ignore" ];
+  services.sanoid.datasets."storage/media/immich/cache".autosnap = false;
 
   users.groups.mail = {
     # Members of this group have access to secret "password-smtp"
@@ -221,6 +221,18 @@ in
       trash.days = 200;
       trash.enabled = true;
       user.deleteDelay = 30;
+    };
+  };
+
+  services.nginx.virtualHosts."alpha.pictures.proesmans.eu" = {
+    serverAliases = [ "pictures.proesmans.eu" ];
+    useACMEHost = "alpha-services.proesmans.eu";
+    onlySSL = true;
+    locations."/" = {
+      proxyPass =
+        assert config.services.immich.host == "127.0.0.1";
+        "http://127.0.0.1:${toString config.services.immich.port}";
+      proxyWebsockets = true;
     };
   };
 
