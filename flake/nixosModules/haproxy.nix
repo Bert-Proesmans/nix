@@ -495,10 +495,10 @@ let
 in
 
 {
-  disabledModules = [ "${modulesPath}/services/networking/haproxy.nix" ];
+  # disabledModules = [ "${modulesPath}/services/networking/haproxy.nix" ];
 
   options = {
-    services.haproxy = {
+    services.proesmans.haproxy = {
       enable = lib.mkEnableOption "HAProxy, the reliable, high performance TCP/HTTP load balancer.";
       validateConfigFile = lib.mkEnableOption "validation of the configuration file at build time";
 
@@ -569,7 +569,7 @@ in
     # configuration file indirection is needed to support reloading
     environment.etc."haproxy.cfg".source = haproxyCfg;
 
-    services.haproxy.settings = {
+    services.proesmans.haproxy.settings = {
       global.extraConfig = lib.mkIf cfg.settings.recommendedTlsSettings ''
         # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
         # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
