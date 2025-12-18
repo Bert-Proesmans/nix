@@ -84,6 +84,8 @@ in
           bind :443 v4v6
 
           log global
+          option tcplog
+          option dontlognull
           
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
@@ -115,7 +117,6 @@ in
           description raw tcp/tls passthrough with proxy protocol, fallback over multiple hosts
           mode tcp
 
-          log global
           balance first
 
           # TODO; Figure out how health checks should be performed!
@@ -128,14 +129,12 @@ in
           description raw tcp/tls passthrough for buddy with proxy protocol
           mode tcp
 
-          log global
           server buddy ${upstream.buddy.location} send-proxy-v2 check
 
         backend passthrough_freddy
           description raw tcp/tls passthrough for tcp with proxy protocol
           mode tcp
 
-          log global
           server freddy ${upstream.freddy.location} send-proxy-v2 check
 
         listen forward_to_buddy

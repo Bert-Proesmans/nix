@@ -93,8 +93,7 @@
         backend passthrough_kanidm
           description raw tcp/tls passthrough for kanidm with proxy protocol
           mode tcp
-          
-          log global          
+
           server idm ${services.idm.location} send-proxy-v2
       '';
     };
