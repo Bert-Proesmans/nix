@@ -200,4 +200,15 @@ in
       OAUTH_SECRET=${config.sops.placeholder."gatus-oauth-secret"}
     '';
   };
+
+  services.nginx.virtualHosts."omega.status.proesmans.eu" = {
+    useACMEHost = "omega-services.proesmans.eu";
+    onlySSL = true;
+    serverAliases = [ "status.proesmans.eu" ];
+    locations."/" = {
+      proxyPass =
+        assert config.services.gatus.settings.web.address == "127.0.0.1";
+        "http://127.0.0.1:${toString config.services.gatus.settings.web.port}";
+    };
+  };
 }

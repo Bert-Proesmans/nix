@@ -1,39 +1,37 @@
-{ lib, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 let
   inherit (config.proesmans.facts) buddy freddy;
 in
 {
   networking.firewall.allowedTCPPorts = [
+    # TODO; Restrict port binding for haproxy user only
     80
     443
   ];
 
-  security.acme = {
-    defaults.reloadServices = [ config.systemd.services.haproxy.name ];
-    certs."omega.proesmans.eu".group = config.services.haproxy.group;
-  };
-
-  # Allow r/w access to varnish frontend socket
-  users.groups.varnish-frontend.members = [ config.services.haproxy.group ];
-
   services.haproxy =
     let
       upstream.buddy = {
-        # Always forward these domains to buddy
+        # Client -> Haproxy -> Buddy passthrough
         aliases = [
           "alpha.idm.proesmans.eu"
+          "alpha.pictures.proesmans.eu"
         ];
         # WARN; Expecting the upstream to ingest our proxy frames based on IP ACL rule
         # NOTE; Using the tailscale address to tunnel between nodes.
         location = "${buddy.host.tailscale.address}:${toString buddy.service.reverse-proxy.port}";
       };
       upstream.freddy = {
-        # Always forward these domains to freddy
+        # Client -> Haproxy -> Freddy passthrough
         aliases = [
           "omega.idm.proesmans.eu"
-          "idm.proesmans.eu"
-          "omega.passwords.proesmans.eu"
           "passwords.proesmans.eu"
+          "omega.passwords.proesmans.eu"
           "wiki.proesmans.eu"
           "omega.wiki.proesmans.eu"
         ];
@@ -41,358 +39,190 @@ in
         # NOTE; Using the tailscale address to tunnel between nodes.
         location = "${freddy.host.tailscale.address}:${toString freddy.service.reverse-proxy.port}";
       };
-      service.pictures = {
-        hostname = "omega.pictures.proesmans.eu";
-        aliases = [ "pictures.proesmans.eu" ];
-        # NOTE; Upstream is local varnish webcache
-        location = "unix@/run/varnish-sockets/frontend.sock";
-      };
-      service.status =
-        assert config.services.gatus.settings.web.address == "127.0.0.1";
-        {
-          hostname = "omega.status.proesmans.eu";
-          aliases = [ "status.proesmans.eu" ];
-          location = "127.0.0.1:${toString config.services.gatus.settings.web.port}";
-        };
+      # loadbalanced.idm = {
+      #   aliases = [
+      #     "idm.proesmans.eu"
+      #   ];
+      # };
     in
     {
       enable = true;
-      settings = {
-        recommendedTlsSettings = true;
+      # NOTE; Example timeouts
+      # timeout connect 5s # Maximum time for client to finish handshake
+      # timeout client 65s # Maximum idle time of client
+      # timeout server 65s # Maximum idle time of upstream server
+      # timeout queue 5s # Maximum wait time in Haproxy queue until slot to upstream is free
+      # timeout tunnel 1h # Websocket idle time
+      # timeout http-request 10s #
+      # timeout http-keep-alive 2s #
+      # timeout client-fin 1s #
+      # timeout server-fin 1s #
+      config = ''
+        global
+          log stdout format raw local0 info
+          # DEBUG
+          # log stdout format raw local0 notice
+          
+        defaults
+          timeout connect 5s
+          timeout client 65s
+          timeout server 65s
+          timeout tunnel 1h
 
-        global = {
-          sslDhparam = config.security.dhparams.params.haproxy.path;
-          extraConfig = ''
-            # Workarounds
-            #
-            # ERROR; Firefox attempts to upgrade to websockets over HTTP1.1 protocol with a bogus HTTP2 version tag.
-            # The robust thing to do is to return an error.. but that doesn't help the users with a shitty client!
-            #
-            # NOTE; What exactly happens is ALPN negotiates H2 between browser and haproxy. This triggers H2 specific flows in 
-            # both programs with haproxy strictly applying standards and firefox farting all over.
-            h2-workaround-bogus-websocket-clients
+        listen http_plain
+          description Redirect clients to https
+          mode http
+          bind :80 v4v6
 
-            # DEBUG
-            # log stdout format raw local0 notice
-          '';
-        };
+          log global
+          option httplog
+          option dontlognull
 
-        defaults."" = {
-          # Anonymous defaults section.
-          # Using anonymous defaults section is highly discouraged!
-          timeout = {
-            connect = "15s";
-            client = "65s";
-            server = "65s";
-            tunnel = "1h";
-          };
+          http-request redirect scheme https code 301 unless { ssl_fc }
 
-          option = [
-            "dontlognull"
-          ];
+        listen tls_muxing
+          description Perform sni-tls routing, this mirrors nginx `stream { ... }` behavior but Haproxy has proxy-v2 support
+          mode tcp
+          bind :443 v4v6
 
-          extraConfig = ''
-            log global
-          '';
-        };
+          log global
+          
+          # inspect clienthello to get SNI
+          tcp-request inspect-delay 5s
+          tcp-request content accept if { req_ssl_hello_type 1 }
 
-        crt-stores.omega.extraConfig = ''
-          crt-base '${config.security.acme.certs."omega.proesmans.eu".directory}'
-          key-base '${config.security.acme.certs."omega.proesmans.eu".directory}'
-          # NOTE; Wildcard + multiple domains certificate
-          load crt 'fullchain.pem' key 'key.pem'
-        '';
+          # route by SNI
+          use_backend passthrough_buddy if { req.ssl_sni -i "${
+            lib.concatMapStringsSep " " lib.escapeShellArg upstream.buddy.aliases
+          }" }
+          use_backend passthrough_freddy if { req.ssl_sni -i "${
+            lib.concatMapStringsSep " " lib.escapeShellArg upstream.freddy.aliases
+          }" }
 
-        frontend.http_plain = {
-          mode = "http";
-          bind = [ ":80 v4v6" ];
-          option = [
-            "httplog"
-            "dontlognull"
-          ];
-          # This is a stub that redirects the client to https
-          request = [ "redirect scheme https code 301 unless { ssl_fc }" ];
-        };
+          # Default backend
+          server local-nginx unix@/run/nginx/virtualhosts.sock send-proxy-v2
 
-        listen.tls_mux = {
-          mode = "tcp";
-          bind = [ ":443 v4v6" ];
-          option = [ "tcplog" ];
-          # No logging here because duplicate logs introduced by hairpin into https_terminator
-          extraConfig = ''
-            # no log
-          '';
+        # WARN; DO NOT check TLS certificate because Haproxy cannot handle CHECK with PROXY with TLS. The below options DO NOT work!
+        # The TCP proxy node is also not the right location for TLS verification, only the end nodes are proper.
+        # Use the tailscale peer IP for mutual TLS verification if MITM is a concern.
+        #
+        # "ssl verify required"
+        # "ca-file /etc/ssl/certs/ca-bundle.crt"
+        # "check-sni ${builtins.head upstream.freddy.aliases}"
 
-          request = [
-            "inspect-delay 5s"
-            "content accept if { req_ssl_hello_type 1 }"
-          ];
+        backend passthrough_buddy
+          description raw tcp/tls passthrough for buddy with proxy protocol
+          mode tcp
 
-          acl.buddy_request = lib.concatMapStringsSep " || " (fqdn: "req.ssl_sni -i ${fqdn}") (
-            upstream.buddy.aliases
-          );
-          acl.freddy_request = lib.concatMapStringsSep " || " (fqdn: "req.ssl_sni -i ${fqdn}") (
-            upstream.freddy.aliases
-          );
-          backend = [
-            {
-              name = "buddy_passthrough";
-              condition = "buddy_request";
-            }
-            {
-              name = "freddy_passthrough";
-              condition = "freddy_request";
-            }
-          ];
+          log global
+          server buddy ${upstream.buddy.location} send-proxy-v2 check
 
-          server.local = "unix@/run/haproxy/local-https.sock send-proxy-v2";
-        };
+        backend passthrough_freddy
+          description raw tcp/tls passthrough for tcp with proxy protocol
+          mode tcp
 
-        backend.freddy_passthrough = {
-          mode = "tcp";
-          server.freddy = {
-            inherit (upstream.freddy) location;
-            # WARN; DO NOT check TLS certificate because Haproxy cannot handle PROXY + TLS. The below options DO NOT work!
-            # The TCP proxy node is also not the right location for TLS verification, only the end nodes are proper.
-            # Use the tailscale peer IP for mutual TLS verification if MITM is a fear.
-            # "ssl verify required"
-            # "ca-file /etc/ssl/certs/ca-bundle.crt"
-            # "check-sni ${builtins.head upstream.freddy.aliases}"
-            extraOptions = lib.concatStringsSep " " [
-              "send-proxy-v2"
-              "check"
-            ];
-          };
-        };
+          log global
+          server freddy ${upstream.freddy.location} send-proxy-v2 check
 
-        backend.buddy_passthrough = {
-          mode = "tcp";
-          server.buddy = {
-            inherit (upstream.buddy) location;
-            extraOptions = lib.concatStringsSep " " [
-              "send-proxy-v2"
-              "check"
-              # WARN; DO NOT check TLS certificate because Haproxy cannot handle PROXY + TLS.
-              # Use the tailscale peer IP for mutual TLS verification if MITM is a fear.
-            ];
-          };
-        };
+        listen forward_to_buddy
+          description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
+          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 accept-proxy
+          mode http
 
-        frontend.https_terminator = {
-          mode = "http";
-          bind = [
-            {
-              location = "unix@/run/haproxy/local-https.sock";
-              extraOptions = "ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy";
-            }
-          ];
-          option = [
-            "httplog"
-            "dontlognull"
-            "http-server-close" # Allow server-side websocket connection termination
-          ];
-          compression = {
-            algo = [
-              "gzip"
-              "deflate"
-            ];
-            type = [
-              "text/html"
-              "text/plain"
-              "text/css"
-              "text/javascript"
-              "application/javascript"
-              "application/x-javascript"
-              "application/json"
-              "application/ld+json"
-              "application/wasm"
-              "application/xml"
-              "application/xhtml+xml"
-              "application/rss+xml"
-              "application/atom+xml"
-              "text/xml"
-              "text/markdown"
-              "text/vtt"
-              "text/cache-manifest"
-              "text/calendar"
-              "text/csv"
-              "font/ttf"
-              "font/otf"
-              "image/svg+xml"
-              "application/vnd.ms-fontobject"
-            ];
-          };
+          no log
 
-          acl.pictures_host = "req.hdr(host) -i ${service.pictures.hostname}";
-          acl.pictures_alias = lib.concatMapStringsSep " || " (
-            fqdn: "req.hdr(host) -i ${fqdn}"
-          ) service.pictures.aliases;
-          acl.status_host = "req.hdr(host) -i ${service.status.hostname}";
-          acl.status_alias = lib.concatMapStringsSep " || " (
-            fqdn: "req.hdr(host) -i ${fqdn}"
-          ) service.status.aliases;
-
-          # http/1.1 websocket detection
+          # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
           #
-          # NOTE; HTTP_2.0 is a built-in ACL
+          # NOTE; sni override is explicitly required if request headers, like host, were manipulated for upstream use! Before entering
+          # this (backend) block the sni must be known!
           #
-          acl.is_websocket = "req.hdr(Upgrade) -i websocket";
-          acl.is_upgrade = "req.hdr(Connection) -i upgrade";
-          # http/2 websocket detection
+          # ERROR; sni argument is processed _before_ per-request set-headers are in effect!
+          # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
+          # is created.
+          # USE 'sni req.hdr(host)' => If the frontend has corrected to the right upstream hostname
           #
-          # SEEALSO; global > h2-workaround-bogus-websocket-clients
+          # NOTE; Using http2 protocol with reused backend connections should(?) reduce tcp connection overhead lowering total latency through channel multiplexing.
+          # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
-          acl.h2_ws_connect = "req.hdr(:method) -i CONNECT";
-          acl.h2_ws_protocol = "req.hdr(:protocol) -i websocket";
-
-          acl.host_is_omega = "hdr_beg(host) -i omega.";
-
-          request = [
-            "redirect prefix https://${service.pictures.hostname} code 302 if pictures_alias"
-            "redirect prefix https://${service.status.hostname} code 302 if status_alias"
-
-            "set-header X-Forwarded-Proto https"
-            "set-header X-Forwarded-Host %[req.hdr(Host)]"
-            "set-header X-Forwarded-Server %[hostname]"
-            "set-header Strict-Transport-Security max-age=63072000"
-
-            "set-var(txn.backend_name) str(immich_app) if pictures_host"
-            "set-var(txn.backend_name) str(gatus_app) if status_host"
-
-            # Websocket processing
-            "set-var(txn.is_ws_h1) bool(true) if is_websocket is_upgrade !HTTP_2.0"
-            "set-var(txn.is_ws_h2) bool(true) if h2_ws_connect h2_ws_protocol HTTP_2.0"
-            "set-var(txn.is_ws) bool(true) if { var(txn.is_ws_h1) -m bool } or { var(txn.is_ws_h2) -m bool }"
-            # short-circuit websockets
-            "set-var(txn.backend_name) str(tls_to_buddy) if pictures_host { var(txn.is_ws) -m bool }"
-
-            # transform omega.<domain> -> alpha.<domain> if websocket forwarding
-            #
-            # NOTE; HTTP header 'host' is updated before short-circuiting to the upstream service.
-            #
-            # NOTE; Documentation is unclear if this does the logical thing abstracted over both http1.1 and http2..
-            # (Maybe need to use set-uri)
-            "set-header Host %[req.hdr(host),regsub(^omega\.,alpha.,)] if { var(txn.is_ws) -m bool } pictures_host host_is_omega"
-
-            # allow/deny large uploads similar to nginx's client_max_body_size (nginx default was 10M)
-            "set-var(txn.max_body) str(\"10m\")"
-            "set-var(txn.max_body) str(\"500m\") if pictures_host"
-
-            # enforce payload size, units in bytes
-            "set-var(txn.max_body_bytes) var(txn.max_body_str),bytes"
-            "set-var(txn.body_size_diff) var(req.body_size),sub(txn.max_body_bytes)"
-            "set-var(txn.cl_size_diff)   req.hdr_val(content-length),sub(txn.max_body_bytes)"
-            "deny status 413 if { var(txn.body_size_diff) -m int gt 0 }"
-            "deny status 413 if { var(txn.cl_size_diff) -m int gt 0 }"
-
-            # reject if no backend set (optional hardening)
-            "deny status 421 if !{ var(txn.backend_name) -m found }"
-          ];
-          backend = [
-            "%[var(txn.backend_name)]"
-          ];
-        };
-
-        backend.immich_app = {
-          mode = "http";
-          acl.host_is_omega = "hdr_beg(host) -i omega.";
-          request = [
-            # transform omega.<domain> -> alpha.<domain>
-            #
-            # NOTE; HTTP header 'host' is updated before delivering to varnish to have consistency between request and response.
-            #
-            # NOTE; Documentation is unclear if this does the logical thing abstracted over both http1.1 and http2..
-            "set-header Host %[req.hdr(Host),regsub(^omega\.,alpha.,)]"
-          ];
-          server.varnish =
-            assert lib.strings.hasInfix "varnish" service.pictures.location;
-            {
-              inherit (service.pictures) location;
-              # Varnish endpoint!
-              extraOptions = "send-proxy-v2 check";
-            };
-        };
-
-        backend.gatus_app = {
-          mode = "http";
-          request = [ ];
-          server.gatus = {
-            inherit (service.status) location;
-            extraOptions = "check";
-          };
-        };
-
-        listen.tls_to_buddy = {
-          description = "varnish community edition cannot connect upstream over TLS, so this is a leg of the hairpin (with proxy-v2)";
-          mode = "http";
-          bind = [
-            {
-              location = "unix@/run/haproxy-sockets/frontend.sock";
-              extraOptions = "accept-proxy group haproxy-frontend mode 660";
-            }
-            # {
-            #   # DEBUG
-            #   location = "127.0.0.1:6666";
-            # }
-          ];
-          extraConfig = ''
-            no log
-          '';
-
-          server.buddy = {
-            inherit (upstream.buddy) location;
-            # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
-            #
-            # NOTE; sni override is explicitly required if request headers, like host, were manipulated for upstream use! Before entering
-            # this (backend) block the sni must be known!
-            #
-            # ERROR; sni argument is processed _before_ per-request set-headers are in effect!
-            # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
-            # is created.
-            # USE 'sni req.hdr(host)' => If the frontend has corrected to the right upstream hostname
-            #
-            # NOTE; Using http2 protocol with reused backend connections should(?) reduce tcp connection overhead lowering total latency through channel multiplexing.
-            # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
-            extraOptions = lib.concatStringsSep " " [
-              "alpn h2,http/1.1"
-              "send-proxy-v2"
-              "check"
-              # In HTTP proxy mode we _must_ verify the endpoint certificate!
-              "ssl verify required"
-              "ca-file /etc/ssl/certs/ca-bundle.crt"
-              "sni req.hdr(host)"
-            ];
-          };
-        };
-      };
+          # In HTTP proxy mode we _must_ verify the endpoint certificate!
+          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+      '';
     };
 
   systemd.services.haproxy = {
-    requires = [ "acme-omega.proesmans.eu.service" ];
-    after = [ "acme-omega.proesmans.eu.service" ];
-  };
-
-  # Add members to group haproxy-frontend for r/w access to /run/haproxy-sockets/frontend.sock
-  users.groups.haproxy-frontend.members = [ config.services.haproxy.group ];
-  systemd.tmpfiles.settings."50-haproxy-sockets" = {
-    "/run/haproxy-sockets".d = {
-      user = config.services.haproxy.user;
-      group = config.users.groups.haproxy-frontend.name;
-      mode = "0755";
+    serviceConfig = {
+      RestartSec = "5s";
+      SupplementaryGroups = [
+        # Allow Haproxy access to /run/nginx/virtualhosts.sock
+        config.users.groups.nginx.name
+      ];
     };
   };
 
-  # Ensure no other modules enable nginx, only Haproxy is deployed!
-  services.nginx.enable = false;
+  services.nginx = {
+    enable = true;
+    package = pkgs.nginxMainline;
+    recommendedOptimisation = true;
+    recommendedTlsSettings = true;
+    recommendedProxySettings = true;
+    recommendedGzipSettings = true;
+    recommendedBrotliSettings = true;
+    sslDhparam = config.security.dhparams.params.nginx.path;
+    appendHttpConfig = ''
+      # Enable access logging for crowdsec
+      access_log syslog:server=unix:/dev/log;
+
+      # trust proxy protocol and correctly represent client IP
+      set_real_ip_from unix:;
+      real_ip_header proxy_protocol;
+    '';
+
+    defaultListen = [
+      {
+        addr = "unix:/run/nginx/virtualhosts.sock";
+        port = null;
+        ssl = true;
+        proxyProtocol = true;
+      }
+    ];
+
+    virtualHosts = {
+      "default" = {
+        default = true;
+        locations."/".return = "404";
+      };
+    };
+  };
 
   security.dhparams = {
     enable = true;
     # NOTE; Suggested by Mozilla TLS config generator
     defaultBitSize = 2048;
-    # Name of parameter set must match the systemd service name!
-    params.haproxy = {
+    params.nginx = {
       # Defaults are used.
-      # Use 'params.haproxy.path' to retrieve the parameters.
+      # Use 'params.nginx.path' to retrieve the parameters.
+    };
+  };
+
+  security.acme = {
+    certs."omega-services.proesmans.eu" = {
+      group = config.users.groups.nginx.name;
+      reloadServices = [ config.systemd.services.nginx.name ];
+    };
+  };
+
+  systemd.services.nginx = {
+    requires = [ "acme-omega-services.proesmans.eu.service" ];
+    after = [ "acme-omega-services.proesmans.eu.service" ];
+
+    serviceConfig = {
+      # Restrict nginx from doing anything outside of muxing between unix socket and upstream services
+      RestrictAddressFamilies = lib.mkForce [
+        "AF_UNIX"
+        "AF_INET"
+      ];
+      IPAddressDeny = "any";
+      IPAddressAllow = "127.0.0.0/8";
     };
   };
 }

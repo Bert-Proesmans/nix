@@ -1,8 +1,5 @@
 { lib, config, ... }:
 {
-  # Allow r/w access to haproxy frontend socket
-  users.groups.haproxy-frontend.members = [ "varnish" ];
-
   services.varnish = {
     enable = true;
     # ERROR; Varnish verifies upstream IP reachability.. during build time :/
@@ -19,9 +16,9 @@
     listen = [
       {
         name = "local_unix";
-        address = "/run/varnish-sockets/frontend.sock";
+        address = "/run/varnishd/frontend.sock";
         proto = "PROXY"; # Enable proxy V2 frames
-        group = config.users.groups.varnish-frontend.name;
+        group = config.users.groups.varnish.name;
         mode = "660";
       }
     ];
@@ -36,11 +33,11 @@
       backend upstream {
         # ERROR; Varnish community does NOT support tls upstream connections!
         # NOTE; Varnish enterprise does..
-        .path = "/run/haproxy-sockets/frontend.sock";  # run it back to haproxy
+        .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
         .proxy_header = 2;
 
-        .first_byte_timeout     = 300s;   # How long to wait before we receive a first byte from our backend?
         .connect_timeout        = 5s;     # How long to wait for a backend connection?
+        .first_byte_timeout     = 65s;   # How long to wait before we receive a first byte from our backend?
         .between_bytes_timeout  = 2s;     # How long to wait between bytes received from our backend?
 
         .probe = {
@@ -296,6 +293,11 @@
     # clears all cached data. A service (or config) reload persists the cached data instead.
 
     serviceConfig = {
+      SupplementaryGroups = [
+        # Allow varnish access to /run/haproxy/forward_to_buddy.sock
+        config.users.groups.haproxy.name
+      ];
+
       # ERROR; Service directories are set to varnish_d_ upstream!
       CacheDirectory = "varnishd";
       CacheDirectoryMode = "0700";
@@ -306,16 +308,35 @@
       # NOTE; Limit is a bit higher than the default vsl space (80m) to allow for other memory segment types to be locked too.
       # REF; https://github.com/varnishcache/pkg-varnish-cache/blob/1f0d212dc45065f38bd80ac57fe22773a20a0595/systemd/varnish.service
       LimitMEMLOCK = "100M";
+
+      # Restrict varnish from doing anything outside of muxing between unix sockets
+      RestrictAddressFamilies = lib.mkForce [
+        "AF_UNIX"
+        # WORKAROUND; Varnish tries to find out default TCP socket parameters.
+        # Allow AF_INET but deny any actual IP communication. (see IPAddressDeny below)
+        #
+        # REF; https://github.com/varnishcache/varnish-cache/blob/6e4e674b9bef2e58eab3d755856244e2c9541068/bin/varnishd/mgt/mgt_param_tcp.c#L74-L76
+        "AF_INET"
+      ];
+      IPAddressDeny = "any"; # WORKAROUND
     };
   };
 
-  # Add members to group varnish-frontend for r/w access to /run/varnish-sockets/frontend.sock
-  users.groups.varnish-frontend.members = [ "varnish" ];
-  systemd.tmpfiles.settings."50-varnish-sockets" = {
-    "/run/varnish-sockets".d = {
-      user = "varnish";
-      group = config.users.groups.varnish-frontend.name;
-      mode = "0755";
+  services.nginx.virtualHosts."omega.pictures.proesmans.eu" = {
+    serverAliases = [ "pictures.proesmans.eu" ];
+    useACMEHost = "omega-services.proesmans.eu";
+    onlySSL = true;
+    locations."/" = {
+      proxyPass = "http://unix:/run/varnishd/frontend.sock";
+    };
+  };
+
+  systemd.services.nginx = {
+    serviceConfig = {
+      SupplementaryGroups = [
+        # Allow nginx access to /run/varnishd/frontend.sock
+        config.users.groups.varnish.name
+      ];
     };
   };
 }

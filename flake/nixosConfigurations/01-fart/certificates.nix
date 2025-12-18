@@ -19,9 +19,8 @@
       dnsResolver = "1.1.1.1:53";
     };
 
-    certs."omega.proesmans.eu" = {
-      # This block requests a wildcard certificate.
-      domain = lib.mkForce "*.omega.proesmans.eu";
+    certs."omega-services.proesmans.eu" = {
+      domain = lib.mkForce "omega.proesmans.eu";
       extraDomainNames = lib.mkForce [
         "pictures.proesmans.eu"
         "omega.pictures.proesmans.eu"
