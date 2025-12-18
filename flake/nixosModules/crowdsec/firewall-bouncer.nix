@@ -42,14 +42,30 @@ in
       crowdsec-firewall-bouncer = {
         partOf = [ config.systemd.targets.crowdsec.name ];
 
-        # Bouncer is effectively not working. Workaround can be removed when PR below is merged.
-        # REF; https://github.com/NixOS/nixpkgs/pull/459188
         serviceConfig = rec {
+          TimeoutSec = 90;
+          Restart = "always";
+          RestartSec = 60;
+
+          # Bouncer is effectively not working. Workaround can be removed when PR below is merged.
+          # REF; https://github.com/NixOS/nixpkgs/pull/459188
           AmbientCapabilities = lib.optional (
             (cfg.settings.mode == "iptables") || (cfg.settings.mode == "ipset")
           ) "CAP_NET_RAW";
           CapabilityBoundingSet = AmbientCapabilities;
         };
+        unitConfig =
+          let
+            inherit (config.systemd.services.crowdsec-firewall-bouncer.serviceConfig) TimeoutSec;
+            maxTries = 5;
+            bufferSec = 5;
+          in
+          {
+            # The max. time needed to perform `maxTries` start attempts of systemd
+            # plus a bit of buffer time (bufferSec) on top.
+            StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
+            StartLimitBurst = maxTries;
+          };
       };
     };
   });
