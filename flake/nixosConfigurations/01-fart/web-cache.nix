@@ -50,10 +50,10 @@
             "Connection: close"
             "User-Agent: Varnish Health Probe";
 
-          .interval  = 5s; # check the health of each backend every 5 seconds
-          .timeout   = 1s; # timing out after 1 second.
-          .window    = 5;  # If 3 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
-          .threshold = 3;
+          .interval  = 2s; # check the health of each backend every 5 seconds
+          .timeout   = 5s; # timing out after 1 second.
+          .window    = 5;  # If 2 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
+          .threshold = 2;
         }
       }
 
@@ -65,15 +65,26 @@
           return (synth(404));
         }
 
-        # Normalize host value for easy matching
+        # Normalize values that we're matching for accurate results
+        if (req.http.url ~ "[[:upper:]]") {
+          set req.http.url = req.http.url.lower();
+        }
+
         if (req.http.X-Forwarded-Host ~ "[[:upper:]]") {
           set req.http.X-Forwarded-Host = req.http.X-Forwarded-Host.lower();
         }
 
         # --- Backend selection ---
-        if (req.http.X-Forwarded-Host ~ "pictures\.proesmans\.eu$") {
+        if (req.http.X-Forwarded-Host == "pictures.proesmans.eu" || 
+            req.http.X-Forwarded-Host ~ "\.pictures\.proesmans\.eu$") {
           set req.http.X-Backend = "pictures";
           set req.backend_hint = pictures;
+
+          # Fix the host header data to always be alpha.pictures.proesmans.eu, which is the right (only) hostname
+          # for this upstream.
+          # ERROR; This change happens as early as possible to not interfere with hashing/retrieval logic
+          set req.http.Host = "alpha.pictures.proesmans.eu";
+          set req.http.X-Forwarded-Host = "alpha.pictures.proesmans.eu";
         } else {
           return (synth(404));
         }
@@ -111,7 +122,7 @@
           #
           set req.http.cookie = cookie.get_string();
 
-          if(req.http.X-Backend == "pictures" && req.url ~ "^/api/assets/") {
+          if(req.http.X-Backend == "pictures" && (req.url ~ "^/api/assets/" || req.url ~ "^/_app/")) {
             # Ignore all cookies for immich assets, but keep them for the backend request on cache-miss.
             # SECURITY; This path must use secure randomly generated asset ids to not leak assets!
             #
@@ -221,9 +232,11 @@
           return (abandon);
         }
 
+        # Attempt a default TTL otherwise a hit-for-miss is served.
+        set beresp.ttl = 10s;
         # Allow serving stale content in case the backend goes down.
         # The cache will still attempt to revalidate these objects at client request.
-        set beresp.grace = 6h;
+        set beresp.grace = 1m;
 
         if (beresp.http.ETag || beresp.http.Last-Modified) {
           # Response has appropriate headers for efficient stale checks.
@@ -241,12 +254,22 @@
           }
         }
 
+        # WARN; Other items are also returned outside of media underneath /api/assets/ !!
         if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
+          set beresp.ttl = 10s; # serving from cache
+          set beresp.grace = 1h; # serving from cache with attempting refresh on client request
+        }
+
+        # These are specifically the media files!
+        if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original)") {
+          # Force enable caching because immich returns HTTP "cache-control: private"
+          unset beresp.http.cache-control;
+          unset beresp.http.Set-Cookie;
           set beresp.ttl = 1w; # serving from cache
-          set beresp.grace = 6w; # serving from cache with attempting refresh on client request
+          set beresp.grace = 1w; # serving from cache with attempting refresh on client request
           set beresp.keep = 1w; # no serving, best case refresh if no metadata change
         }
 

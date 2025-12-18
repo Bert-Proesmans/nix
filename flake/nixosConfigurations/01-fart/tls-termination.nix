@@ -197,6 +197,14 @@ in
           http-request set-header X-Forwarded-Host %[req.hdr(Host)]
           http-request set-header X-Forwarded-Server %[hostname]
 
+          # Detect http1.1 websocket and redirect
+          acl is_websocket hdr(Upgrade) -i WebSocket
+          acl is_upgrade hdr_beg(Connection) -i Upgrade
+          # ERROR; 503 Service Unavailable
+          # The host header must be fixed or connection fails due to TLS verification
+          http-request set-header Host alpha.pictures.proesmans.eu if is_websocket || is_upgrade
+          use_backend forward_to_buddy if is_websocket || is_upgrade
+
           server local-varnish unix@/run/varnishd/frontend.sock send-proxy-v2
 
         listen forward_to_buddy
