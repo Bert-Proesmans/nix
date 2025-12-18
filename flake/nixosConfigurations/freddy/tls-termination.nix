@@ -60,6 +60,7 @@
           mode http
           bind :80 v4v6
 
+          log global
           option httplog
           option dontlognull
 
