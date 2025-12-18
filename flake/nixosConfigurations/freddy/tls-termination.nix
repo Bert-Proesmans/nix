@@ -75,7 +75,9 @@
           no log
 
           # Conditionally accept proxy protocol from tunnel hosts
-          acl trusted_proxies src ${lib.concatStringsSep " " downstream.proxies.addresses}
+          acl trusted_proxies src ${
+            lib.concatMapStringsSep " " lib.escapeShellArg downstream.proxies.addresses
+          }
           tcp-request connection expect-proxy layer4 if trusted_proxies
           
           # inspect clienthello to get SNI
@@ -83,7 +85,7 @@
           tcp-request content accept if { req_ssl_hello_type 1 }
 
           # route by SNI
-          use_backend passthrough_kanidm if { req.ssl_sni -i "${services.idm.hostname}" "idm.proesmans.eu" }
+          use_backend passthrough_kanidm if { req.ssl_sni -i ${lib.escapeShellArg services.idm.hostname} idm.proesmans.eu }
           
           # Default backend
           server local-nginx unix@/run/nginx/virtualhosts.sock send-proxy-v2
