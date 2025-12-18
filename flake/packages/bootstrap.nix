@@ -12,11 +12,6 @@
     # For everything else use the _module.args option instead (inside configuration).
     flake = {
       inherit (flake) inputs;
-      outputs = {
-        # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
-        # anyway. Their evaluation could change depending on introduced overlays!
-        inherit (flake.outputs) overlays homeModules;
-      };
     };
   };
   modules = [
@@ -24,6 +19,12 @@
       { config, modulesPath, ... }:
       {
         _file = ./bootstrap.nix;
+
+        _module.args.flake.outputs = {
+          # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
+          # anyway. Their evaluation could change depending on introduced overlays!
+          inherit (flake.outputs) overlays homeModules;
+        };
 
         imports = [
           "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
