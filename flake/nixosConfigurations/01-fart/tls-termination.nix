@@ -39,11 +39,9 @@ in
         # NOTE; Using the tailscale address to tunnel between nodes.
         location = "${freddy.host.tailscale.address}:${toString freddy.service.reverse-proxy.port}";
       };
-      # loadbalanced.idm = {
-      #   aliases = [
-      #     "idm.proesmans.eu"
-      #   ];
-      # };
+      loadbalance.idm = {
+        aliases = [ "idm.proesmans.eu" ];
+      };
     in
     {
       enable = true;
@@ -92,6 +90,9 @@ in
           tcp-request content accept if { req_ssl_hello_type 1 }
 
           # route by SNI
+          use_backend loadbalance_idm if { req.ssl_sni -i ${
+            lib.concatMapStringsSep " " lib.escapeShellArg loadbalance.idm.aliases
+          } }
           use_backend passthrough_buddy if { req.ssl_sni -i ${
             lib.concatMapStringsSep " " lib.escapeShellArg upstream.buddy.aliases
           } }
@@ -109,6 +110,19 @@ in
         # "ssl verify required"
         # "ca-file /etc/ssl/certs/ca-bundle.crt"
         # "check-sni ${builtins.head upstream.freddy.aliases}"
+
+        backend loadbalance_idm
+          description raw tcp/tls passthrough with proxy protocol, fallback over multiple hosts
+          mode tcp
+
+          log global
+          balance first
+
+          # TODO; Figure out how health checks should be performed!
+          # Ideally over TLS into Kanidm status endpoint
+
+          server freddy ${upstream.freddy.location} id 1 send-proxy-v2 check
+          server buddy ${upstream.buddy.location} id 2 send-proxy-v2 check
 
         backend passthrough_buddy
           description raw tcp/tls passthrough for buddy with proxy protocol
