@@ -114,20 +114,13 @@ in
     };
 
     nginx = {
+      useACMEHost = "omega-services.proesmans.eu";
       onlySSL = true;
-      useACMEHost = "omega.proesmans.eu";
+      serverAliases = [ "wiki.proesmans.eu" ];
     };
   };
 
   systemd.services.bookstack-setup = {
     after = [ "mysql.service" ];
-  };
-
-  services.nginx.virtualHosts = {
-    "wiki.proesmans.eu" = {
-      onlySSL = true;
-      useACMEHost = "omega.proesmans.eu";
-      globalRedirect = "omega.wiki.proesmans.eu";
-    };
   };
 }

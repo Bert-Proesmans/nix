@@ -12,7 +12,7 @@
 }:
 
 let
-  cfg = config.services.haproxy;
+  cfg = config.services.proesmans.haproxy;
 
   noNewlines =
     s: lib.strings.concatLines (builtins.filter (s: s != "") (lib.strings.splitString "\n" s));

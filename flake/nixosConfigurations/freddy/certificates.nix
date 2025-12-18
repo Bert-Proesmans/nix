@@ -38,7 +38,7 @@
       ];
     };
 
-    certs."omega.proesmans.eu" = {
+    certs."omega-services.proesmans.eu" = {
       # This block requests a wildcard certificate.
       domain = lib.mkForce "omega.proesmans.eu";
       extraDomainNames = lib.mkForce [

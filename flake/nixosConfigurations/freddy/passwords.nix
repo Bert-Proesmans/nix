@@ -61,6 +61,7 @@ in
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
 
       # WARN; Custom config, see overlays!
+      # REF; https://github.com/dani-garcia/vaultwarden/discussions/6567
       WEBAUTH_DOMAIN = "passwords.proesmans.eu";
       DOMAIN = "https://omega.passwords.proesmans.eu"; # App URL
 
@@ -179,5 +180,17 @@ in
     unitConfig.RequiresMountsFor = [
       vaultwardenStatePath
     ];
+  };
+
+  services.nginx.virtualHosts."omega.passwords.proesmans.eu" = {
+    serverAliases = [ "passwords.proesmans.eu" ];
+    useACMEHost = "omega.passwords.proesmans.eu";
+    onlySSL = true;
+    locations."/" = {
+      proxyPass =
+        assert config.services.vaultwarden.config.ROCKET_ADDRESS == "127.0.0.1";
+        "http://127.0.0.1:${toString config.services.vaultwarden.config.ROCKET_PORT}";
+      proxyWebsockets = true;
+    };
   };
 }
