@@ -92,12 +92,12 @@ in
           tcp-request content accept if { req_ssl_hello_type 1 }
 
           # route by SNI
-          use_backend passthrough_buddy if { req.ssl_sni -i "${
+          use_backend passthrough_buddy if { req.ssl_sni -i ${
             lib.concatMapStringsSep " " lib.escapeShellArg upstream.buddy.aliases
-          }" }
-          use_backend passthrough_freddy if { req.ssl_sni -i "${
+          } }
+          use_backend passthrough_freddy if { req.ssl_sni -i ${
             lib.concatMapStringsSep " " lib.escapeShellArg upstream.freddy.aliases
-          }" }
+          } }
 
           # Default backend
           server local-nginx unix@/run/nginx/virtualhosts.sock send-proxy-v2
