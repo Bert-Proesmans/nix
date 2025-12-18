@@ -16,10 +16,5 @@
     fqdn = "02-fart.default.omega.oraclevcn.com";
   };
 
-  service.gatus = {
-    port = 443;
-    uri = addr: "https://${addr}";
-  };
-
   ## FREEFORM ##
 }

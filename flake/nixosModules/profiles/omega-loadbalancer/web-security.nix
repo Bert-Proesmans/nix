@@ -9,17 +9,16 @@ let
   controller-url-crowdsec = freddy.service.crowdsec-lapi.uri freddy.host.tailscale.address;
 in
 {
-  sops.secrets."01-fart-sensor-crowdsec-key" = { };
-  # WARN; Bouncer service is running as root!
-  sops.secrets."01-fart-bouncer-crowdsec-key" = { };
+  sops.secrets."sensor-crowdsec-key" = { };
+  sops.secrets."bouncer-crowdsec-key" = { };
 
   sops.templates."crowdsec-connect.yaml" = {
     owner = "crowdsec";
     restartUnits = [ config.systemd.services.crowdsec.name ];
     content = ''
       url: ${controller-url-crowdsec}
-      login: ${"01-fart"}
-      password: ${config.sops.placeholder."01-fart-sensor-crowdsec-key"}
+      login: ${config.networking.hostName}
+      password: ${config.sops.placeholder."sensor-crowdsec-key"}
     '';
   };
 
@@ -74,7 +73,7 @@ in
     # NOTE; Setup as remote bouncer
     enable = true;
     # NOTE; ROOT ownership is OK due to SystemD LoadCredential.
-    secrets.apiKeyPath = config.sops.secrets."01-fart-bouncer-crowdsec-key".path;
+    secrets.apiKeyPath = config.sops.secrets."bouncer-crowdsec-key".path;
     settings = {
       api_url = controller-url-crowdsec;
       log_mode = "stdout";

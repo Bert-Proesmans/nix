@@ -3,7 +3,7 @@
   ...
 }:
 {
-  sops.secrets.tailscale_connect_key.owner = "root";
+  sops.secrets.tailscale_connect_key = { };
   services.tailscale = {
     enable = true;
     disableTaildrop = true;

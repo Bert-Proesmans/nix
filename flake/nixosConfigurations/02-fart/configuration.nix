@@ -1,18 +1,13 @@
 {
   lib,
+  flake,
   ...
 }:
 {
   imports = [
-    ./certificates.nix
     ./disks.nix
     ./hardware-configuration.nix
-    ./memory-handling.nix
-    ./monitor.nix
-    ./private-network.nix
-    ./tls-termination.nix
-    ./web-cache.nix
-    ./web-security.nix
+    flake.profiles.omega-loadbalancer
   ];
 
   # Slows down write operations considerably

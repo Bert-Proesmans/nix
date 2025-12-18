@@ -36,23 +36,21 @@
         .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
         .proxy_header = 2;
 
-        .connect_timeout        = 5s;     # How long to wait for a backend connection?
+        .connect_timeout        = 10s;   # How long to wait for a backend connection?
         .first_byte_timeout     = 65s;   # How long to wait before we receive a first byte from our backend?
-        .between_bytes_timeout  = 2s;     # How long to wait between bytes received from our backend?
+        .between_bytes_timeout  = 2s;    # How long to wait between bytes received from our backend?
 
         .probe = {
-          #.url = "/"; # short easy way (GET /)
-          
           # Debug with; varnishadm backend.list
           .request =
-            "GET / HTTP/1.1"
+            "GET /api/server/ping HTTP/1.1"
             "Host: alpha.pictures.proesmans.eu"
             "Connection: close"
             "User-Agent: Varnish Health Probe";
 
-          .interval  = 2s; # check the health of each backend every 5 seconds
-          .timeout   = 5s; # timing out after 1 second.
-          .window    = 5;  # If 2 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
+          .interval  = 5s;  # check the health of each backend every 5 seconds
+          .timeout   = 10s; # timing out after 1 second.
+          .window    = 5;   # If 2 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
           .threshold = 2;
         }
       }
