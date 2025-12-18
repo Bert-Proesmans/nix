@@ -17,6 +17,11 @@
     flake.profiles.hypervisor
   ];
 
+  # TEMP; Quick fix for non-working local-dns
+  networking.hosts = {
+    "192.168.88.11" = [ "buddy.internal.proesmans.eu" ];
+  };
+
   networking.domain = config.proesmans.facts.self.domainName;
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
