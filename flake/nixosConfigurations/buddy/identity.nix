@@ -230,7 +230,7 @@ in
         displayName = "Wiki";
         basicSecretFile = config.sops.secrets."bookstack-oauth-secret".path;
         # WARN; URLs must end with a forward slash if path element is empty!
-        originLanding = "https://wiki.proesmans.eu/";
+        originLanding = "https://wiki.proesmans.eu/login";
         imageFile = "${flake.documentationAssets}/bookstack-logo.png";
 
         # ERROR; Bookstack only accepts RS256 signing algorithm
