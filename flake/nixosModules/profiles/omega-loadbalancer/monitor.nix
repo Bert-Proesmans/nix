@@ -1,5 +1,8 @@
 { lib, config, ... }:
 let
+  fart-01-tailscale-ip = config.proesmans.facts."01-fart".host.tailscale.address;
+  fart-02-tailscale-ip = config.proesmans.facts."02-fart".host.tailscale.address;
+  freddy-tailscale-ip = config.proesmans.facts.freddy.host.tailscale.address;
   buddy-tailscale-ip = config.proesmans.facts.buddy.host.tailscale.address;
 
   # Hardcoded upstream
@@ -23,14 +26,9 @@ in
   };
 
   networking.hosts = {
-    "${buddy-tailscale-ip}" = [
-      # No IP for alpha.idm is known on the internet
+    "127.0.0.1" = [
+      # ALPHA server expects a PROXY protocol header from load balancer
       "alpha.idm.proesmans.eu"
-
-      # ERROR; wiki.proesmans.eu doesn't currently resolve over the internet
-      # Temporarily connect to wiki application over tailscale tunnel
-      "wiki.proesmans.eu"
-      "alpha.wiki.proesmans.eu"
     ];
   };
 
@@ -63,9 +61,22 @@ in
       endpoints = [
         {
           enabled = true;
+          name = "Freddy";
+          group = "core";
+          url = "icmp://${freddy-tailscale-ip}";
+          interval = "5m";
+          conditions = [
+            "[CONNECTED] == true"
+            "[RESPONSE_TIME] < 80ms"
+          ];
+          maintenance-windows = [ ];
+          ui.hide-hostname = true;
+        }
+        {
+          enabled = true;
           name = "Omega server 01";
           group = "core";
-          url = "icmp://01-fart.omega.proesmans.eu";
+          url = "icmp://${fart-01-tailscale-ip}";
           interval = "5m";
           conditions = [
             "[CONNECTED] == true"
@@ -78,7 +89,7 @@ in
           enabled = true;
           name = "Omega server 02";
           group = "core";
-          url = "icmp://02-fart.omega.proesmans.eu";
+          url = "icmp://${fart-02-tailscale-ip}";
           interval = "5m";
           conditions = [
             "[CONNECTED] == true"
@@ -167,12 +178,12 @@ in
           enabled = true;
           name = "Wiki";
           # group = "alpha";
-          url = "https://wiki.proesmans.eu/s/1f53ffce-0927-4a7c-a5bc-e14132cd81ff";
+          url = "https://wiki.proesmans.eu/";
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
             "[RESPONSE_TIME] < 250ms"
-            "[BODY] == pat(*<h1 dir=\"ltr\">Proesmans.EU</h1>*)"
+            "[BODY] == pat(*<title>Wiki | Proesmans.EU</title>*)"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
             "[CERTIFICATE_EXPIRATION] > 10d"
