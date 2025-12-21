@@ -5,10 +5,19 @@
   ...
 }:
 {
+  sops.secrets.mail-users = {
+    format = "binary";
+    sopsFile = ./mail-users.encrypted.yaml;
+    owner = config.users.users.smtprelay.name;
+  };
+
   security.acme.certs."freddy.omega.proesmans.eu" = {
     group = "smtprelay";
     reloadServices = [ config.systemd.services.smtprelay.name ];
   };
+
+  # Redirect mailserver connection attempts to localhost
+  networking.hosts."127.0.0.1" = [ config.services.smtprelay.settings.hostname ];
 
   # Relay setup;
   #
@@ -32,10 +41,6 @@
 
       tls.listener = { inherit certificate key; };
       tls.relay = { inherit certificate key; };
-      allowed_users.vaultwarden = {
-        bcrypt-hash = "$2y$12$.h4mk0uw1Qr43/z.y1MjhuO2Am0PEPyGmzAaJtdFDYR9IsOxg7hcy";
-        email = "passwords@proesmans.eu";
-      };
 
       settings = {
         log_level = "trace";
@@ -46,7 +51,8 @@
         ];
         max_connections = 10;
         max_recipients = 5;
-        allowed_sender = "^(.*)@proesmans.eu$";
+        allowed_sender = "^.*@(alpha\.|omega\.)?proesmans\.eu$";
+        allowed_users = config.sops.secrets.mail-users.path;
 
         remotes = [
           "starttls://proesmans-eu.mail.protection.outlook.com:25"

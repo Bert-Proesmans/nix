@@ -14,6 +14,7 @@
     ./hardware-configuration.nix
     ./identity.nix
     ./mail-server.nix
+    ./mail-transfer.nix
     ./passwords.nix
     ./private-network.nix
     ./remote-builder.nix

@@ -137,6 +137,9 @@ in
       description = ''
         Attribute set containing combinations username, passwords and email addresses that are verified
         on incoming e-mails.
+
+        WARNING: This is stored world-readable in the nix store. If you need to specify any secret credentials here, consider
+        setting `settings.allowed_users` manually instead with a path to a file outside of the nix-store.
       '';
     };
 
