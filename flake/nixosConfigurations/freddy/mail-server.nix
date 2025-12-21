@@ -48,6 +48,12 @@
         listen = [
           "tls://127.0.0.1:465"
           "tls://[::1]:465"
+          "tls://${config.proesmans.facts.self.host.tailscale.address}:465"
+        ];
+        allowed_nets = [
+          "127.0.0.0/8"
+          "::1/128"
+          "${config.proesmans.facts.buddy.host.tailscale.address}/32"
         ];
         max_connections = 10;
         max_recipients = 5;
