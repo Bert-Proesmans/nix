@@ -5,42 +5,45 @@
   ...
 }:
 {
-  boot.supportedFilesystems = [ "zfs" ];
-  # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
-  # at unexpected moments and cause kernel downgrade.
-  # Leave the boot.kernelPackages options at default to use the long-term stable kernel. The LTS is practically
-  # guaranteed to be compatible with the latest zfs release.
-  # REMOVED; boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
+  # Tune ZFS
+  #
+  # NOTE; This configuration is _not_ tackling limited free space performance impact.
+  # Due to the usage of AVL trees to track free space, a highly fragmented or otherwise a full pool results in
+  # more overhead to find free space. There is actually no robust solution for this problem, there is
+  # no quick or slow fix (defragmentation) at this moment in time.
+  # ZFS pools should be physically sized at maximum required storage +- ~10% from the beginning.
+  # * If your pool is full => expand it by a large amount.
+  # * If your pool is fragmented => create a new dataset and move your data out of the old dataset +
+  # purge old dataset + move back into the new dataset.
+  #
+  # HELP; A way to solve used space performance impact is to set dataset quota's to limit space usage to ~90%.
+  # With a 90% usage limit there is backpressure to cleanup earlier snapshots. Doesn't work if your pool is
+  # full though, only increasing raw storage space will!
+  boot.extraModprobeConfig = ''
+    # Fix the commit timeout (seconds), because the default has changed before
+    options zfs zfs_txg_timeout=5
 
-  # Boot is both efi and bios compatible
-  # TODO; Remove grub in favour of systemd if mirrored EFI boot install is available through SystemD (or something else)
-  # TODO; Integrate lanzaboot to sign boot stubs for EFI secure boot
-  # TODO; Integrate TPM measured boot to only release decryption keys on unchanged platform configuration registers (PCR)
-  # TODO; Encrypt root and data block storage; luks/luks+zfs/zfs native
-  #       Don't forget to enable aes acceleration modules
-  boot.loader.grub = {
-    enable = true;
-    efiSupport = true;
-    # Uses file name conventions instead of explicitly registering each EFI executable with the EFI firmware.
-    efiInstallAsRemovable = true;
-    # ERROR; Must set the devices array to empty because disko fills it in trying to be helpful.
-    # Tree boot partitions are configured, these take priority over giving the disks over for automated GRUB install.
-    devices = lib.mkForce [ ];
-    mirroredBoots = [
-      {
-        devices = [ "nodev" ];
-        path = "/boot/0";
-      }
-      {
-        devices = [ "nodev" ];
-        path = "/boot/1";
-      }
-      {
-        devices = [ "nodev" ];
-        path = "/boot/2";
-      }
-    ];
-  };
+    # This is a hypervisor server, and ZFS ARC is sometimes slow with giving back RAM.
+    # It defaults to 50% of total RAM, but we fix the amount.
+    # 8 GiB (bytes)
+    options zfs zfs_arc_max=8589934592
+
+    # Data writes less than this amount (bytes) are written in sync, while writes larger are written async.
+    # WARN; Only has effect when no SLOG special device is attached to the pool to be written to.
+    #
+    # ERROR; Data writes larger than the recordsize are automatically async, to prevent complexities while handling
+    # multiple block pointers in a ZIL log record.
+    # HELP; Set this value equal to or less than the largest recordsize written on this system/pool.
+    # 1MiB (bytes?)
+    options zfs zfs_immediate_write_sz=1048576
+
+    # Disable prefetcher. Zfs could proactively read data expecting inflight, or future requests, into the ARC.
+    # We have a system with pools on low IOPS hard drives, including high random access load from databases.
+    # I choose to not introduce additional I/O latency when the potential for random access is high!
+    #
+    # HELP; Re-enable prefetch on system with fast pools (like full ssd-array)
+    options zfs zfs_prefetch_disable=1
+  '';
 
   # Do not force anything when pools have not been properly exported!
   boot.zfs.forceImportRoot = false;
@@ -50,9 +53,62 @@
   boot.zfs.extraPools = [ "storage" ];
 
   services.fstrim.enable = true;
-  services.zfs.trim.enable = true;
-  services.zfs.autoScrub.enable = true;
-  services.zfs.autoScrub.interval = "weekly";
+  services.zfs = {
+    autoScrub.enable = true;
+    autoScrub.interval = "weekly";
+    trim.enable = true;
+    zed = {
+      # NOTE; Enable sending ZFS events through sendmail
+      enableMail = true;
+      # REF; https://github.com/openzfs/zfs/blob/master/cmd/zed/zed.d/zed.rc
+      settings = {
+        ZED_EMAIL_ADDR = [ "root" ];
+        # NOTE; Send notification even if pool is healthy.
+        # Test mail delivery on pool "zroot" with;
+        # zpool scrub zroot
+        # ZED_NOTIFY_VERBOSE = true;
+      };
+    };
+  };
+
+  services.smartd = {
+    enable = true;
+    autodetect = true;
+    notifications.mail.enable = true; # sendmail
+    notifications.test = false; # Notify on boot - for each disk
+    defaults.monitored = lib.concatStringsSep " " [
+      # NOTE; SmartD only accepts short-form options, and these options _DO NOT_ map cleanly to smartctl!
+      # smartctl is exec'ed by smartd but not through command-line options.
+      #
+      # Enables SMART on device.
+      "-s on" # smartctl --smart=on
+      # Enables SMART Automatic Offline Testing when smartd starts up and has no further effect.
+      "-o on" # smartctl --offlineauto=on
+      # Enables Attribute Autosave when smartd starts up and has no further effect
+      "-S on" # smartctl --saveauto=on
+      # Equivalent to turning on all of the following Directives [ATA + SCSI + NVMe]:
+      #   - '-H' to check the SMART health status
+      #   - '-f' to report failures of Usage (rather than Prefail) Attributes
+      #   - '-t' to track changes in both Prefailure and Usage Attributes
+      #   - '-l error' to report increases in the number of ATA errors
+      #   - '-l selftest' to report increases in the number of Self-Test Log errors
+      #   - '-l selfteststs' to report changes of Self-Test execution status
+      #   - '-C 197' to report nonzero values of the current pending sector count
+      #   - '-U 198' to report nonzero values of the offline pending sector count
+      "-a"
+      # Run Self-Tests or Offline Immediate Tests, at scheduled times:
+      #   - S/../.././03 short self-test at 03:00
+      #   - L/../01/./02 long self-test on 1st of every month at 02:00
+      "-s (S/../.././03|L/../01/./02)"
+      # Tracks disk temperatures and alerts if they rise too quickly or hit a high limit (°C);
+      #   - Log changes of 10 degrees or more
+      #   - Log informational when temp reaches 40 degrees
+      #   - Log WARN + email when temp reaches 45
+      "-W 10,40,45"
+      # Don't check devices in SLEEP or STANDBY mode. This prevents the disks from spinning up.
+      "-n standby,q" # smartctl --nocheck=
+    ];
+  };
 
   # @@ Disk rundown @@
   #   - Partitions, root disk***
@@ -543,45 +599,42 @@
     };
   };
 
-  # Tune ZFS
-  #
-  # NOTE; This configuration is _not_ tackling limited free space performance impact.
-  # Due to the usage of AVL trees to track free space, a highly fragmented or otherwise a full pool results in
-  # more overhead to find free space. There is actually no robust solution for this problem, there is
-  # no quick or slow fix (defragmentation) at this moment in time.
-  # ZFS pools should be physically sized at maximum required storage +- ~10% from the beginning.
-  # * If your pool is full => expand it by a large amount.
-  # * If your pool is fragmented => create a new dataset and move your data out of the old dataset +
-  # purge old dataset + move back into the new dataset.
-  #
-  # HELP; A way to solve used space performance impact is to set dataset quota's to limit space usage to ~90%.
-  # With a 90% usage limit there is backpressure to cleanup earlier snapshots. Doesn't work if your pool is
-  # full though, only increasing raw storage space will!
-  boot.extraModprobeConfig = ''
-    # Fix the commit timeout (seconds), because the default has changed before
-    options zfs zfs_txg_timeout=5
+  boot.supportedFilesystems = [ "zfs" ];
+  # NOTE; Don't pin the latest compatible linux kernel anymore. It can be dropped from the package index
+  # at unexpected moments and cause kernel downgrade.
+  # Leave the boot.kernelPackages options at default to use the long-term stable kernel. The LTS is practically
+  # guaranteed to be compatible with the latest zfs release.
+  # REMOVED; boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
-    # This is a hypervisor server, and ZFS ARC is sometimes slow with giving back RAM.
-    # It defaults to 50% of total RAM, but we fix the amount.
-    # 8 GiB (bytes)
-    options zfs zfs_arc_max=8589934592
-
-    # Data writes less than this amount (bytes) are written in sync, while writes larger are written async.
-    # WARN; Only has effect when no SLOG special device is attached to the pool to be written to.
-    #
-    # ERROR; Data writes larger than the recordsize are automatically async, to prevent complexities while handling
-    # multiple block pointers in a ZIL log record.
-    # HELP; Set this value equal to or less than the largest recordsize written on this system/pool.
-    # 1MiB (bytes?)
-    options zfs zfs_immediate_write_sz=1048576
-
-    # Disable prefetcher. Zfs could proactively read data expecting inflight, or future requests, into the ARC.
-    # We have a system with pools on low IOPS hard drives, including high random access load from databases.
-    # I choose to not introduce additional I/O latency when the potential for random access is high!
-    #
-    # HELP; Re-enable prefetch on system with fast pools (like full ssd-array)
-    options zfs zfs_prefetch_disable=1
-  '';
+  # Boot is both efi and bios compatible
+  # TODO; Remove grub in favour of systemd if mirrored EFI boot install is available through SystemD (or something else)
+  # TODO; Integrate lanzaboot to sign boot stubs for EFI secure boot
+  # TODO; Integrate TPM measured boot to only release decryption keys on unchanged platform configuration registers (PCR)
+  # TODO; Encrypt root and data block storage; luks/luks+zfs/zfs native
+  #       Don't forget to enable aes acceleration modules
+  boot.loader.grub = {
+    enable = true;
+    efiSupport = true;
+    # Uses file name conventions instead of explicitly registering each EFI executable with the EFI firmware.
+    efiInstallAsRemovable = true;
+    # ERROR; Must set the devices array to empty because disko fills it in trying to be helpful.
+    # Tree boot partitions are configured, these take priority over giving the disks over for automated GRUB install.
+    devices = lib.mkForce [ ];
+    mirroredBoots = [
+      {
+        devices = [ "nodev" ];
+        path = "/boot/0";
+      }
+      {
+        devices = [ "nodev" ];
+        path = "/boot/1";
+      }
+      {
+        devices = [ "nodev" ];
+        path = "/boot/2";
+      }
+    ];
+  };
 
   # ## Enable the ZFS mount generator ##
   #
