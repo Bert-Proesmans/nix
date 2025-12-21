@@ -49,14 +49,8 @@ in
   # Disable snapshots on the cache dataset
   services.sanoid.datasets."storage/media/immich/cache".autosnap = false;
 
-  users.groups.mail = {
-    # Members of this group have access to secret "password-smtp"
-    members = [ "immich" ];
-  };
-
   sops.secrets = {
     # NOTE; Secrets are loaded through the SystemD LoadCredential system, so they can remain owned by root!
-    "password-smtp".restartUnits = [ config.systemd.services.immich-server.name ];
     "immich-oauth-secret".restartUnits = [ config.systemd.services.immich-server.name ];
   };
 
@@ -172,21 +166,21 @@ in
       map.enabled = true;
       map.lightStyle = "https://tiles.immich.cloud/v1/style/light.json";
       newVersionCheck.enabled = false;
-      notifications.smtp = {
-        enabled = true;
-        from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
-        replyTo = "pictures@proesmans.eu";
-        transport = {
-          host = "localhost";
-          ignoreCert = false;
-          username = "alpha@proesmans.eu";
-          password._secret = config.sops.secrets."password-smtp".path;
-          port = 587; # TODO; Fix STARTLS -> TLS ON
-          # ERROR; Immich performs protocol detection based on the port. The local mailproxy does not support SMTP over TLS,
-          # but emulates STARTLS
-          #port = 465; # TLS ON
-        };
-      };
+      # notifications.smtp = {
+      #   enabled = true;
+      #   from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
+      #   replyTo = "pictures@proesmans.eu";
+      #   transport = {
+      #     host = "localhost";
+      #     ignoreCert = false;
+      #     username = "alpha@proesmans.eu";
+      #     password._secret = config.sops.secrets."password-smtp".path;
+      #     port = 587; # TODO; Fix STARTLS -> TLS ON
+      #     # ERROR; Immich performs protocol detection based on the port. The local mailproxy does not support SMTP over TLS,
+      #     # but emulates STARTLS
+      #     #port = 465; # TLS ON
+      #   };
+      # };
       oauth = {
         enabled = true;
         autoRegister = true;
