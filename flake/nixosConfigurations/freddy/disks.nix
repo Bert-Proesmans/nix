@@ -5,13 +5,6 @@
   ...
 }:
 {
-  boot.zfs = {
-    devNodes = "/dev/";
-    forceImportRoot = false;
-    forceImportAll = false;
-    requestEncryptionCredentials = config.proesmans.facts.self.encryptedDisks;
-  };
-
   boot.extraModprobeConfig = ''
     # Fix the commit timeout (seconds), because the default has changed before
     options zfs zfs_txg_timeout=5
@@ -44,6 +37,46 @@
         # ZED_NOTIFY_VERBOSE = true;
       };
     };
+  };
+
+  services.smartd = {
+    # ERROR !! Oracle block volume does _not_ support SMART!
+    enable = false;
+    autodetect = true;
+    notifications.mail.enable = true; # sendmail
+    notifications.test = true; # Notify on boot
+    defaults.monitored = lib.concatStringsSep " " [
+      # NOTE; SmartD only accepts short-form options, and these options _DO NOT_ map cleanly to smartctl!
+      # smartctl is exec'ed by smartd but not through command-line options.
+      #
+      # Enables SMART on device.
+      "-s on" # smartctl --smart=on
+      # Enables SMART Automatic Offline Testing when smartd starts up and has no further effect.
+      "-o on" # smartctl --offlineauto=on
+      # Enables Attribute Autosave when smartd starts up and has no further effect
+      "-S on" # smartctl --saveauto=on
+      # Equivalent to turning on all of the following Directives [ATA + SCSI + NVMe]:
+      #   - '-H' to check the SMART health status
+      #   - '-f' to report failures of Usage (rather than Prefail) Attributes
+      #   - '-t' to track changes in both Prefailure and Usage Attributes
+      #   - '-l error' to report increases in the number of ATA errors
+      #   - '-l selftest' to report increases in the number of Self-Test Log errors
+      #   - '-l selfteststs' to report changes of Self-Test execution status
+      #   - '-C 197' to report nonzero values of the current pending sector count
+      #   - '-U 198' to report nonzero values of the offline pending sector count
+      "-a"
+      # Run Self-Tests or Offline Immediate Tests, at scheduled times:
+      #   - S/../.././03 short self-test at 03:00
+      #   - L/../01/./02 long self-test on 1st of every month at 02:00
+      "-s (S/../.././03|L/../01/./02)"
+      # Tracks disk temperatures and alerts if they rise too quickly or hit a high limit (°C);
+      #   - Log changes of 10 degrees or more
+      #   - Log informational when temp reaches 40 degrees
+      #   - Log WARN + email when temp reaches 45
+      "-W 10,40,45"
+      # Don't check devices in SLEEP or STANDBY mode. This prevents the disks from spinning up.
+      "-n standby,q" # smartctl --nocheck=
+    ];
   };
 
   # @@ Disk rundown @@
@@ -135,6 +168,13 @@
       # Datasets are filesystems, those are defined in ./filesystems.nix for readability.
       datasets = { };
     };
+  };
+
+  boot.zfs = {
+    devNodes = "/dev/";
+    forceImportRoot = false;
+    forceImportAll = false;
+    requestEncryptionCredentials = config.proesmans.facts.self.encryptedDisks;
   };
 
   # ## Enable the ZFS mount generator ##
