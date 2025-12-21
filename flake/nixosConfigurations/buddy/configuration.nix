@@ -11,6 +11,7 @@
     ./hardware-configuration.nix
     ./identity.nix
     ./mail-server.nix
+    ./mail-transfer.nix
     ./pictures.nix
     ./private-network.nix
     ./tls-termination.nix
