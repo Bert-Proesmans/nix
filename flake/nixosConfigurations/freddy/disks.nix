@@ -32,6 +32,18 @@
     autoScrub.enable = true;
     autoScrub.interval = "weekly";
     trim.enable = true;
+    zed = {
+      # NOTE; Enable sending ZFS events through sendmail
+      enableMail = true;
+      # REF; https://github.com/openzfs/zfs/blob/master/cmd/zed/zed.d/zed.rc
+      settings = {
+        ZED_EMAIL_ADDR = [ "root" ];
+        # NOTE; Send notification even if pool is healthy.
+        # Test mail delivery on pool "zroot" with;
+        # zpool scrub zroot
+        # ZED_NOTIFY_VERBOSE = true;
+      };
+    };
   };
 
   # @@ Disk rundown @@
