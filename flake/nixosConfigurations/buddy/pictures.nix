@@ -176,7 +176,8 @@ in
           ignoreCert = false;
           username = "immich";
           password._secret = config.sops.secrets."immich-smtp".path;
-          port = 465; # TLS ON
+          port = config.proesmans.facts.freddy.service.mail.port; # TLS ON
+          secure = true; # TLS ON
         };
       };
       oauth = {
@@ -202,7 +203,8 @@ in
         storageLabelClaim = "preferred_username";
         storageQuotaClaim = "immich_quota";
       };
-      passwordLogin.enabled = false; # Enable for maintenance work
+      passwordLogin.enabled = false;
+      # passwordLogin.enabled = true; # Enable for maintenance work
       reverseGeocoding.enabled = true;
       server.externalDomain = "https://pictures.proesmans.eu";
       server.loginPageMessage = "Proesmans fotos, klik op de knop onderaan om verder te gaan";
