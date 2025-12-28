@@ -190,6 +190,22 @@ in
           ];
           maintenance-windows = [ ];
         }
+        {
+          enabled = true;
+          name = "Passwords";
+          # group = "alpha";
+          url = "https://passwords.proesmans.eu/alive";
+          interval = "5m";
+          conditions = [
+            "[STATUS] == 200"
+            "[RESPONSE_TIME] < 250ms"
+            "len([BODY]) > 0"
+            # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
+            # "[DOMAIN_EXPIRATION] > 720h"
+            "[CERTIFICATE_EXPIRATION] > 10d"
+          ];
+          maintenance-windows = [ ];
+        }
       ];
       security.oidc = {
         issuer-url = "https://idm.proesmans.eu/oauth2/openid/status";
