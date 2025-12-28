@@ -64,7 +64,7 @@ in
           name = "Freddy";
           group = "core";
           url = "icmp://${freddy-tailscale-ip}";
-          interval = "5m";
+          interval = "30s";
           conditions = [
             "[CONNECTED] == true"
             "[RESPONSE_TIME] < 80ms"
@@ -77,7 +77,7 @@ in
           name = "Omega server 01";
           group = "core";
           url = "icmp://${fart-01-tailscale-ip}";
-          interval = "5m";
+          interval = "30s";
           conditions = [
             "[CONNECTED] == true"
             "[RESPONSE_TIME] < 80ms"
@@ -90,7 +90,7 @@ in
           name = "Omega server 02";
           group = "core";
           url = "icmp://${fart-02-tailscale-ip}";
-          interval = "5m";
+          interval = "30s";
           conditions = [
             "[CONNECTED] == true"
             "[RESPONSE_TIME] < 80ms"
@@ -103,7 +103,7 @@ in
           name = "Alpha server";
           group = "core";
           url = "icmp://${buddy-tailscale-ip}"; # Tailscale forward
-          interval = "5m";
+          interval = "30s";
           conditions = [
             "[CONNECTED] == true"
             "[RESPONSE_TIME] < 80ms"
@@ -150,7 +150,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 150ms"
+            "[RESPONSE_TIME] < 250ms"
             "[BODY] == true"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
