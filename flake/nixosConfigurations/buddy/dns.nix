@@ -19,6 +19,10 @@
   # Disable resolved (systemd) to free up the DNS port(53) on loopback.
   services.resolved.enable = false;
 
+  # Servicing structure
+  # [INGRESS] -> Response cache component -> TTL modifier -> Client rate limiter -> *
+  # * -> Query blocklist -> Query response blocklist -> IP response blocklist -> *
+  # * -> Upstream rate limiter -> Upstream failover -> [EGRESS]
   services.routedns = {
     # WARN; The service will throw warnings about blocklists not being cached. These warnings will suspiciously look
     # like errors. It just means that routedns will download the requested files.
@@ -44,18 +48,19 @@
         # Listeners for the local network. Can be restricted further to specific networks
         # with the "allowed-net" option
         network-udp = {
-          address = "0.0.0.0:53";
+          address = ":53";
           protocol = "udp";
           resolver = "cache";
         };
         network-tcp = {
-          address = "0.0.0.0:53";
+          address = ":53";
           protocol = "tcp";
           resolver = "cache";
         };
       };
 
       groups = {
+        # Cache resolve responses
         cache = {
           type = "cache";
           resolvers = [ "ttl-update" ];
@@ -64,18 +69,18 @@
           backend.size = 8192; # units
         };
 
+        # Clamp TTL values in responses
         ttl-update = {
-          # Update TTL to avoid noise using values that are too low
           type = "ttl-modifier";
           resolvers = [ "rate-limit-client" ];
           ttl-min = 1800; # 30 Minutes
           ttl-max = 43200; # 12 Hours
         };
 
+        # Rate limit requests for each client individually
         rate-limit-client = {
-          # Rate limit requests for each client
           type = "rate-limiter";
-          resolvers = [ "blocklist" ];
+          resolvers = [ "blocklist-request" ];
           limit-resolver = "static-refused";
           # Max 100 requests per host-IP per 2 minutes
           requests = 100;
@@ -84,91 +89,91 @@
           prefix6 = 128;
         };
 
-        # Block queries (by name) using lists loaded from remote locations with HTTP and refreshed once a day
-        blocklist = {
+        # Block queries (by domain name) using lists loaded from remote locations with HTTP and refreshed once a day
+        blocklist-request = {
           type = "blocklist-v2";
           resolvers = [ "blocklist-response" ];
           blocklist-refresh = 86400; # 24 hours
           blocklist-source = [
+            # WARN; MUST PICK DOT-version if available!
+            # DOC; (Type) Domain - A list of domains with some wildcard capabilities. Also results in an NXDOMAIN. Entries in the list are matched as follows:
+            #  - domain.com matches just domain.com and no sub-domains.
+            #  - .domain.com matches domain.com and all sub-domains.
+            #  - *.domain.com matches all subdomains but not domain.com. Only one wildcard (at the start of the string) is allowed.
+            #
+            # SEEALSO; cbuijs' lists
             ({
-              name = "recent-domains";
+              name = "recent-domains-shreshtait";
               cache-dir = "/var/cache/routedns";
               allow-failure = false;
               format = "domain";
               source = "https://shreshtait.com/newly-registered-domains/nrd-1m";
             })
             ({
-              name = "steven-black-malware-fakenews-blocklist";
+              name = "recent-domains-cbuijs";
+              cache-dir = "/var/cache/routedns";
+              allow-failure = false;
+              format = "domain";
+              source = "https://raw.githubusercontent.com/cbuijs/accomplist/refs/heads/main/chris/nrd-30-days-dot.list";
+            })
+            ({
+              name = "abuse-tlds-cbuijs";
+              cache-dir = "/var/cache/routedns";
+              allow-failure = false;
+              format = "domain";
+              source = "https://raw.githubusercontent.com/cbuijs/accomplist/refs/heads/main/chris/abuse-tld-registered-dot.list";
+            })
+            ({
+              name = "malware-fakenews-steven-black";
               cache-dir = "/var/cache/routedns";
               allow-failure = false;
               format = "hosts";
               source = "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/fakenews/hosts";
             })
-            # ({
-            #   # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
-            #   name = "cbuijs-abused-tlds";
-            #   cache-dir = "/var/cache/routedns";
-            #   allow-failure = false;
-            #   format = "domain";
-            #   # ERROR; 404 response due to Github intervention, repo is being rebuilt
-            #   source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/tlds/plain.black.domain.list";
-            # })
             ({
-              # REF; https://github.com/serverless-dns/blocklists/commit/f88589abb5b52a39a4c46ee00680c62c8769ba7f#commitcomment-107591979
-              name = "cbuijs-easylist-adblock";
+              name = "adblock-privacy-hagezi";
               cache-dir = "/var/cache/routedns";
               allow-failure = false;
               format = "domain";
-              source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/easylist/plain.black.domain.list";
+              source = "https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/domains/pro.txt";
+            })
+            ({
+              name = "malware-hagezi";
+              cache-dir = "/var/cache/routedns";
+              allow-failure = false;
+              format = "domain";
+              source = "https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/domains/tif.txt";
             })
           ];
         };
+        # Block queries that cloak, aka block based on domain names in CNAME, MX, NS, PRT and SRV records
         blocklist-response = {
-          # Block responses that include blacklisted keywords
           type = "response-blocklist-name";
           resolvers = [ "blocklist-ip" ];
           blocklist-refresh = 86400; # 24 hours
           blocklist-source = [
-            # ({
-            #   name = "cbuijs-dynamic-content-malicious";
-            #   cache-dir = "/var/cache/routedns";
-            #   allow-failure = false;
-            #   format = "domain";
-            #   # ERROR; 404 response due to Github intervention, repo is being rebuilt
-            #   source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/cloak/plain.black.domain.list";
-            # })
+            ({
+              name = "cloaked-domains-cbuijs";
+              cache-dir = "/var/cache/routedns";
+              allow-failure = false;
+              format = "domain";
+              # ERROR; Should be dotted!
+              source = "https://raw.githubusercontent.com/cbuijs/accomplist/refs/heads/main/chris/cloak.list";
+            })
           ];
         };
 
+        # Block queries resolving to malicious IPs
+        # WARN; IP address blocking results in a high false-positive rate!
         blocklist-ip = {
-          # Block responses by IP ranges
           type = "response-blocklist-ip";
           resolvers = [ "rate-limit-upstream" ];
           blocklist-refresh = 86400; # 24 hours
-          blocklist-source = [
-            ({
-              name = "cbuijs-bogon-ips";
-              cache-dir = "/var/cache/routedns";
-              allow-failure = false;
-              format = "cidr";
-              source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/bogons/plain.black.ip4cidr.list";
-            })
-            # ({
-            #   name = "cbuijs-malware-ips";
-            #   cache-dir = "/var/cache/routedns";
-            #   allow-failure = false;
-            #   format = "cidr";
-            #   # ERROR; This list of IPs blocks the cache.nixos.org website! This blocks nixos-rebuild from using the main file caches!
-            #   # LOG; level=debug msg="blocking response" client=127.0.0.1 id=blocklist-ip ip=151.101.194.217 list=cbuijs-malware-ips
-            #   #      qname=cache.nixos.org. qtype=A rule=151.101.194.217/32
-            #   # TODO; Build out my own nixpkg cache!
-            #   source = "https://raw.githubusercontent.com/cbuijs/accomplist/master/malicious-ip/plain.black.ipcidr.list";
-            # })
-          ];
+          blocklist-source = [ ];
         };
 
+        # Put a limit to the amount of upstream requests
         rate-limit-upstream = {
-          # Put a limit to the amount of upstream requests
           type = "rate-limiter";
           resolvers = [ "cloudflare" ];
           limit-resolver = "static-refused";
@@ -179,14 +184,14 @@
           prefix6 = 64;
         };
 
+        # Route requests into this handler to terminate the response flow
         static-refused = {
-          # Route requests into this handler to terminate the response flow
           type = "static-responder";
           rcode = 5; # REFUSED
         };
 
+        # Resolver group that uses 2 cloudflare upstream resolvers, additional ones can be added
         cloudflare = {
-          # Resolver group that uses 2 cloudflare upstream resolvers, additional ones can be added
           type = "fail-rotate";
           resolvers = [
             "cloudflare-dot-1"
@@ -197,7 +202,10 @@
 
       resolvers = {
         # Cloudflare DNS-over-TLS, blocking websites with malware.
-        # NOTE; Performance regarding "blocking websites with unwanted software" is absymall, prefer dns0 instead.
+        # NOTE; Performance regarding "blocking websites with unwanted software" is absymall (RIP dns0).
+        #
+        # WARN; ISPs started to intercept, and inject into, plain-DNS queries to block websites provided legal pressure.
+        # Must use one of the encrypted-DNS variants to prevent ISP hijacking!
         cloudflare-dot-1 = {
           address = "security.cloudflare-dns.com:853";
           bootstrap-address = "1.1.1.2";
