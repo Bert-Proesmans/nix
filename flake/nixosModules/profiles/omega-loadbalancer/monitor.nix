@@ -10,12 +10,18 @@ let
 in
 {
   services.gatus.settings.announcements = [
-    # {
-    #   timestamp = "2025-08-15T12:00:00Z";
-    #   # outage, warning, information, operational, none
-    #   type = "information";
-    #   message = "New monitoring dashboard features will be deployed next week";
-    # }
+    {
+      timestamp = "2025-12-28T12:00:00Z";
+      # outage, warning, information, operational, none
+      type = "warning";
+      # Markdown aware
+      message = ''
+        The [Pictures service](https://pictures.proesmans.eu) is being reworked to have higher availability.
+        Outages will occur while this process is ongoing.
+
+        Service migration is expected to finish by january 4th, 2026.
+      '';
+    }
   ];
 
   services.gatus.settings.maintenance = {
