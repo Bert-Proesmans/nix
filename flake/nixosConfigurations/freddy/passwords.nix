@@ -192,5 +192,14 @@ in
         "http://127.0.0.1:${toString config.services.vaultwarden.config.ROCKET_PORT}";
       proxyWebsockets = true;
     };
+    # TODO; Remove when v1.35.0 lands in nixpkgs
+    # REF; https://github.com/dani-garcia/vaultwarden/pull/6557
+    extraConfig = ''
+      # Handle the /api/tasks endpoint that Vaultwarden doesn't support yet
+      location = /api/tasks {
+          return 200 '{"data":[]}';
+          add_header Content-Type application/json;
+      }
+    '';
   };
 }
