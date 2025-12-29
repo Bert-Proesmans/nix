@@ -10,6 +10,9 @@ let
   immichCachePath = "/var/cache/immich-server";
   # Location for external libraries
   immichExternalStatePath = "/var/lib/immich-external";
+
+  ip-freddy = config.proesmans.facts.freddy.host.tailscale.address;
+  fqdn-freddy = "freddy.omega.proesmans.eu";
 in
 {
   # @@ IMMICH media location @@
@@ -48,6 +51,11 @@ in
 
   # Disable snapshots on the cache dataset
   services.sanoid.datasets."storage/media/immich/cache".autosnap = false;
+
+  networking.hosts = {
+    # Bind SMTP host over tailscale IP
+    "${ip-freddy}" = [ fqdn-freddy ];
+  };
 
   sops.secrets = {
     # NOTE; Secrets are loaded through the SystemD LoadCredential system, so they can remain owned by root!
@@ -172,7 +180,7 @@ in
         from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
         replyTo = "pictures@proesmans.eu";
         transport = {
-          host = "freddy.omega.proesmans.eu";
+          host = fqdn-freddy;
           ignoreCert = false;
           username = "immich";
           password._secret = config.sops.secrets."immich-smtp".path;
