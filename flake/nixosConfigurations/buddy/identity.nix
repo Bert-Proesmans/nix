@@ -163,6 +163,17 @@ in
 
       # TODO; Change logo and name if/when provisioning is supported
       # REF; https://github.com/oddlama/kanidm-provision/issues/30
+      #
+      # WORKAROUND;
+      #  1. Get Kanidmd rendered start command using;
+      #     systemctl show -p ExecStart kanidm --no-pager
+      #  2. Recover admin account password using;
+      #     sudo -u kanidm <server-binary> -c <config> recover-account admin
+      #  4. Update kanidm system parameters
+      #     1. Set website name, requires admin login, using;
+      #       kanidm system domain set-displayname "Identity | Proesmans.EU" --name admin
+      #     2. Enable easter-eggs, currently doesn't work!, using;
+      #       kanidm system domain set-allow-easter-eggs true
 
       extraJsonFile = config.sops.secrets.kanidm-extra.path;
       autoRemove = true;
@@ -173,6 +184,7 @@ in
 
         # Known group with static membership, members can perform password reset for others
         "idm_service_desk" = { }; # Builtin
+
         "household.alpha" = { };
         "household.beta" = { };
 
@@ -184,6 +196,7 @@ in
         mailAddresses = [ "bert@proesmans.eu" ];
         groups = [
           # Allow credential reset on other persons
+          # NOTE; Someday this will be incorporated into the web-ui 😅
           "idm_service_desk" # tainted role
           "household.alpha"
           "immich.access"
@@ -229,8 +242,11 @@ in
       systems.oauth2."bookstack" = {
         displayName = "Wiki";
         basicSecretFile = config.sops.secrets."bookstack-oauth-secret".path;
+        # ERROR; Bookstack has does some weird shit with redirecting after login; "Page expired".
+        # It's not ergonomic to link to the login process directly.
+        #
         # WARN; URLs must end with a forward slash if path element is empty!
-        originLanding = "https://wiki.proesmans.eu/login";
+        originLanding = "https://wiki.proesmans.eu/";
         imageFile = "${flake.documentationAssets}/bookstack-logo.png";
 
         # ERROR; Bookstack only accepts RS256 signing algorithm

@@ -53,8 +53,8 @@ in
         default-sort-by = "name";
         buttons = [
           {
-            name = "Visit idm";
-            link = "https://idm.proesmans.eu";
+            name = "Visit wiki";
+            link = "https://wiki.proesmans.eu";
           }
         ];
       };
