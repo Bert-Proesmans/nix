@@ -20,7 +20,9 @@
   services.resolved.enable = false;
 
   # Servicing structure
-  # [INGRESS] -> Response cache component -> TTL modifier -> Client rate limiter -> *
+  # [INGRESS] -> Divert local or not -> ++local / **remote
+  # ++local -> Resolve /etc/hosts -> **remote
+  # **remote -> Response cache component -> TTL modifier -> Client rate limiter -> *
   # * -> Query blocklist -> Query response blocklist -> IP response blocklist -> *
   # * -> Upstream rate limiter -> Upstream failover -> [EGRESS]
   services.routedns = {
@@ -50,16 +52,44 @@
         network-udp = {
           address = ":53";
           protocol = "udp";
-          resolver = "cache";
+          resolver = "local_or_not";
         };
         network-tcp = {
           address = ":53";
           protocol = "tcp";
-          resolver = "cache";
+          resolver = "local_or_not";
         };
       };
 
+      routers.local_or_not = {
+        routes = [
+          ({
+            source = "127.0.0.0/8";
+            resolver = "hosts-override";
+          })
+          ({
+            source = "::1/128";
+            resolver = "hosts-override";
+          })
+          ({ resolver = "cache"; })
+        ];
+      };
+
       groups = {
+        # Answer with hosts file override!
+        hosts-override = {
+          type = "blocklist-v2";
+          resolvers = [ "cache" ];
+          # NOTE; Refresh is also required for local files!
+          blocklist-refresh = 300; # 5 minutes
+          blocklist-source = [
+            ({
+              format = "hosts";
+              source = "/etc/hosts";
+            })
+          ];
+        };
+
         # Cache resolve responses
         cache = {
           type = "cache";
@@ -184,9 +214,11 @@
           prefix6 = 64;
         };
 
-        # Route requests into this handler to terminate the response flow
+        # Route requests here to reply with REFUSED
         static-refused = {
           type = "static-responder";
+          # NOTE; We want explicit refused so it's not cached upstream and retried by the client later.
+          # NOTE; NXDOMAIN <=> code 3
           rcode = 5; # REFUSED
         };
 
