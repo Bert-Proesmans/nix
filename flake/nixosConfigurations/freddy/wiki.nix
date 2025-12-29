@@ -76,21 +76,21 @@ in
       #
       # Custom draw.io parameters are used to define the interface and style of the content
       # REF; https://www.drawio.com/doc/faq/supported-url-parameters
-      # DRAWIO = lib.concatStringsSep "&" [
-      #   "https://draw.live.e-power.org/?embed=1&proto=json&spin=1" # Base url and require arguments
-      #   "configure=1" # Sends configure javascript-event
-      #   "lang=en"
-      #   "stealth=1" # Disables features that require external web services
-      #   "dark=auto"
-      #   "ui=min" # Reduce the UI as much as possible
-      #   "sketch=0" # Sketching contents
-      #   "rough=0" # Sketching contents
-      #   "grid=0" # Disable the background grid
-      #   "layers=0" # Disable layer control
-      #   # Plugins explore/tooltips/sql, very interesting stuff btw
-      #   # REF; https://www.drawio.com/doc/faq/plugins
-      #   "p=ex;tips;sql"
-      # ];
+      DRAWIO = lib.concatStringsSep "&" [
+        "https://embed.diagrams.net/?embed=1&proto=json&spin=1&configure=1" # Base url and require arguments
+        #   "lang=en" # Select from browser language
+        #   "stealth=1" # Disables features that require external web services
+        "dark=auto"
+        #   "ui=min" # Reduce the UI as much as possible
+        "ui=sketch"
+        #   "sketch=0" # Sketching contents
+        #   "rough=0" # Sketching contents
+        #   "grid=0" # Disable the background grid
+        "layers=0" # Disable layer control
+        #   # Plugins explore/tooltips/sql, very interesting stuff btw
+        #   # REF; https://www.drawio.com/doc/faq/plugins
+        "p=ex;tips;sql"
+      ];
 
       # ERROR; Cannot use the combination of password/oidc login, decided by the developers.
       #AUTH_METHOD = "standard"; # username/pass login only
