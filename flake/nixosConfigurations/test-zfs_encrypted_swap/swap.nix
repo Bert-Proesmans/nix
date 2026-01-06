@@ -37,8 +37,10 @@
     enableRootSlice = true;
     enableSystemSlice = true;
     enableUserSlices = true;
-    extraConfig.DefaultMemoryPressureLimit = "60%"; # Systemd default
-    extraConfig.DefaultMemoryPressureDurationSec = "20s"; # Fedora default
+    settings.OOM = {
+      DefaultMemoryPressureLimit = "60%"; # Systemd default
+      DefaultMemoryPressureDurationSec = "20s"; # Fedora default
+    };
   };
 
   zramSwap = {

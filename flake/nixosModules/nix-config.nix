@@ -188,7 +188,7 @@ in
             overlays = cfg.overlays;
 
             config = config.nixpkgs.config;
-            localSystem.system = pkgs.system;
+            localSystem.system = pkgs.stdenv.hostPlatform.system;
           };
         in
         cfg.overlays

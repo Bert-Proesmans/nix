@@ -29,7 +29,6 @@
     vscode-server.inputs.flake-utils.follows = "flake-utils";
     microvm.url = "github:astro/microvm.nix";
     microvm.inputs.nixpkgs.follows = "nixpkgs";
-    microvm.inputs.flake-utils.follows = "flake-utils";
     dns.url = "github:nix-community/dns.nix";
     dns.inputs.nixpkgs.follows = "nixpkgs";
     dns.inputs.flake-utils.follows = "flake-utils";
@@ -254,10 +253,10 @@
       hydraJobs =
         eachSystem (pkgs: {
           recurseForDerivations = true;
-          formatter = outputs.formatter.${pkgs.system};
-          devShells = outputs.devShells.${pkgs.system};
-          packages = outputs.packages.${pkgs.system};
-          checks = outputs.checks.${pkgs.system};
+          formatter = outputs.formatter.${pkgs.stdenv.hostPlatform.system};
+          devShells = outputs.devShells.${pkgs.stdenv.hostPlatform.system};
+          packages = outputs.packages.${pkgs.stdenv.hostPlatform.system};
+          checks = outputs.checks.${pkgs.stdenv.hostPlatform.system};
         })
         // {
           no-system.recurseForDerivations = true;
