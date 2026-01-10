@@ -253,7 +253,12 @@ in
     '';
   };
 
+  systemd.services.immich-machine-learning = lib.mkIf config.services.immich.enable {
+    wantedBy = lib.mkForce [ ];
+  };
+
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
+    wantedBy = lib.mkForce [ ];
     environment = {
       # Force overwrite custom URL for the machine learning service
       IMMICH_MACHINE_LEARNING_URL =
