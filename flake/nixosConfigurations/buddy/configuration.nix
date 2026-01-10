@@ -13,6 +13,7 @@
     ./mail-transfer.nix
     ./pictures.nix
     ./private-network.nix
+    ./storage-provision.nix
     ./tls-termination.nix
     # ./web-security.nix
     flake.profiles.hypervisor

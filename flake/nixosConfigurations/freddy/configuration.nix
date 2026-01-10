@@ -18,6 +18,7 @@
     ./passwords.nix
     ./private-network.nix
     ./remote-builder.nix
+    ./remote-fs.nix
     ./tls-termination.nix
     ./web-security.nix
     ./wiki.nix
