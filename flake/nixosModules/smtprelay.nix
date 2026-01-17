@@ -382,6 +382,8 @@ in
 
         User = cfg.user;
         Group = cfg.group;
+        Restart = "always";
+        TimeoutSec = 30;
 
         # Bind standard privileged ports
         AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
@@ -418,6 +420,19 @@ in
         ];
         UMask = "0077";
       };
+
+      unitConfig =
+        let
+          inherit (config.systemd.services.smtprelay.serviceConfig) TimeoutSec;
+          maxTries = 3;
+          bufferSec = 600; # 10mins
+        in
+        {
+          # The upper limit of required time to start(attempt) maxTries within the configured startup timeout.
+          # NOTE; Service retrycount resets after this amount of seconds.
+          StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
+          StartLimitBurst = maxTries;
+        };
     };
   };
 }

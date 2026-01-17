@@ -68,6 +68,13 @@
 
   systemd.services.smtprelay = {
     requires = [ "acme-freddy.omega.proesmans.eu.service" ];
-    after = [ "acme-freddy.omega.proesmans.eu.service" ];
+    wants = [
+      # WARN; Binding to tailscale IP, so tailscale must be running and connected!
+      "tailscaled-autoconnect.service"
+    ];
+    after = [
+      "acme-freddy.omega.proesmans.eu.service"
+      "tailscaled-autoconnect.service"
+    ];
   };
 }
