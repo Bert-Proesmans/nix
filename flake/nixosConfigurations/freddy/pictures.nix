@@ -70,9 +70,9 @@ in
         # ERROR; Matplotlib wants some kind of persistent cache
         # aug 16 23:03:17 buddy machine-learning[13288]: mkdir -p failed for path /var/empty/.config/matplotlib: [Errno 1] Operation not permitted: '/var/empty/.config'
         # aug 16 23:03:17 buddy machine-learning[13288]: Matplotlib created a temporary cache directory at /tmp/matplotlib-srvzammy because there was an issue with the default path (/var/empty/.config/matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
-        # HOME = "/var/cache/immich/home";
-        # XDG_CONFIG_HOME = "/var/cache/immich/home/.config";
-        # MPLCONFIGDIR = "/var/cache/immich/home/.config";
+        HOME = "/var/cache/immich/home";
+        XDG_CONFIG_HOME = "/var/cache/immich/home/.config";
+        MPLCONFIGDIR = "/var/cache/immich/home/.config";
         # ERROR; Huggingface library doing something fucky wucky producing the following error message
         # RuntimeError: Data processing error: I/O error: Operation not permitted (os error 1)
         #
