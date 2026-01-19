@@ -72,11 +72,9 @@ in
         "allow_other"
       ];
       unitConfig = { };
-      mountConfig = {
-        # Time to wait before SIGKILL
-        # NOTE; Should match with rclone timeout settings
-        TimeoutSec = "61s";
-      };
+      # Time to wait before SIGKILL
+      # NOTE; Should match with rclone timeout settings
+      mountConfig.TimeoutSec = 61;
     }
   ];
 
@@ -99,7 +97,9 @@ in
   networking.hosts."${ip-buddy}" = [ fqdn-buddy ];
 
   environment.systemPackages = [
-    # Must exist at system path for .mount unit file to work
+    # Following packages must exist at system path for .mount unit files to work
+    # NOTE; Couldn't I just add these to systemd package set?
+    pkgs.fuse3 # fuse defaults to fuse2
     pkgs.rclone
   ];
 }
