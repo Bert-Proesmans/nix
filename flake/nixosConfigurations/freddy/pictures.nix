@@ -227,7 +227,8 @@ in
       unitConfig = {
         DefaultDependencies = false;
         RequiresMountsFor = [ "/var/lib/local-immich" ];
-        WantsMountsFor = [ "/mnt/buddy/pictures" ];
+        # WARN; Completely detach the network mount, if it's online it's online.. otherwise nothing much
+        # WantsMountsFor = [ "/mnt/buddy/pictures" ];
       };
       mountConfig.TimeoutSec = 30;
     }
