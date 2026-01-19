@@ -33,7 +33,8 @@
       backend pictures {
         # ERROR; Varnish community does NOT support tls upstream connections!
         # NOTE; Varnish enterprise does..
-        .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
+        # .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
+        .path = "/run/haproxy/forward_to_freddy.sock";  # run it back to haproxy
         .proxy_header = 2;
 
         .connect_timeout        = 10s;   # How long to wait for a backend connection?
