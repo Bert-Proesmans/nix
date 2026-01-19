@@ -33,7 +33,6 @@
       backend pictures {
         # ERROR; Varnish community does NOT support tls upstream connections!
         # NOTE; Varnish enterprise does..
-        # .path = "/run/haproxy/forward_to_buddy.sock";  # run it back to haproxy
         .path = "/run/haproxy/forward_to_freddy.sock";  # run it back to haproxy
         .proxy_header = 2;
 
@@ -45,7 +44,7 @@
           # Debug with; varnishadm backend.list
           .request =
             "GET /api/server/ping HTTP/1.1"
-            "Host: alpha.pictures.proesmans.eu"
+            "Host: omega.pictures.proesmans.eu"
             "Connection: close"
             "User-Agent: Varnish Health Probe";
 
@@ -79,11 +78,11 @@
           set req.http.X-Backend = "pictures";
           set req.backend_hint = pictures;
 
-          # Fix the host header data to always be alpha.pictures.proesmans.eu, which is the right (only) hostname
+          # Fix the host header data to always be omega.pictures.proesmans.eu, which is the right (only) hostname
           # for this upstream.
           # ERROR; This change happens as early as possible to not interfere with hashing/retrieval logic
-          set req.http.Host = "alpha.pictures.proesmans.eu";
-          set req.http.X-Forwarded-Host = "alpha.pictures.proesmans.eu";
+          set req.http.Host = "omega.pictures.proesmans.eu";
+          set req.http.X-Forwarded-Host = "omega.pictures.proesmans.eu";
         } else {
           return (synth(404));
         }
