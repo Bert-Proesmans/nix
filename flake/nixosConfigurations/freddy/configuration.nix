@@ -16,6 +16,7 @@
     ./mail-server.nix
     ./mail-transfer.nix
     ./passwords.nix
+    ./pictures.nix
     ./private-network.nix
     ./remote-builder.nix
     ./remote-fs.nix

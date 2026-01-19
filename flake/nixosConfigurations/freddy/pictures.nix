@@ -29,47 +29,12 @@ in
   #
   # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
   # The state directory will point to the storage pool dataset, and symlinks will point to the other datasets.
-  disko.devices.zpool.storage.datasets = {
-    "media/immich/originals" = {
-      type = "zfs_fs";
-      # WARN; To be backed up !
-      options.mountpoint = immichStatePath;
-    };
-
-    "media/immich/external" = {
-      type = "zfs_fs";
-      # WARN; To be backed up !
-      options.mountpoint = immichExternalStatePath;
-    };
-
-    "media/immich/cache" = {
-      type = "zfs_fs";
-      # NOTE; Backup not necessary, can be regenerated
-      options.mountpoint = immichCachePath;
-    };
-  };
-
-  # Disable snapshots on the cache dataset
-  services.sanoid.datasets."storage/media/immich/cache".autosnap = false;
-
-  networking.hosts = {
-    # Bind SMTP host over tailscale IP
-    "${ip-freddy}" = [ fqdn-freddy ];
-  };
-
-  sops.secrets = {
-    # NOTE; Secrets are loaded through the SystemD LoadCredential system, so they can remain owned by root!
-    "immich-oauth-secret".restartUnits = [ config.systemd.services.immich-server.name ];
-    "immich-smtp".restartUnits = [ config.systemd.services.immich-server.name ];
-  };
-
   services.immich = {
     enable = true;
     host = "127.0.0.1";
     port = 8080;
     openFirewall = false; # Use reverse proxy
     mediaLocation = immichStatePath;
-    accelerationDevices = [ "/dev/dri/renderD128" ];
 
     redis.enable = true;
     database = {
@@ -77,9 +42,7 @@ in
       name = "immich";
       createDB = true;
       enableVectorChord = true; # New vector extension
-      # Backwards compatibility, should be disabled after migration
-      # REF; https://docs.immich.app/administration/postgres-standalone#migrating-from-pgvectors
-      enableVectors = false; # Migration DONE
+      enableVectors = false; # Explicit disable, vectorchord is the current approach
     };
 
     environment = {
@@ -97,27 +60,24 @@ in
       # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] Initialised VAAPI connection: version 1.22
       # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] VAAPI driver: Mesa Gallium driver 25.2.0 for AMD Radeon Vega 3 Graphics (radeonsi, raven, ACO, DRM 3.61, 6.12.41).
       # aug 16 21:10:29 buddy immich[1684]: [AVHWDeviceContext @ 0x2a514e40] Driver not found in known nonstandard list, using standard behaviour.
-      HOME = "/var/cache/immich-server/home";
-      XDG_CACHE_HOME = "/var/cache/immich-server/home/.cache";
+      # HOME = "/var/cache/immich-server/home";
+      # XDG_CACHE_HOME = "/var/cache/immich-server/home/.cache";
     };
 
     machine-learning = {
       enable = true;
       environment = {
-        IMMICH_HOST = lib.mkForce "127.175.0.99"; # Upstream overwrite
-        IMMICH_PORT = lib.mkForce "3003"; # Upstream overwrite
-
         # ERROR; Matplotlib wants some kind of persistent cache
         # aug 16 23:03:17 buddy machine-learning[13288]: mkdir -p failed for path /var/empty/.config/matplotlib: [Errno 1] Operation not permitted: '/var/empty/.config'
         # aug 16 23:03:17 buddy machine-learning[13288]: Matplotlib created a temporary cache directory at /tmp/matplotlib-srvzammy because there was an issue with the default path (/var/empty/.config/matplotlib); it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing.
-        HOME = "/var/cache/immich/home";
-        XDG_CONFIG_HOME = "/var/cache/immich/home/.config";
-        MPLCONFIGDIR = "/var/cache/immich/home/.config";
+        # HOME = "/var/cache/immich/home";
+        # XDG_CONFIG_HOME = "/var/cache/immich/home/.config";
+        # MPLCONFIGDIR = "/var/cache/immich/home/.config";
         # ERROR; Huggingface library doing something fucky wucky producing the following error message
         # RuntimeError: Data processing error: I/O error: Operation not permitted (os error 1)
         #
         # Put all relevant filepaths together on the same filesystem so atomic move operations won't fail.
-        HF_HOME = "/var/cache/immich/hf";
+        # HF_HOME = "/var/cache/immich/hf";
       };
     };
 
@@ -126,7 +86,7 @@ in
       ffmpeg = {
         accel = "vaapi";
         accelDecode = true;
-        preferredHwDevice = "renderD128"; # /dev/dri node
+        # preferredHwDevice = "renderD128"; # /dev/dri node
         cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
         targetAudioCodec = "aac"; # optimized for device compatibility
         targetResolution = "720"; # 720p, optimized for filesize
@@ -170,49 +130,49 @@ in
         # Changed model requires recognizing _all_ detected faces again (docs say restart face detection??)
         modelName = "buffalo_l"; # Default Immich v1.132+
       };
-      machineLearning.urls = [ "http://127.175.0.99:3003" ];
+      # machineLearning.urls = [ "http://127.175.0.99:3003" ];
       map.darkStyle = "https://tiles.immich.cloud/v1/style/dark.json";
       map.enabled = true;
       map.lightStyle = "https://tiles.immich.cloud/v1/style/light.json";
       newVersionCheck.enabled = false;
-      notifications.smtp = {
-        enabled = true;
-        from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
-        replyTo = "pictures@proesmans.eu";
-        transport = {
-          host = fqdn-freddy;
-          ignoreCert = false;
-          username = "immich";
-          password._secret = config.sops.secrets."immich-smtp".path;
-          port = config.proesmans.facts.freddy.service.mail.port; # TLS ON
-          secure = true; # TLS ON
-        };
-      };
-      oauth = {
-        enabled = true;
-        autoRegister = true;
-        buttonText = "Login met Proesmans account";
-        clientId = "photos";
-        # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
-        clientSecret._secret = config.sops.secrets."immich-oauth-secret".path;
-        defaultStorageQuota = 500;
-        # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
-        # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
-        # issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
-        issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
-        mobileOverrideEnabled = false;
-        mobileRedirectUri = "";
-        profileSigningAlgorithm = "none";
-        scope = "openid email profile";
-        signingAlgorithm = "RS256";
-        # NOTE; Immich currently ONLY applies these claims during account creation!
-        # ERROR; storage label _must_ be unique for each user (or unset)!
-        # Trying to group media from multiple users behind the same label is a wrong assumption.
-        storageLabelClaim = "preferred_username";
-        storageQuotaClaim = "immich_quota";
-      };
-      passwordLogin.enabled = false;
-      # passwordLogin.enabled = true; # Enable for maintenance work
+      # notifications.smtp = {
+      #   enabled = true;
+      #   from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
+      #   replyTo = "pictures@proesmans.eu";
+      #   transport = {
+      #     host = fqdn-freddy;
+      #     ignoreCert = false;
+      #     username = "immich";
+      #     password._secret = config.sops.secrets."immich-smtp".path;
+      #     port = config.proesmans.facts.freddy.service.mail.port; # TLS ON
+      #     secure = true; # TLS ON
+      #   };
+      # };
+      # oauth = {
+      #   enabled = true;
+      #   autoRegister = true;
+      #   buttonText = "Login met Proesmans account";
+      #   clientId = "photos";
+      #   # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
+      #   clientSecret._secret = config.sops.secrets."immich-oauth-secret".path;
+      #   defaultStorageQuota = 500;
+      #   # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
+      #   # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
+      #   # issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
+      #   issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
+      #   mobileOverrideEnabled = false;
+      #   mobileRedirectUri = "";
+      #   profileSigningAlgorithm = "none";
+      #   scope = "openid email profile";
+      #   signingAlgorithm = "RS256";
+      #   # NOTE; Immich currently ONLY applies these claims during account creation!
+      #   # ERROR; storage label _must_ be unique for each user (or unset)!
+      #   # Trying to group media from multiple users behind the same label is a wrong assumption.
+      #   storageLabelClaim = "preferred_username";
+      #   storageQuotaClaim = "immich_quota";
+      # };
+      # passwordLogin.enabled = false;
+      passwordLogin.enabled = true; # Enable for maintenance work
       reverseGeocoding.enabled = true;
       server.externalDomain = "https://pictures.proesmans.eu";
       server.loginPageMessage = "Proesmans fotos, klik op de knop onderaan om verder te gaan";
@@ -226,9 +186,69 @@ in
     };
   };
 
-  services.nginx.virtualHosts."alpha.pictures.proesmans.eu" = {
+  disko.devices.zpool.zroot.datasets = {
+    "encryptionroot/media/local-immich" = {
+      type = "zfs_fs";
+      options.mountpoint = "/var/lib/local-immich";
+      options.refquota = "10G";
+    };
+  };
+
+  systemd.mounts = [
+    {
+      description = "Immich state directory";
+      wants = [ ];
+      after = [ ];
+
+      # NOTE; Local cache, followed by networked storage
+      what = "/var/lib/local-immich:/mnt/buddy/pictures";
+      where = "/var/lib/immich";
+      type = "fuse.mergerfs";
+      options = lib.concatStringsSep "," [
+        # NOTE; I'm not caring about path transformation into specific mount, nor (tricky) behaviour on rename etc.
+        # The purpose of mergerfs is to keep immich alive when the sftp mount hangs/fails(network unavailability).
+        # This setup is flexible enough to add additional storage later.
+        #
+        # WARN; The reported free space is the aggregate space available not the contiguous space available.
+        #
+        # REF; https://manpages.debian.org/buster/mergerfs/mergerfs.1.en.html#mount_options
+        "fsname=immich mergerfs"
+        "defaults" # atomic_o_trunc, auto_cache, big_writes, default_permissions, splice_move, splice_read, splice_write
+        "allow_other"
+        "moveonenospc=true" # Retry with other mount if write fails
+        "use_ino"
+        "hard_remove" # Improve data consistency
+        "dropcacheonclose=true"
+        "minfreespace=1M" # 1 megabyte, intention is to fill the first mount entirely!
+        "category.create=ff" # Create files on first mount (local disk)
+        "category.search=ff" # Search files on first mount (local disk)
+      ];
+      unitConfig = {
+        RequiresMountsFor = [ "/var/lib/local-immich" ];
+        WantsMountsFor = [ "/mnt/buddy/pictures" ];
+      };
+      mountConfig.TimeoutSec = 30;
+    }
+  ];
+
+  systemd.automounts = [
+    {
+      # Since /var/lib/immich is not part of local-fs, add an automount so it gets ordered between services anyway.
+      description = "Automount for /var/lib/immich";
+      wantedBy = [ "multi-user.target" ];
+      where = "/var/lib/immich";
+    }
+  ];
+
+  environment.systemPackages = [
+    pkgs.fuse3 # fuse defaults to fuse2
+    pkgs.mergerfs-tools
+    pkgs.mergerfs
+  ];
+
+  services.nginx.virtualHosts."omega.pictures.proesmans.eu" = {
     serverAliases = [ "pictures.proesmans.eu" ];
-    useACMEHost = "alpha-services.proesmans.eu";
+    useACMEHost = "omega-services.proesmans.eu";
     onlySSL = true;
     locations."/" = {
       proxyPass =
@@ -253,31 +273,9 @@ in
     '';
   };
 
-  systemd.services.immich-machine-learning = lib.mkIf config.services.immich.enable {
-    wantedBy = lib.mkForce [ ]; # TEMP DISABLE
-  };
-
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
-    wantedBy = lib.mkForce [ ]; # TEMP DISABLE
-    environment = {
-      # Force overwrite custom URL for the machine learning service
-      IMMICH_MACHINE_LEARNING_URL =
-        let
-          inherit (config.services.immich.machine-learning.environment) IMMICH_HOST IMMICH_PORT;
-        in
-        lib.mkForce "http://${IMMICH_HOST}:${IMMICH_PORT}";
-    };
 
-    unitConfig.RequiresMountsFor = [
-      immichStatePath
-      immichCachePath
-      immichExternalStatePath
-    ];
     serviceConfig = {
-      SupplementaryGroups = [
-        # Required for hardware accelerated video transcoding
-        config.users.groups.render.name
-      ];
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";
         assert immichExternalStatePath == "/var/lib/immich-external";
@@ -307,36 +305,24 @@ in
             text = ''
               # NOTE; Script must run as immich user!
 
-              SOURCE="''${TMPDIR:-/var/tmp}"
-              mkdir --parents "$SOURCE/upload"
+              TEMP="''${TMPDIR:-/var/tmp}"
+              mkdir --parents "$TEMP/upload"
               # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
               # the immich startup check.
-              touch "$SOURCE/upload/.immich"
-              ln --symbolic --force --target-directory="${immichStatePath}" "$SOURCE/upload"
-            '';
-          };
-          setupCachePath = pkgs.writeShellApplication {
-            name = "setup-immich-cache";
-            runtimeInputs = [ pkgs.coreutils ];
-            text = ''
-              # NOTE; Script must run as immich user!
-
-              SOURCE="${immichCachePath}"
-              mkdir --parents "$SOURCE/thumbs"
-              mkdir --parents "$SOURCE/encoded-video"
-              # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
-              # the immich startup check.
-              touch "$SOURCE/thumbs/.immich"
-              touch "$SOURCE/encoded-video/.immich"
-              ln --symbolic --force --target-directory="${immichStatePath}" "$SOURCE/thumbs"
-              ln --symbolic --force --target-directory="${immichStatePath}" "$SOURCE/encoded-video"
+              touch "$TEMP/upload/.immich"
+              ln --symbolic --force --target-directory="${immichStatePath}" "$TEMP/upload"
             '';
           };
         in
         [
           (lib.getExe setupUploadsPath)
-          (lib.getExe setupCachePath)
         ];
     };
+
+    unitConfig.RequiresMountsFor = [
+      immichStatePath
+      immichCachePath
+      immichExternalStatePath
+    ];
   };
 }
