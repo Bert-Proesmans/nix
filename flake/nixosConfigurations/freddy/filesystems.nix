@@ -184,5 +184,30 @@
       };
     };
 
+    "encryptionroot/postgres" = {
+      # NOTE; Base dataset for storage data managed by a postgres database server.
+      type = "zfs_fs";
+      options = {
+        canmount = "off";
+        mountpoint = "none";
+        atime = "off";
+
+        # Performance notes for postgres itself;
+        #   - Disable database checksumming
+        #     - Checksumming is a necessity in HA clusters with timelines though (eg Patroni)
+        #   - Disable full_page_writes
+
+        # Postgres page size is fixed 8K (hardcoded). A bigger recordsize is more performant on reads, but not writes.
+        # Latency of any read under 1MiB is dominated by disk seek time (~10ms), so the choice of recordsize
+        # between 8K and 128K is basically meaningless (as long as it's a multiple of 8K).
+        recordsize = "32K";
+        # Assumes all postgres state fits in RAM, so no double caching of data files.
+        # Caches metadata for lower latency retrieval of non-cached records.
+        primarycache = "metadata";
+        # No fragmented writes from ZIL to data pool
+        logbias = "latency";
+      };
+    };
+
   };
 }
