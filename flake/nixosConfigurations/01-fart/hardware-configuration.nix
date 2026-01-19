@@ -25,6 +25,7 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
+  boot.loader.systemd-boot.netbootxyz.enable = true;
   boot.tmp.useTmpfs = false; # Only have 1G RAM
   boot.tmp.cleanOnBoot = true;
 
