@@ -197,8 +197,9 @@ in
   systemd.mounts = [
     {
       description = "Immich state directory";
+      conflicts = [ "umount.target" ];
       wants = [ ];
-      after = [ ];
+      after = [ "local-fs-pre.target" ];
 
       # NOTE; Local cache, followed by networked storage
       what = "/var/lib/local-immich:/mnt/buddy/pictures";
@@ -224,6 +225,7 @@ in
         "category.search=ff" # Search files on first mount (local disk)
       ];
       unitConfig = {
+        DefaultDependencies = false;
         RequiresMountsFor = [ "/var/lib/local-immich" ];
         WantsMountsFor = [ "/mnt/buddy/pictures" ];
       };
@@ -274,7 +276,6 @@ in
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
-
     serviceConfig = {
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";

@@ -44,6 +44,7 @@ in
   systemd.mounts = [
     {
       description = "Mount buddy pictures to local filesystem";
+      conflicts = [ "umount.target" ];
       wants = [
         "network.target"
         "tailscaled-autoconnect.service"
@@ -51,6 +52,7 @@ in
       after = [
         "network.target"
         "tailscaled-autoconnect.service"
+        "remote-fs-pre.target"
       ];
       what = "buddy:/pictures";
       where = "/mnt/buddy/pictures";
@@ -71,7 +73,7 @@ in
         "rw"
         "allow_other"
       ];
-      unitConfig = { };
+      unitConfig.DefaultDependencies = false;
       # Time to wait before SIGKILL
       # NOTE; Should match with rclone timeout settings
       mountConfig.TimeoutSec = 61;
