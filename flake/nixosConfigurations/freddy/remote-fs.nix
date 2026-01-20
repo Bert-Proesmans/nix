@@ -37,7 +37,7 @@ in
   };
 
   systemd.services."prep-mount-fs@" = {
-    description = "Landing zone prep for %i";
+    description = "Landing zone prep for %I";
     conflicts = [ "shutdown.target" ];
     before = [ "shutdown.target" ];
     after = [ "sysinit.target" ];
@@ -48,7 +48,7 @@ in
       pkgs.e2fsprogs # chattr
     ];
     enableStrictShellChecks = true;
-    scriptArgs = "'%i'";
+    scriptArgs = "'%I'";
     script = ''
       location="$1"
 
@@ -73,7 +73,7 @@ in
   };
 
   systemd.services."finalize-mount-fs@" = {
-    description = "Mount finalization for %i";
+    description = "Mount finalization for %I";
     conflicts = [ "shutdown.target" ];
     before = [ "shutdown.target" ];
     path = [
@@ -82,7 +82,7 @@ in
       pkgs.attr # setfattr
     ];
     enableStrictShellChecks = true;
-    scriptArgs = "'%i'";
+    scriptArgs = "'%I'";
     script = ''
       location="$1"
 
@@ -129,13 +129,13 @@ in
       options = lib.concatStringsSep "," [
         "config=/etc/rclone.config"
         "contimeout=60s" # SFTP session (/socket) timeout
-        "timeout=60s" # I/O timeout -> I/O operations hang indefinite otherwise
+        "timeout=15s" # I/O timeout -> I/O operations hang indefinite otherwise
         # NOTE; Pre-created directory.
         # NOTE; Having multiple rclone processes working on the same cache directory should be no issue (while the processes are running
         # in the same security context!)
         "cache-dir=/var/cache/rclone"
         "vfs-cache-mode=writes"
-        "daemon-wait=60s" # Startup time
+        "daemon-wait=15s" # Startup time
         # Don't optimize VFS cache yet..
         # REF; https://github.com/rclone/rclone/blob/master/vfs/vfs.md
         "args2env" # Pass mount arguments below to mount helper!
@@ -145,17 +145,19 @@ in
       unitConfig.DefaultDependencies = false;
       # Time to wait before SIGKILL
       # NOTE; Should match with rclone timeout settings
-      mountConfig.TimeoutSec = 61;
+      mountConfig.TimeoutSec = 16;
     }
   ];
 
   systemd.automounts = [
-    {
-      # Since /mnt/remote/pictures-buddy-sftp is not part of local-fs, add an automount so it gets ordered between services anyway.
-      description = "Automount for /mnt/remote/pictures-buddy-sftp";
-      wantedBy = [ "multi-user.target" ];
-      where = "/mnt/remote/pictures-buddy-sftp";
-    }
+    # Automount seems to be too eager and blocks various operations. Better to explicitly mount instead.
+    #
+    # {
+    #   # Since /mnt/remote/pictures-buddy-sftp is not part of local-fs, add an automount so it gets ordered between services anyway.
+    #   description = "Automount for /mnt/remote/pictures-buddy-sftp";
+    #   wantedBy = [ "multi-user.target" ];
+    #   where = "/mnt/remote/pictures-buddy-sftp";
+    # }
   ];
 
   programs.ssh.knownHosts = {
