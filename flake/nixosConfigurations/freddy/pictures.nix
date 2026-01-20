@@ -1,5 +1,6 @@
 {
   lib,
+  utils,
   pkgs,
   config,
   ...
@@ -198,12 +199,28 @@ in
     {
       description = "Immich state directory";
       conflicts = [ "umount.target" ];
-      wants = [ ];
-      after = [ "local-fs-pre.target" ];
+      wants = [
+        "prep-mount-fs@${utils.escapeSystemdPath "/var/lib/immich"}.service"
+      ];
+      after = [
+        "prep-mount-fs@${utils.escapeSystemdPath "/var/lib/immich"}.service"
+        "network.target"
+      ];
 
       # NOTE; Local cache, followed by networked storage
-      what = "/var/lib/local-immich:/mnt/buddy/pictures";
+      # 'RW' means read-write, 1M is the individual minfreespace option on the subject branch
+      # 'NC' means no-create on the subject branch
+      #
+      # NOTE; Minimum free space is set larger than a single picture as to not run out of space halfway writing.
+      what = "/var/lib/local-immich=RW,10M:/mnt/remote/pictures-buddy-sftp=NC";
       where = "/var/lib/immich";
+      # Currently experimenting with mergerFS, I might be holding it wrong..
+      # READ THE DOCS; https://trapexit.github.io/mergerfs/latest/quickstart/
+      #
+      # ERROR; mergerfs is sadly way more unstable than anticipated.
+      # The first hour of experimenting causes system hangs where each process doing _anything_ filesystem related are being blocked.
+      # Consistent reproduction happens when running `sudo ls -la /var/lib/immich`, while the command without sudo _just works_ --'
+      # Targetted file work, like immich who has a file reference database, seems to work without any issues.
       type = "fuse.mergerfs";
       options = lib.concatStringsSep "," [
         # NOTE; I'm not caring about path transformation into specific mount, nor (tricky) behaviour on rename etc.
@@ -214,21 +231,25 @@ in
         #
         # REF; https://manpages.debian.org/buster/mergerfs/mergerfs.1.en.html#mount_options
         "fsname=immich mergerfs"
-        "defaults" # atomic_o_trunc, auto_cache, big_writes, default_permissions, splice_move, splice_read, splice_write
-        "allow_other"
-        "moveonenospc=true" # Retry with other mount if write fails
-        "use_ino"
-        "hard_remove" # Improve data consistency
-        "dropcacheonclose=true"
-        "minfreespace=1M" # 1 megabyte, intention is to fill the first mount entirely!
-        "category.create=ff" # Create files on first mount (local disk)
-        "category.search=ff" # Search files on first mount (local disk)
+        # "allow_other" # Implied when mount is executed as root
+        "category.create=ff" # Write always to first found RW-branch
+        "cache.files=off" # Prevent buffer bloat, increase performance
+        # Return the newest modified time when applications call mtime().
+        # WARN; This is an exception on the search category policy 'ff'.
+        "func.getattr=newest"
+        # Increased size of messages communicated over /dev/fuse, directly increases memory usage.
+        # Optimized value from mergerFS docs.
+        "fuse-msg-size=4M"
+        "func.readdir=cor" # Optimize directory listing over high latency network mounts
+        # Retry with other mount if write fails
+        # NOTE; Only useful with multiple writeable branches..
+        # "moveonenospc=true"
       ];
       unitConfig = {
         DefaultDependencies = false;
         RequiresMountsFor = [ "/var/lib/local-immich" ];
         # WARN; Completely detach the network mount, if it's online it's online.. otherwise nothing much
-        # WantsMountsFor = [ "/mnt/buddy/pictures" ];
+        # WantsMountsFor = [ "/mnt/remote/pictures-buddy-sftp" ];
       };
       mountConfig.TimeoutSec = 30;
     }

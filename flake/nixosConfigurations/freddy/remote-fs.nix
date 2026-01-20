@@ -1,5 +1,6 @@
 {
   lib,
+  utils,
   pkgs,
   config,
   ...
@@ -28,17 +29,79 @@ in
   };
 
   systemd.tmpfiles.settings."10-remote_fs" = {
-    "/mnt".d = {
-      user = "root";
-      group = "root";
-      mode = "0555"; # a+rx
-    };
-
     "/var/cache/rclone".d = {
       user = "root";
       group = "root";
       mode = "0700"; # u+rwx
     };
+  };
+
+  systemd.services."prep-mount-fs@" = {
+    description = "Landing zone prep for %i";
+    conflicts = [ "shutdown.target" ];
+    before = [ "shutdown.target" ];
+    after = [ "sysinit.target" ];
+    path = [
+      pkgs.util-linux # mountpoint
+      pkgs.coreutils # chown/chmod
+      pkgs.attr # sefattr
+      pkgs.e2fsprogs # chattr
+    ];
+    enableStrictShellChecks = true;
+    scriptArgs = "'%i'";
+    script = ''
+      location="$1"
+
+      # Code must run _before_ anything is mounted at $location
+      mountpoint --quiet "$location" && exit 0
+
+      # Create directory and make it immutable for all users and systems.
+      # The directory is marked for mergerfs to differentiate mounted/to be mounted.
+
+      mkdir --parents "$location"
+      chown root:root "$location"
+      chmod 0000 "$location"
+      setfattr -n user.mergerfs.branch_mounts_here "$location"
+      chattr +i "$location"
+    '';
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = false;
+      # Run as root
+    };
+    unitConfig.DefaultDependencies = false;
+  };
+
+  systemd.services."finalize-mount-fs@" = {
+    description = "Mount finalization for %i";
+    conflicts = [ "shutdown.target" ];
+    before = [ "shutdown.target" ];
+    path = [
+      pkgs.util-linux # mountpoint
+      pkgs.coreutils # chown/chmod
+      pkgs.attr # setfattr
+    ];
+    enableStrictShellChecks = true;
+    scriptArgs = "'%i'";
+    script = ''
+      location="$1"
+
+      # Code must run _after_ the mount at $location
+      mountpoint --quiet "$location" || exit 0
+
+      # Default open/simple permissions for any mount type.
+      # The directory is marked for mergerfs to differentiate mounted/to be mounted.
+
+      chown root:root "$location"
+      chmod 1777 "$location"
+      setfattr -n user.mergerfs.branch "$location"
+    '';
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = false;
+      # Run as root
+    };
+    unitConfig.DefaultDependencies = false;
   };
 
   systemd.mounts = [
@@ -48,14 +111,20 @@ in
       wants = [
         "network.target"
         "tailscaled-autoconnect.service"
+        "prep-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
+        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
       ];
       after = [
+        "sysinit.target" # Tempfiles creation
         "network.target"
         "tailscaled-autoconnect.service"
-        "remote-fs-pre.target"
+        "prep-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
+      ];
+      before = [
+        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
       ];
       what = "buddy:/pictures";
-      where = "/mnt/buddy/pictures";
+      where = "/mnt/remote/pictures-buddy-sftp";
       type = "rclone";
       options = lib.concatStringsSep "," [
         "config=/etc/rclone.config"
@@ -82,10 +151,10 @@ in
 
   systemd.automounts = [
     {
-      # Since /mnt/buddy/pictures is not part of local-fs, add an automount so it gets ordered between services anyway.
-      description = "Automount for /mnt/buddy/pictures";
+      # Since /mnt/remote/pictures-buddy-sftp is not part of local-fs, add an automount so it gets ordered between services anyway.
+      description = "Automount for /mnt/remote/pictures-buddy-sftp";
       wantedBy = [ "multi-user.target" ];
-      where = "/mnt/buddy/pictures";
+      where = "/mnt/remote/pictures-buddy-sftp";
     }
   ];
 
