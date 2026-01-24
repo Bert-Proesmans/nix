@@ -248,8 +248,9 @@ in
       unitConfig = {
         DefaultDependencies = false;
         RequiresMountsFor = [ "/var/lib/local-immich" ];
-        # WARN; Completely detach the network mount, if it's online it's online.. otherwise nothing much
-        # WantsMountsFor = [ "/mnt/remote/pictures-buddy-sftp" ];
+        # ERROR; Attempting to load the sftp mount while the host is offline could lead to system hangs!
+        # DO NOT _just_ depend on the rclone mount without specialized reason!
+        # WantsMountsFor = [ "<buddy-pictures>" ];
       };
       mountConfig.TimeoutSec = 30;
     }
@@ -299,6 +300,9 @@ in
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
     serviceConfig = {
+      # NOTE; Immich state layout contains links into temporary directory
+      PrivateTmp = true;
+
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";
         assert immichExternalStatePath == "/var/lib/immich-external";
@@ -310,6 +314,7 @@ in
           # External library location, make read-only
           "immich-external::ro"
         ];
+
       CacheDirectory =
         assert immichCachePath == "/var/cache/immich-server";
         [
@@ -318,6 +323,7 @@ in
           "immich-server/thumbs"
           "immich-server/encoded-video"
         ];
+
       ExecStartPre =
         let
           # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath'
@@ -333,11 +339,13 @@ in
               # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
               # the immich startup check.
               touch "$TEMP/upload/.immich"
-              ln --symbolic --force --target-directory="${immichStatePath}" "$TEMP/upload"
+              # Create link "${immichStatePath}/upload" pointing to "$TEMP/upload"
+              ln --symbolic --force --no-target-directory "$TEMP/upload" "${immichStatePath}/upload"
             '';
           };
         in
         [
+          # WARN; Temporary directory access required!
           (lib.getExe setupUploadsPath)
         ];
     };

@@ -150,10 +150,9 @@ in
   ];
 
   systemd.automounts = [
-    # Automount seems to be too eager and blocks various operations. Better to explicitly mount instead.
-    #
+    # ERROR; Automount seems to be too eager and blocks various operations. MergerFS also causes userspace hangs during toplevel operations.
+    # Better to explicitly mount instead.
     # {
-    #   # Since /mnt/remote/pictures-buddy-sftp is not part of local-fs, add an automount so it gets ordered between services anyway.
     #   description = "Automount for /mnt/remote/pictures-buddy-sftp";
     #   wantedBy = [ "multi-user.target" ];
     #   where = "/mnt/remote/pictures-buddy-sftp";
