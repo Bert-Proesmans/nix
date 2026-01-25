@@ -34,34 +34,89 @@ in
       group = "root";
       mode = "0700"; # u+rwx
     };
+
+    "/mnt/remote/buddy-sftp" = {
+      d = {
+        # REF; https://wiki.archlinux.org/title/SFTP_chroot#Setup_the_filesystem
+        user = "root";
+        group = "root";
+        mode = "0000";
+      };
+      h.argument = "i"; # Immutable (chattr)
+    };
+    "/mnt/remote/buddy-sftp/pictures".d = {
+      # Empty, only create no change
+      # WARN; The mount is at /mnt/remote/buddy-sftp, and fuse seems to fail when the pictures subfolder exists.
+      # The default behaviour of fuse3 should be to ignore existing data but something fails..
+    };
   };
 
-  systemd.services."prep-mount-fs@" = {
+  systemd.services."merger-fs-pre@" = {
     description = "Landing zone prep for %I";
     conflicts = [ "shutdown.target" ];
     before = [ "shutdown.target" ];
-    after = [ "sysinit.target" ];
     path = [
       pkgs.util-linux # mountpoint
       pkgs.coreutils # chown/chmod
       pkgs.attr # sefattr
-      pkgs.e2fsprogs # chattr
+      pkgs.e2fsprogs # chattr/lsattr
     ];
     enableStrictShellChecks = true;
     scriptArgs = "'%I'";
     script = ''
-      location="$1"
+      # ERROR; Path could have dropped root slash during conversion!
+      location="/$1"
 
       # Code must run _before_ anything is mounted at $location
       mountpoint --quiet "$location" && exit 0
 
       # Create directory and make it immutable for all users and systems.
       # The directory is marked for mergerfs to differentiate mounted/to be mounted.
+      # REF; https://trapexit.github.io/mergerfs/latest/config/branches/#mount-points
+
+      planned=false
+      chown_do=false
+      chmod_do=false
+      xattr_do=false
+
+      if [ ! -d "$location" ]; then
+        # WARN; Branch shouldn't happen if we assume systemd-tmpfiles did its job!
+        planned=true
+        chown_do=true
+        chmod_do=true
+        xattr_do=true
+      fi
+
+      if [ -d "$location" ] && [ "$(stat -c '%u:%g' "$location")" != "0:0" ]; then
+        chown_do=true
+        planned=true
+      fi
+
+      if [ -d "$location" ] && [ "$(stat -c '%a' "$location")" != "0" ]; then
+        chmod_do=true
+        planned=true
+      fi
+
+      if [ -d "$location" ] &&
+        ! getfattr --only-values --name user.mergerfs.branch_mounts_here "$location" >/dev/null 2>&1
+      then
+        xattr_do=true
+        planned=true
+      fi
+
+      [ "$planned" = false ] && exit 0
 
       mkdir --parents "$location"
-      chown root:root "$location"
-      chmod 0000 "$location"
-      setfattr -n user.mergerfs.branch_mounts_here "$location"
+
+      if lsattr -l -d "$location" 2>/dev/null | grep --quiet 'immutable'; then
+        chattr -i "$location"
+      fi
+
+      $chown_do && chown root:root "$location"
+      $chmod_do && chmod 0000 "$location"
+      $xattr_do && setfattr -n user.mergerfs.branch_mounts_here "$location"
+
+      # Finalise with marking immutable
       chattr +i "$location"
     '';
     serviceConfig = {
@@ -72,29 +127,25 @@ in
     unitConfig.DefaultDependencies = false;
   };
 
-  systemd.services."finalize-mount-fs@" = {
+  systemd.services."merger-fs-post@" = {
     description = "Mount finalization for %I";
     conflicts = [ "shutdown.target" ];
     before = [ "shutdown.target" ];
     path = [
       pkgs.util-linux # mountpoint
-      pkgs.coreutils # chown/chmod
       pkgs.attr # setfattr
     ];
     enableStrictShellChecks = true;
     scriptArgs = "'%I'";
     script = ''
-      location="$1"
+      # ERROR; Path could have dropped root slash during conversion!
+      location="/$1"
 
       # Code must run _after_ the mount at $location
       mountpoint --quiet "$location" || exit 0
 
-      # Default open/simple permissions for any mount type.
       # The directory is marked for mergerfs to differentiate mounted/to be mounted.
-
-      chown root:root "$location"
-      chmod 1777 "$location"
-      setfattr -n user.mergerfs.branch "$location"
+      setfattr --name user.mergerfs.branch "$location"
     '';
     serviceConfig = {
       Type = "oneshot";
@@ -106,27 +157,28 @@ in
 
   systemd.mounts = [
     {
-      description = "Mount buddy pictures to local filesystem";
+      description = "Mount buddy to local filesystem";
       conflicts = [ "umount.target" ];
       wants = [
         "network.target"
         "tailscaled-autoconnect.service"
-        "prep-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
-        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
+        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
       ];
       after = [
-        "sysinit.target" # Tempfiles creation
+        "systemd-tmpfiles-setup.service"
         "network.target"
         "tailscaled-autoconnect.service"
-        "prep-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
+        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
       ];
       before = [
-        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/pictures-buddy-sftp"}.service"
+        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
       ];
-      what = "buddy:/pictures";
-      where = "/mnt/remote/pictures-buddy-sftp";
+      what = "buddy:/";
+      where = "/mnt/remote/buddy-sftp";
       type = "rclone";
       options = lib.concatStringsSep "," [
+        "vv" # DEBUG
         "config=/etc/rclone.config"
         "contimeout=60s" # SFTP session (/socket) timeout
         "timeout=15s" # I/O timeout -> I/O operations hang indefinite otherwise
@@ -153,9 +205,9 @@ in
     # ERROR; Automount seems to be too eager and blocks various operations. MergerFS also causes userspace hangs during toplevel operations.
     # Better to explicitly mount instead.
     # {
-    #   description = "Automount for /mnt/remote/pictures-buddy-sftp";
+    #   description = "Automount for /mnt/remote/buddy-sftp/pictures";
     #   wantedBy = [ "multi-user.target" ];
-    #   where = "/mnt/remote/pictures-buddy-sftp";
+    #   where = "/mnt/remote/buddy-sftp/pictures";
     # }
   ];
 

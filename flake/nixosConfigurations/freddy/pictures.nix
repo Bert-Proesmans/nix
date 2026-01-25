@@ -16,6 +16,27 @@ let
   fqdn-freddy = "freddy.omega.proesmans.eu";
 in
 {
+
+  disko.devices.zpool.zroot.datasets = {
+    "encryptionroot/media/local-immich" = {
+      type = "zfs_fs";
+      options.mountpoint = "/var/lib/local-immich";
+      options.refquota = "10G";
+    };
+  };
+
+  systemd.tmpfiles.settings."10-immich" = {
+    "/var/lib/immich" = {
+      d = {
+        # REF; https://wiki.archlinux.org/title/SFTP_chroot#Setup_the_filesystem
+        user = "root";
+        group = "root";
+        mode = "0000";
+      };
+      h.argument = "i"; # Immutable (chattr)
+    };
+  };
+
   # @@ IMMICH media location @@
   # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
   # "library" => Originals are stored here => main dataset
@@ -187,32 +208,18 @@ in
     };
   };
 
-  disko.devices.zpool.zroot.datasets = {
-    "encryptionroot/media/local-immich" = {
-      type = "zfs_fs";
-      options.mountpoint = "/var/lib/local-immich";
-      options.refquota = "10G";
-    };
-  };
-
   systemd.mounts = [
     {
       description = "Immich state directory";
       conflicts = [ "umount.target" ];
-      wants = [
-        "prep-mount-fs@${utils.escapeSystemdPath "/var/lib/immich"}.service"
-      ];
-      after = [
-        "prep-mount-fs@${utils.escapeSystemdPath "/var/lib/immich"}.service"
-        "network.target"
-      ];
+      after = [ "network.target" ];
 
       # NOTE; Local cache, followed by networked storage
       # 'RW' means read-write, 1M is the individual minfreespace option on the subject branch
       # 'NC' means no-create on the subject branch
       #
       # NOTE; Minimum free space is set larger than a single picture as to not run out of space halfway writing.
-      what = "/var/lib/local-immich=RW,10M:/mnt/remote/pictures-buddy-sftp=NC";
+      what = "/var/lib/local-immich=RW,10M:/mnt/remote/buddy-sftp/pictures=NC";
       where = "/var/lib/immich";
       # Currently experimenting with mergerFS, I might be holding it wrong..
       # READ THE DOCS; https://trapexit.github.io/mergerfs/latest/quickstart/
@@ -299,6 +306,7 @@ in
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
+    wantedBy = lib.mkForce [ ]; # DEBUG
     serviceConfig = {
       # NOTE; Immich state layout contains links into temporary directory
       PrivateTmp = true;
@@ -355,5 +363,68 @@ in
       immichCachePath
       immichExternalStatePath
     ];
+  };
+
+  systemd.services.immich-move-data = {
+    description = "Move Immich media";
+    path = [
+      pkgs.systemd # systemctl
+      pkgs.mergerfs-tools # mergerfs.balance
+      pkgs.rsync
+      pkgs.findutils # find
+    ];
+    enableStrictShellChecks = true;
+    script = ''
+      buddy_mount_unit="${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount"
+      if ! systemctl is-active "$buddy_mount_unit" >/dev/null; then
+        echo "'$buddy_mount_unit' is not activated (yet)"
+        # NOTE; Explicitly not added any timeouts because here we trust the timeout value of the unit
+        if ! systemctl start --wait "$buddy_mount_unit" >/dev/null 2>&1; then
+          echo "Failed to mount buddy"
+          exit 0
+        fi
+      fi
+
+      ###
+      # Assumes buddy is mounted!
+      ###
+
+      # NOTE; More branches will require some type of disk usage balancing.
+      # eg BUT not perfect use-case match; mergerfs.balance "$immich_state_path"
+      source_path="/var/lib/local-immich"
+      target_path="/mnt/remote/buddy-sftp/pictures"
+      rsync ${
+        lib.concatStringsSep " " [
+          "--compress" # Attempt to transfer less bits
+          "--itemize-changes" # Print details of files transferred
+          "--archive"
+          "--one-file-system" # Stick to a single filesystem to discover files in <source>
+          "--links"
+          "--hard-links"
+          "--acls"
+          "--xattrs"
+          "--executability"
+          "--delay-updates" # Atomic file renames
+          "--whole-file" # Don't attempt to retry interrupted transfers
+          # I want to cleanup partial files after failure, those are seen as double occurences of the same file
+          # "--partial"
+          "--partial-dir=.rsync-partial"
+          "--relative"
+          "--remove-source-files"
+
+          # SOURCE
+          # Manually include the directories to sync over
+          "\"$source_path\"/./{encoded-video,library,profile,thumbs}"
+
+          # DESTINATION
+          # WARN; Destination must end with a slash!
+          "$target_path/"
+        ]
+      }
+
+      # WARN; rsync doesn't clean-up empty directories!
+      # WARN; mindepth=1 to not delete the toplevel directories themselves!
+      find "$source_path/"{encoded-video,library,profile,thumbs} -mindepth 1 -type d -empty -delete
+    '';
   };
 }

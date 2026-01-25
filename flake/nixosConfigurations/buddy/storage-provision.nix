@@ -1,5 +1,6 @@
 {
   lib,
+  utils,
   pkgs,
   config,
   ...
@@ -12,20 +13,25 @@ in
     # All remote users share the same chroot. An individual home directory is not necessary.
     # Useful data is mounted into the chroot.
 
-    "/chroot".d = {
-      user = "root";
-      group = "root";
-      mode = "0555"; # a+rx
+    "/chroot" = {
+      d = {
+        # REF; https://wiki.archlinux.org/title/SFTP_chroot#Setup_the_filesystem
+        user = "root";
+        group = "root";
+        mode = "0755";
+      };
+      h.argument = "i"; # Immutable (chattr)
+    };
+    "/chroot/pictures".d = {
+      # Empty, only create no change
     };
 
-    # "/chroot/pictures".d =
-    #   assert "/chroot/pictures" == pictures-basepath;
-    #   {
-    #     # NOTE; This directory is bind-mounted over!
-    #     user = config.users.users.freddy.name;
-    #     group = config.users.groups.sftpusers.name;
-    #     mode = "0700"; # u+rwx
-    #   };
+    # DEBUG
+    "/tmp/mounting-test".d = {
+      user = "freddy";
+      group = "freddy";
+      mode = "0755";
+    };
   };
 
   # Freddy target
@@ -54,6 +60,7 @@ in
         # ERROR; RestartTriggers with system toplevel derivation does not work! Infinite recursion..
         "sysinit-reactivation.target"
       ];
+      after = [ "systemd-tmpfiles-setup.service" ];
       before = [ "sysinit-reactivation.target" ];
       what = "/run/current-system/sw";
       where = "/chroot/run/current-system/sw";
@@ -64,6 +71,7 @@ in
     }
     {
       wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-tmpfiles-setup.service" ];
       what = "/nix/store";
       where = "/chroot/nix/store";
       type = "none";
@@ -72,24 +80,38 @@ in
     }
     {
       wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-tmpfiles-setup.service" ];
       what = "/dev";
       where = "/chroot/dev";
       type = "none";
       options = lib.concatStringsSep "," [ "bind" ];
       unitConfig.RequiresMountsFor = [ "/dev" ];
     }
-    # TODO IMMICH Pictures
+    # DEBUG
     {
       wantedBy = [ "multi-user.target" ];
-      what = "/var/lib/immich";
+      after = [ "systemd-tmpfiles-setup.service" ];
+      what = "/tmp/mounting-test";
       where = pictures-basepath;
       type = "none";
       options = lib.concatStringsSep "," [
         # NOTE; The immich directory has sub-mounts that we want to make accessible (recursive bind)
         "rbind"
       ];
-      unitConfig.RequiresMountsFor = [ "/var/lib/immich" ];
+      unitConfig.RequiresMountsFor = [ "/tmp/mounting-test" ];
     }
+    # TODO IMMICH Pictures
+    # {
+    #   wantedBy = [ "multi-user.target" ];
+    #   what = "/var/lib/immich";
+    #   where = pictures-basepath;
+    #   type = "none";
+    #   options = lib.concatStringsSep "," [
+    #     # NOTE; The immich directory has sub-mounts that we want to make accessible (recursive bind)
+    #     "rbind"
+    #   ];
+    #   unitConfig.RequiresMountsFor = [ "/var/lib/immich" ];
+    # }
   ];
 
   services.openssh = {
