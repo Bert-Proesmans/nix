@@ -157,6 +157,13 @@ in
 
   systemd.mounts = [
     {
+      # ERROR; This 'single-mount' has a flaw that owner:group is fabricated on demand, there are no _real_ inodes
+      # to construct a permission model on freddy with remote data from buddy!
+      #
+      # TODO; Either
+      # - Mount buddy and pictures directory as immich user
+      # - Make a projection with bindfs for a specific service directory through bind(fs?)
+      #   eg <mount>/pictures -[bind+map root/immich]-> <project>/pictures)
       description = "Mount buddy to local filesystem";
       conflicts = [ "umount.target" ];
       wants = [
