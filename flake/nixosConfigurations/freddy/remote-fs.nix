@@ -178,23 +178,31 @@ in
       where = "/mnt/remote/buddy-sftp";
       type = "rclone";
       options = lib.concatStringsSep "," [
-        "vv" # DEBUG
+        # NOTE; Daemon mode doesn't produce any interesting logs!
+        # HINT; Use logfile argument to store operational logging data
+        # "vv" # DEBUG
         "config=/etc/rclone.config"
         "contimeout=60s" # SFTP session (/socket) timeout
         "timeout=15s" # I/O timeout -> I/O operations hang indefinite otherwise
         # NOTE; Pre-created directory.
-        # NOTE; Having multiple rclone processes working on the same cache directory should be no issue (while the processes are running
-        # in the same security context!)
+        # ERROR; Do not reuse the cache directory between rclone processes handling the same remotes, this clobbers the cache!
         "cache-dir=/var/cache/rclone"
         "vfs-cache-mode=writes"
-        "daemon-wait=15s" # Startup time
+        # File open/-read cache is allowed get to around 20GB large.
+        # NOTE; Files with open handle are not evicted from cache.
+        # NOTE; Cache objects expire (see vfs-cache-max-age)!
+        "vfs-cache-max-size=10G"
+        # NOTE; Since most useful operations are handled by the database, the cache shouldn't be large.
+        # HINT; Account for processing time, don't expire entries that are (long time) queued for immich processing!
+        "vfs-cache-max-age=1h" # Default
         # Don't optimize VFS cache yet..
+        # REF; https://github.com/rclone/rclone/blob/master/vfs/vfs.md
+        "daemon-wait=15s" # Startup time
         #
         # WARN; The 'pictures' directory is pre-created by systemd-tmpfiles to have a validation condition. RClone by default errors
         # when a filesystem node is not a directory node or not empty.
         # Tell _rclone_ to skip mount-dir validation!
         "allow-non-empty"
-        # REF; https://github.com/rclone/rclone/blob/master/vfs/vfs.md
         "args2env" # Do not pass config to fuse process as arguments (leaks into process monitors)!
         "rw"
         "allow_other"
