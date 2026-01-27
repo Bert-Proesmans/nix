@@ -225,10 +225,11 @@ in
   # Make sure the fqdn of buddy resolves through tailscale!
   networking.hosts."${ip-buddy}" = [ fqdn-buddy ];
 
-  environment.systemPackages = [
-    # Following packages must exist at system path for .mount unit files to work
-    # NOTE; Couldn't I just add these to systemd package set?
-    pkgs.fuse3 # fuse defaults to fuse2
-    pkgs.rclone
-  ];
+  programs.fuse = {
+    # NOTE; Should put fuse2 and fuse3 on system PATH
+    enable = true;
+    userAllowOther = false;
+  };
+
+  environment.systemPackages = [ pkgs.rclone ];
 }

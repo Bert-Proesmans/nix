@@ -273,7 +273,6 @@ in
   ];
 
   environment.systemPackages = [
-    pkgs.fuse3 # fuse defaults to fuse2
     pkgs.mergerfs-tools
     pkgs.mergerfs
   ];
