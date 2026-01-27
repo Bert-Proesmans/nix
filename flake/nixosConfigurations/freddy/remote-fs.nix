@@ -189,8 +189,13 @@ in
         "vfs-cache-mode=writes"
         "daemon-wait=15s" # Startup time
         # Don't optimize VFS cache yet..
+        #
+        # WARN; The 'pictures' directory is pre-created by systemd-tmpfiles to have a validation condition. RClone by default errors
+        # when a filesystem node is not a directory node or not empty.
+        # Tell _rclone_ to skip mount-dir validation!
+        "allow-non-empty"
         # REF; https://github.com/rclone/rclone/blob/master/vfs/vfs.md
-        "args2env" # Pass mount arguments below to mount helper!
+        "args2env" # Do not pass config to fuse process as arguments (leaks into process monitors)!
         "rw"
         "allow_other"
       ];
