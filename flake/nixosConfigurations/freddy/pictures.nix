@@ -9,6 +9,8 @@ let
   immichStatePath = "/var/lib/immich";
   # ERROR; Immich machine learning service is already using '/var/cache/immich'
   immichCachePath = "/var/cache/immich-server";
+  # Location for media while storage node is offline
+  immichVPSOnlineStoragePath = "/var/lib/local-immich";
   # Location for external libraries
   immichExternalStatePath = "/var/lib/immich-external";
 
@@ -254,7 +256,7 @@ in
       ];
       unitConfig = {
         DefaultDependencies = false;
-        RequiresMountsFor = [ "/var/lib/local-immich" ];
+        RequiresMountsFor = [ immichVPSOnlineStoragePath ];
         # ERROR; Attempting to load the sftp mount while the host is offline could lead to system hangs!
         # DO NOT _just_ depend on the rclone mount without specialized reason!
         # WantsMountsFor = [ "<buddy-pictures>" ];
@@ -312,12 +314,15 @@ in
 
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";
+        assert immichVPSOnlineStoragePath == "/var/lib/local-immich";
         assert immichExternalStatePath == "/var/lib/immich-external";
         [
           "" # Reset
           "immich"
           "immich/library"
           "immich/profile"
+          # Online media cache directory. Added here to simplify file permissions.
+          "local-immich"
           # External library location, make read-only
           "immich-external::ro"
         ];
@@ -360,6 +365,7 @@ in
     unitConfig.RequiresMountsFor = [
       immichStatePath
       immichCachePath
+      immichVPSOnlineStoragePath
       immichExternalStatePath
     ];
   };
