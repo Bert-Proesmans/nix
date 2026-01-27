@@ -7,8 +7,6 @@
 }:
 let
   immichStatePath = "/var/lib/immich";
-  # ERROR; Immich machine learning service is already using '/var/cache/immich'
-  immichCachePath = "/var/cache/immich-server";
   # Location for media while storage node is offline
   immichVPSOnlineStoragePath = "/var/lib/local-immich";
   # Location for external libraries
@@ -327,15 +325,6 @@ in
           "immich-external::ro"
         ];
 
-      CacheDirectory =
-        assert immichCachePath == "/var/cache/immich-server";
-        [
-          "" # Reset
-          "immich-server"
-          "immich-server/thumbs"
-          "immich-server/encoded-video"
-        ];
-
       ExecStartPre =
         let
           # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath'
@@ -364,7 +353,6 @@ in
 
     unitConfig.RequiresMountsFor = [
       immichStatePath
-      immichCachePath
       immichVPSOnlineStoragePath
       immichExternalStatePath
     ];
