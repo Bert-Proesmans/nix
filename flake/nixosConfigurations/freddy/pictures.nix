@@ -324,6 +324,8 @@ in
           # External library location, make read-only
           "immich-external::ro"
         ];
+      # Prevent others from peeping into the data
+      StateDirectoryMode = "0750";
 
       ExecStartPre =
         let
