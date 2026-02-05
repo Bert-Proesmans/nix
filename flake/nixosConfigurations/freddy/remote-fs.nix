@@ -49,6 +49,11 @@ in
       # WARN; The mount is at /mnt/remote/buddy-sftp, and fuse seems to fail when the pictures subfolder exists.
       # The default behaviour of fuse3 should be to ignore existing data but something fails..
     };
+    "/mnt/remote/buddy-sftp/pictures-external".d = {
+      # Empty, only create no change
+      # WARN; The mount is at /mnt/remote/buddy-sftp, and fuse seems to fail when the pictures subfolder exists.
+      # The default behaviour of fuse3 should be to ignore existing data but something fails..
+    };
   };
 
   systemd.services."merger-fs-pre@" = {
@@ -157,26 +162,29 @@ in
 
   systemd.mounts = [
     {
-      # ERROR; This 'single-mount' has a flaw that owner:group is fabricated on demand, there are no _real_ inodes
-      # to construct a permission model on freddy with remote data from buddy!
+      # ERROR; A 'single computer'-mount over sftp has a flaw that owner:group is fabricated on demand, there exist no _real_ inodes
+      # to store custom permissions from the view of freddy!
+      # SFTP has no linux permission model, there is single-user and modification bits.
       #
-      # TODO; Either
-      # - Mount buddy and pictures directory as immich user
-      # - Make a projection with bindfs for a specific service directory through bind(fs?)
-      #   eg <mount>/pictures -[bind+map root/immich]-> <project>/pictures)
+      # NOTE; The mount is forced to be owned by the immich user (freddy view), but actual permissions are validated on buddy.
       description = "Mount buddy to local filesystem";
       conflicts = [ "umount.target" ];
+      # Need these units but won't queue a startjob if they aren't active
+      requisite = [
+        config.systemd.targets."buddy-online".name
+      ];
       wants = [
         "network.target"
         "tailscaled-autoconnect.service"
         "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
-        "finalize-mount-fs@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
       ];
       after = [
         "systemd-tmpfiles-setup.service"
         "network.target"
         "tailscaled-autoconnect.service"
-        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        config.systemd.targets."buddy-online".name
       ];
       before = [
         "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
@@ -202,6 +210,13 @@ in
         # NOTE; Since most useful operations are handled by the database, the cache shouldn't be large.
         # HINT; Account for processing time, don't expire entries that are (long time) queued for immich processing!
         "vfs-cache-max-age=1h" # Default
+        # ERROR; Basic operations like statfs hang when the remote is offline, and it's not possible to instruct mergerFS to ignore
+        # or redirect filesystem requests
+        #
+        # Set total disk size statically to prevent immich hanging
+        "vfs-disk-space-total-size=5T" # 5 Terabytes
+        # ERROR; Free space is misreported at the top of mergerfs!
+        #
         # Don't optimize VFS cache yet..
         # REF; https://github.com/rclone/rclone/blob/master/vfs/vfs.md
         "daemon-wait=15s" # Startup time
@@ -213,6 +228,9 @@ in
         "args2env" # Do not pass config to fuse process as arguments (leaks into process monitors)!
         "rw"
         "allow_other"
+        "uid=${config.users.users.immich.name}"
+        "gid=${config.users.groups.immich.name}"
+        "umask=0022"
       ];
       unitConfig.DefaultDependencies = false;
       # Time to wait before SIGKILL
@@ -230,6 +248,56 @@ in
     #   where = "/mnt/remote/buddy-sftp/pictures";
     # }
   ];
+
+  systemd.targets."buddy-online" = {
+    description = "Buddy is online";
+  };
+
+  systemd.services."buddy-online-tester" = {
+    description = "Ping buddy";
+    wantedBy = [ "multi-user.target" ];
+    path = [
+      pkgs.systemd # systemctl
+      pkgs.iputils # ping
+    ];
+    enableStrictShellChecks = true;
+    script = ''
+      state="unknown"
+
+      while true; do
+        # Want 3 ping replies within 10 seconds awaiting each response for 2 seconds after request.
+        if ping -c 3 -w 10 -W 2 "${config.proesmans.facts.buddy.host.tailscale.address}" >/dev/null; then
+          new_state="online"
+        else
+          new_state="offline"
+        fi
+
+        if [ "$new_state" != "$state" ]; then
+          if [ "$new_state" = "online" ]; then
+            systemctl start "${config.systemd.targets.buddy-online.name}"
+            echo "AVAILABLE transition" >&2
+          else
+            systemctl stop "${config.systemd.targets.buddy-online.name}"
+            echo "OFFLINE transition" >&2
+          fi
+
+          state="$new_state"
+        fi
+
+        if [ "$state" = "online" ]; then
+          # check less often when stable
+          sleep 60
+        else
+          # retry faster when buddy is offline
+          sleep 10
+        fi
+      done
+    '';
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = 60;
+    };
+  };
 
   programs.ssh.knownHosts = {
     "buddy".hostNames = [ fqdn-buddy ];

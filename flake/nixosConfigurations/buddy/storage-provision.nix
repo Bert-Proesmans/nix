@@ -6,7 +6,8 @@
   ...
 }:
 let
-  pictures-basepath = "/chroot/pictures";
+  pictures-path = "/chroot/pictures";
+  pictures-external-path = "/chroot/pictures-external";
 in
 {
   systemd.tmpfiles.settings."10-chroot" = {
@@ -20,9 +21,14 @@ in
         group = "root";
         mode = "0755";
       };
-      h.argument = "i"; # Immutable (chattr)
+      # WARN; It's not possible to unlock + mkdir + lock with systemd-tmpfiles! Lines are executed in path lexicographical order.
+      # MUST lock/unlock manually!
+      # h.argument = "-i"; # Immutable (chattr)
     };
     "/chroot/pictures".d = {
+      # Empty, only create no change
+    };
+    "/chroot/pictures-external".d = {
       # Empty, only create no change
     };
 
@@ -87,24 +93,41 @@ in
       options = lib.concatStringsSep "," [ "bind" ];
       unitConfig.RequiresMountsFor = [ "/dev" ];
     }
-    # DEBUG
     {
+      # DEBUG
+      conflicts = [ "umount.target" ];
       wantedBy = [ "multi-user.target" ];
       after = [ "systemd-tmpfiles-setup.service" ];
       what = "/tmp/mounting-test";
-      where = pictures-basepath;
+      where = pictures-path;
       type = "none";
       options = lib.concatStringsSep "," [
         # NOTE; The immich directory has sub-mounts that we want to make accessible (recursive bind)
         "rbind"
       ];
       unitConfig.RequiresMountsFor = [ "/tmp/mounting-test" ];
+      unitConfig.DefaultDependencies = false;
+    }
+    {
+      # DEBUG
+      conflicts = [ "umount.target" ];
+      wantedBy = [ "multi-user.target" ];
+      after = [ "systemd-tmpfiles-setup.service" ];
+      what = "/tmp/mounting-test";
+      where = pictures-external-path;
+      type = "none";
+      options = lib.concatStringsSep "," [
+        "ro" # Read-only, data unmanaged by immich
+        "rbind"
+      ];
+      unitConfig.RequiresMountsFor = [ "/tmp/mounting-test" ];
+      unitConfig.DefaultDependencies = false;
     }
     # TODO IMMICH Pictures
     # {
     #   wantedBy = [ "multi-user.target" ];
     #   what = "/var/lib/immich";
-    #   where = pictures-basepath;
+    #   where = pictures-path;
     #   type = "none";
     #   options = lib.concatStringsSep "," [
     #     # NOTE; The immich directory has sub-mounts that we want to make accessible (recursive bind)
@@ -136,5 +159,7 @@ in
     '';
   };
 
-  environment.systemPackages = [ ];
+  environment.systemPackages = [
+    pkgs.e2fsprogs # chattr
+  ];
 }

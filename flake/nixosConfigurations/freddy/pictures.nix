@@ -33,7 +33,9 @@ in
         group = "root";
         mode = "0000";
       };
-      h.argument = "i"; # Immutable (chattr)
+      # ERROR; Cannot use systemd-tmpfiles to coordinate fsattributes before mounting!
+      # Must apply immutable attribute manually!
+      # h.argument = "i"; # Immutable (chattr)
     };
   };
 
@@ -219,7 +221,7 @@ in
       # 'NC' means no-create on the subject branch
       #
       # NOTE; Minimum free space is set larger than a single picture as to not run out of space halfway writing.
-      what = "/var/lib/local-immich=RW,10M:/mnt/remote/buddy-sftp/pictures=NC";
+      what = "${immichVPSOnlineStoragePath}=RW,10M:/mnt/remote/buddy-sftp/pictures=NC";
       where = "/var/lib/immich";
       # Currently experimenting with mergerFS, I might be holding it wrong..
       # READ THE DOCS; https://trapexit.github.io/mergerfs/latest/quickstart/
@@ -304,6 +306,15 @@ in
     '';
   };
 
+  systemd.tmpfiles.settings."10-immich-links" = {
+    "${immichExternalStatePath}"."L+" = {
+      # Link into remote mounted storage
+      #
+      # ERROR; Since this is a link, all path elements must be accessible by the immich user!
+      argument = "/mnt/remote/buddy-sftp/pictures-external";
+    };
+  };
+
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
     wantedBy = lib.mkForce [ ]; # DEBUG
     serviceConfig = {
@@ -312,17 +323,13 @@ in
 
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";
+        # TODO; Figure out how to read-lock 'immichVPSOnlineStoragePath'
         assert immichVPSOnlineStoragePath == "/var/lib/local-immich";
-        assert immichExternalStatePath == "/var/lib/immich-external";
         [
-          "" # Reset
-          "immich"
           "immich/library"
           "immich/profile"
           # Online media cache directory. Added here to simplify file permissions.
           "local-immich"
-          # External library location, make read-only
-          "immich-external::ro"
         ];
       # Prevent others from peeping into the data
       StateDirectoryMode = "0750";
@@ -356,36 +363,37 @@ in
     unitConfig.RequiresMountsFor = [
       immichStatePath
       immichVPSOnlineStoragePath
-      immichExternalStatePath
     ];
   };
 
   systemd.services.immich-move-data = {
     description = "Move Immich media";
+    # Need these units but won't queue a startjob if they aren't active
+    requisite = [
+      # Both of these units combined active are precondition for the mover script
+      config.systemd.targets."buddy-online".name
+      "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount"
+    ];
+    after = [
+      config.systemd.targets."buddy-online".name
+    ];
+    # startAt = "<TODO>";
     path = [
-      pkgs.systemd # systemctl
       pkgs.mergerfs-tools # mergerfs.balance
       pkgs.rsync
       pkgs.findutils # find
     ];
     enableStrictShellChecks = true;
     script = ''
-      buddy_mount_unit="${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount"
-      if ! systemctl is-active "$buddy_mount_unit" >/dev/null; then
-        echo "'$buddy_mount_unit' is not activated (yet)"
-        # NOTE; Explicitly not added any timeouts because here we trust the timeout value of the unit
-        if ! systemctl start --wait "$buddy_mount_unit" >/dev/null 2>&1; then
-          echo "Failed to mount buddy"
-          exit 0
-        fi
-      fi
-
       ###
-      # Assumes buddy is mounted!
+      # Assumes storage is mounted and available!
+      #
+      # NOTE; The mount unit can be active but not functional, this is because rclone keeps a cache alive to not cause dataloss
+      # on abrubt disconnect of buddy.
       ###
 
       # NOTE; More branches will require some type of disk usage balancing.
-      # eg BUT not perfect use-case match; mergerfs.balance "$immich_state_path"
+      # eg; mergerfs.balance "$immich_state_path" (BUT this is not a perfect match for use-case)
       source_path="/var/lib/local-immich"
       target_path="/mnt/remote/buddy-sftp/pictures"
       rsync ${
