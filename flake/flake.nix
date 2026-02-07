@@ -34,7 +34,6 @@
     dns.inputs.flake-utils.follows = "flake-utils";
     nix-topology.url = "github:oddlama/nix-topology";
     nix-topology.inputs.nixpkgs.follows = "nixpkgs";
-    nix-topology.inputs.flake-utils.follows = "flake-utils";
   };
 
   outputs =
