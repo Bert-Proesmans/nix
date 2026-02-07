@@ -377,7 +377,8 @@ in
     after = [
       config.systemd.targets."buddy-online".name
     ];
-    # startAt = "<TODO>";
+    # systemd-analyze calendar <pattern>
+    # startAt = "*-*-* *:00/10:00";
     path = [
       pkgs.mergerfs-tools # mergerfs.balance
       pkgs.rsync

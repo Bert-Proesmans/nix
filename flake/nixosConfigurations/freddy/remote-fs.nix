@@ -42,7 +42,9 @@ in
         group = "root";
         mode = "0000";
       };
-      h.argument = "i"; # Immutable (chattr)
+      # WARN; It's not possible to unlock + mkdir + lock with systemd-tmpfiles! Lines are executed in path lexicographical order.
+      # MUST lock/unlock manually!
+      # h.argument = "i"; # Immutable (chattr)
     };
     "/mnt/remote/buddy-sftp/pictures".d = {
       # Empty, only create no change
@@ -314,5 +316,8 @@ in
     userAllowOther = false;
   };
 
-  environment.systemPackages = [ pkgs.rclone ];
+  environment.systemPackages = [
+    pkgs.rclone # mount.rclone on path for systemd mount
+    pkgs.e2fsprogs # chattr
+  ];
 }
