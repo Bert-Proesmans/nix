@@ -1,6 +1,7 @@
 { lib, flake, ... }:
 {
   imports = [
+    ./backup-landing.nix
     ./backup.nix
     ./certificates.nix
     ./computer-backup.nix

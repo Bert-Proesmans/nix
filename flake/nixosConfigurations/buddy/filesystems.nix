@@ -163,6 +163,7 @@
       type = "zfs_fs";
       mountpoint = null;
       options.canmount = "off";
+      options.readonly = "on";
     };
 
     "maintenance" = {
