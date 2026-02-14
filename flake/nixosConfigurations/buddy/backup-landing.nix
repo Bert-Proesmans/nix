@@ -1,4 +1,9 @@
-{ lib, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 {
   disko.devices.zpool.storage.datasets = {
     "backup/freddy" = {
@@ -39,7 +44,7 @@
           "hold"
           "release"
         ]
-      } zpool/storage/backup/freddy
+      } storage/backup/freddy
     '';
     serviceConfig = {
       Type = "oneshot";
@@ -48,4 +53,10 @@
     };
     unitConfig.DefaultDependencies = false;
   };
+
+  environment.systemPackages = [
+    # NOTE; Software used by sending syncoid
+    pkgs.lzop
+    pkgs.mbuffer
+  ];
 }

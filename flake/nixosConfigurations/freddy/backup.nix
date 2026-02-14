@@ -1,5 +1,17 @@
-{ ... }:
 {
+  lib,
+  pkgs,
+  config,
+  ...
+}:
+let
+  ip-buddy = config.proesmans.facts.buddy.host.tailscale.address;
+  fqdn-buddy = "buddy.internal.proesmans.eu";
+in
+{
+  # Make sure the fqdn of buddy resolves through tailscale!
+  networking.hosts."${ip-buddy}" = [ fqdn-buddy ];
+
   services.sanoid =
     let
       default-settings = {
@@ -52,7 +64,8 @@
           # WARN; Datasets with non-atomic settings could have a slight offset between point in time when backups are taken.
           # This is because sanoid executes the operations outside of zfs, possibly across multiple zfs transactions.
           recursive = true; # NOT ATOMIC
-          process_children_only = true;
+          # WARN; MUST HAVE a snapshot of zroot/encryptionroot since this stores the encryption volume key(s)!
+          process_children_only = false;
         };
 
         "zroot/encryptionroot/log" = default-settings // {
@@ -100,26 +113,55 @@
 
   systemd.services.sanoid.environment.TZ = "UTC";
 
-  # NOTE; Have to revisit syncoid later because the nixos module is currently a mess!
-  # Would be great to have send:raw here (coming in ZFS 2.4)
-  # REF; https://github.com/openzfs/zfs/issues/13099#issuecomment-3356148201
+  services.syncoid = {
+    enable = true;
+    interval = "*:05/15:00 UTC";
+    service = {
+      # NOTE; Added to all syncoid systemd unit files
+      requisite = [
+        config.systemd.targets."buddy-online".name
+      ];
+      after = [
+        config.systemd.targets."buddy-online".name
+      ];
+      serviceConfig = { };
+    };
+    localSourceAllow = [
+      "bookmark" # Keep reference point at source for later diffing with target
+      "hold" # Don't touch source until transfer completes
+      "send:raw" # REF; https://github.com/behlendorf/zfs/commit/6c4ede4026974e5e7b871b98f3652108860ea322
+      "release"
+    ];
+    # NOTE; Target datasets are on another system
+    localTargetAllow = [ ];
+    # NOTE; Arguments passed to all syncoid invocations
+    commonArgs = [
+      "--no-sync-snap" # No additional snapshot, use sanoid's snapshots
+      "--create-bookmark" # Keep cheap pointer to replicated datasets
+      "--use-hold" # Don't do anything to the dataset(snapshot) while transmitting
+      "--no-rollback" # No permissions to maintain/recoved (bad) dataset on target
+      # ERROR; Sendoptions get reset because this argument is defined twice!
+      # "--sendoptions=raw" # Always send raw data
+      "--no-privilege-elevation" # SSH user has necessary dataset permissions on target
+      "--sshkey"
+      # NOTE; '${CREDENTIALS_DIRECTORY}' passes through "escapeShellArguments"
+      "\${CREDENTIALS_DIRECTORY}/sshKey"
+    ];
 
-  # WARN; Backups are pulled by host buddy!
-  # users.users.syncoid.openssh.authorizedKeys.keyFiles = [
-  #   # allow buddy to ssh
-  #   "<TODO>"
-  # ];
+    commands = {
+      "zroot/encryptionroot" = {
+        # NOTE; Need encryptionroot dataset because the volume keys are stored here
+        target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot";
+        recursive = false; # Manual dataset selection
+        sendOptions = "raw";
+        service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
+      };
+    };
+  };
 
-  # services.syncoid = {
-  #   enable = true;
-  #   interval = "00/1:00:00 UTC";
-
-  #   commands."encryptionkey" = {
-  #     source = "zroot/encryptionroot";
-  #     target = "syncoid@buddy:<TODO>/freddy/encryptionroot";
-  #     extraArgs = [
-  #       "--no-sync-snap"
-  #     ];
-  #   };
-  # };
+  environment.systemPackages = [
+    # NOTE; Software used by sending syncoid
+    pkgs.lzop
+    pkgs.mbuffer
+  ];
 }
