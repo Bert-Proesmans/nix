@@ -51,6 +51,14 @@
 
   # WARN; Pools that hold no datasets for booting aren't mounted at stage-1 and stage-2!
   boot.zfs.extraPools = [ "storage" ];
+  # WARN; Receiving encrypted datasets on pool "storage" triggers passphrase requests during boot.
+  # The boot process will seem to hang, but it's waiting for interactive password entry (when keylocation=prompt).
+  # NOTE; RequestEncryptionCredentials is effectively disabled until proper handling of zfs encryption is in order.
+  #
+  # NOTE; Workaround hanging boot on credentials by pressing enter 3 times without keyboard input. The request script will
+  # attempt to continue booting after 3 (failed) attempts.
+  boot.zfs.requestEncryptionCredentials = [ ];
+  boot.zfs.passwordTimeout = 0; # Waits forever
 
   services.fstrim.enable = true;
   services.zfs = {
