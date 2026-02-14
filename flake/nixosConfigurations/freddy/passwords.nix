@@ -60,10 +60,10 @@ in
       # ADMIN_TOKEN = ""; # Empty to disable admin panel
       ADMIN_SESSION_LIFETIME = 5; # 5 minutes
 
+      DOMAIN = "https://passwords.proesmans.eu"; # App URL
       # WARN; Custom config, see overlays!
       # REF; https://github.com/dani-garcia/vaultwarden/discussions/6567
-      WEBAUTH_DOMAIN = "passwords.proesmans.eu";
-      DOMAIN = "https://omega.passwords.proesmans.eu"; # App URL
+      WEBAUTHN_ALLOW_SUBDOMAINS = true;
 
       SIGNUPS_ALLOWED = false; # SEEALSO; SIGNUPS_DOMAINS_WHITELIST
       WEBSOCKET_ENABLED = true;

@@ -89,9 +89,7 @@
       #
       overlays = {
         outline = import ./overlays/outline/default.nix;
-
-        # TODO; Pick up when vaultwarden 1.35 releases
-        # vaultwarden = import ./overlays/vaultwarden/default.nix;
+        vaultwarden = import ./overlays/vaultwarden/default.nix;
 
         # example = final: previous: {
         #   hello = previous.hello.overrideAttrs (old: {
