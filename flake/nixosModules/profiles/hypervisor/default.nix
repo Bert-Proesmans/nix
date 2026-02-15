@@ -27,4 +27,8 @@
   # AKA store your newly created volumes at /var/cache/microvm/<name>/<volume>
   systemd.services."microvm@".serviceConfig.CacheDirectory = "microvm/%i";
 
+  # programs.ssh.systemd-ssh-proxy.enable = lib.mkDefault false;
+  # systemd.generators.systemd-ssh-generator = lib.mkDefault "/dev/null";
+  # systemd.sockets.sshd-unix-local.enable = lib.mkDefault false;
+  # systemd.sockets.sshd-vsock.enable = lib.mkDefault false;
 }
