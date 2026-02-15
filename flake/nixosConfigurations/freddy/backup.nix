@@ -157,6 +157,24 @@ in
         sendOptions = "raw";
         service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
       };
+      "zroot/encryptionroot/sqlite" = {
+        target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/sqlite";
+        recursive = true;
+        sendOptions = "raw";
+        service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
+      };
+      "zroot/encryptionroot/mysql" = {
+        target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/mysql";
+        recursive = true;
+        sendOptions = "raw";
+        service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
+      };
+      "zroot/encryptionroot/postgres" = {
+        target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/postgres";
+        recursive = true;
+        sendOptions = "raw";
+        service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
+      };
     };
   };
 
