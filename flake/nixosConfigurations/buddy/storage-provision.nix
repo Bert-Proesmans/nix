@@ -57,6 +57,7 @@ in
   users.groups.freddy = { };
   users.groups.sftpusers = { };
 
+  # TODO; Restrict chroot to union of minimally required functionality
   systemd.mounts = [
     # NOTE; This configuration with system bind-mounting currently works, but could be locked down further with more effort.
     {
@@ -66,18 +67,17 @@ in
         # ERROR; RestartTriggers with system toplevel derivation does not work! Infinite recursion..
         "sysinit-reactivation.target"
       ];
-      after = [ "systemd-tmpfiles-setup.service" ];
       before = [ "sysinit-reactivation.target" ];
+      # Required by all remote users - PATH variable
       what = "/run/current-system/sw";
       where = "/chroot/run/current-system/sw";
       type = "none";
       options = lib.concatStringsSep "," [ "bind" ];
       unitConfig.RequiresMountsFor = [ "/run/current-system/sw" ];
-
     }
     {
       wantedBy = [ "multi-user.target" ];
-      after = [ "systemd-tmpfiles-setup.service" ];
+      # Required by all remote users - Exec software
       what = "/nix/store";
       where = "/chroot/nix/store";
       type = "none";
@@ -86,12 +86,30 @@ in
     }
     {
       wantedBy = [ "multi-user.target" ];
-      after = [ "systemd-tmpfiles-setup.service" ];
+      # Required by ??
       what = "/dev";
       where = "/chroot/dev";
       type = "none";
       options = lib.concatStringsSep "," [ "bind" ];
       unitConfig.RequiresMountsFor = [ "/dev" ];
+    }
+    {
+      wantedBy = [ "multi-user.target" ];
+      # Required by Syncoid
+      what = "/proc";
+      where = "/chroot/proc";
+      type = "none";
+      options = lib.concatStringsSep "," [ "bind" ];
+      unitConfig.RequiresMountsFor = [ "/proc" ];
+    }
+    {
+      wantedBy = [ "multi-user.target" ];
+      # Required by ZFS userspace executable to communicate with kernel module
+      what = "/sys";
+      where = "/chroot/sys";
+      type = "none";
+      options = lib.concatStringsSep "," [ "bind" ];
+      unitConfig.RequiresMountsFor = [ "/sys" ];
     }
     {
       # DEBUG

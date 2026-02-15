@@ -142,7 +142,8 @@ in
       "--no-rollback" # No permissions to maintain/recoved (bad) dataset on target
       # ERROR; Sendoptions get reset because this argument is defined twice!
       # "--sendoptions=raw" # Always send raw data
-      "--no-privilege-elevation" # SSH user has necessary dataset permissions on target
+      # ERROR; Always set (double assignment) by upstream module.
+      # "--no-privilege-elevation" # SSH user has necessary dataset permissions on target
       "--sshkey"
       # NOTE; '${CREDENTIALS_DIRECTORY}' passes through "escapeShellArguments"
       "\${CREDENTIALS_DIRECTORY}/sshKey"
