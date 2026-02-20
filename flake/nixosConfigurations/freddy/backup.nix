@@ -129,6 +129,8 @@ in
     localSourceAllow = [
       "bookmark" # Keep reference point at source for later diffing with target
       "hold" # Don't touch source until transfer completes
+      # ERROR; zfs-send cannot send incrementals (zfs send -I <snapshot> <snapshot>) without 'send' 🤔
+      "send"
       "send:raw" # REF; https://github.com/behlendorf/zfs/commit/6c4ede4026974e5e7b871b98f3652108860ea322
       "release"
     ];
