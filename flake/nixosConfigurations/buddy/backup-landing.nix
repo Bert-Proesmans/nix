@@ -58,5 +58,7 @@
     # NOTE; Software used by sending syncoid
     pkgs.lzop
     pkgs.mbuffer
+    # Figure out what the hell my zpool is doing
+    pkgs.zpool-iostat-viz
   ];
 }

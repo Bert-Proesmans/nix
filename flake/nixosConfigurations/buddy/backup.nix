@@ -33,9 +33,9 @@
 
         # Define what to keep. This config is logically AND'ed to the snapshot schedule on the SOURCE host
         frequently = 0;
-        hourly = 36;
-        daily = 30;
-        monthly = 6;
+        hourly = 0;
+        daily = 60;
+        monthly = 0;
         yearly = 0;
       };
     in

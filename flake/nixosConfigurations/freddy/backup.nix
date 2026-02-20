@@ -20,9 +20,9 @@ in
 
         # NOTE; Assumes snapshot taken every 15minutes
         frequent_period = 15; # Once every 15 mins
-        frequently = 0; # none
-        hourly = 0; # none
-        daily = 30; # 30 days @ 1 day rate
+        frequently = 4; # 1 hour @ 15 mins
+        hourly = 12; # half a day @ 1 hour rate
+        daily = 10; # 30 days @ 1 day rate
         weekly = 0; # none
         monthly = 0; # none
         yearly = 0; # none
@@ -35,20 +35,6 @@ in
         autosnap = false;
         autoprune = false;
         monitor = false;
-      };
-
-      prune-backup-settings = {
-        # NOTE; Let sanoid manage snapshots backuped from other systems
-        autoprune = true;
-        autosnap = false;
-        monitor = false;
-
-        # Define what to keep. This config is logically AND'ed to the snapshot schedule on the SOURCE host
-        frequently = 0; # none
-        hourly = 36; # 1.5 days @ 1 hour rate
-        daily = 30; # 30 days @ 1 day rate
-        monthly = 6; # 6 months @ 1 month rate
-        yearly = 0; # none
       };
     in
     {
