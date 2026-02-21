@@ -1,6 +1,7 @@
 {
   lib,
   pkgs,
+  utils,
   config,
   ...
 }:
@@ -101,7 +102,7 @@ in
 
   services.syncoid = {
     enable = true;
-    interval = "*:05/15:00 UTC";
+    interval = "hourly"; # Value doesn't matter, overritten in explicit timer instance
     service = {
       # NOTE; Added to all syncoid systemd unit files
       requisite = [
@@ -123,8 +124,12 @@ in
     # NOTE; Target datasets are on another system
     localTargetAllow = [ ];
     # NOTE; Arguments passed to all syncoid invocations
+    # HINT; All hosts create frequent local snapshots, the offsite backup should keep cherry-picked snapshots for a longer duration.
     commonArgs = [
       "--no-sync-snap" # No additional snapshot, use sanoid's snapshots
+      # WARN; Each snapshot creates a (small) processing overhead while being received, causing high load on the target pool.
+      # NOTE; '--no-stream' instructs zfs to _not send each individual snapshot_ but group changes into a single snapshot before sending.
+      "--no-stream" # '-i' instead of '-I'
       "--create-bookmark" # Keep cheap pointer to replicated datasets
       "--use-hold" # Don't do anything to the dataset(snapshot) while transmitting
       "--no-rollback" # No permissions to maintain/recoved (bad) dataset on target
@@ -137,34 +142,64 @@ in
       "\${CREDENTIALS_DIRECTORY}/sshKey"
     ];
 
+    # WARN; Sending encrypted streams automatically sets 'encryption' and 'keylocation=prompt' properties on the destination dataset!
+    # You could add 'props' to clone the source properties into target dataset, but that also takes in other options like
+    # 'mountpoint' and 'canmount'..
+    # WARN; Because keylocation=prompt is set on the target dataset, zfs will ask for a loaded key on the target host. This is confusing.
     commands = {
       "zroot/encryptionroot" = {
         # NOTE; Need encryptionroot dataset because the volume keys are stored here
         target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot";
-        recursive = false; # Manual dataset selection
-        sendOptions = "raw";
+        # Manual selection of mirrored datasets because local data (logs, nix-store etc) is also encrypted
+        recursive = false;
+        # WARN; See note above.
+        sendOptions = "w"; # ra(w)
         service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
       };
       "zroot/encryptionroot/sqlite" = {
         target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/sqlite";
         recursive = true;
-        sendOptions = "raw";
+        # WARN; See note above.
+        sendOptions = "w"; # ra(w)
         service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
       };
       "zroot/encryptionroot/mysql" = {
         target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/mysql";
         recursive = true;
-        sendOptions = "raw";
+        # WARN; See note above.
+        sendOptions = "w"; # ra(w)
         service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
       };
       "zroot/encryptionroot/postgres" = {
         target = "freddy@${fqdn-buddy}:storage/backup/freddy/encryptionroot/postgres";
         recursive = true;
-        sendOptions = "raw";
+        # WARN; See note above.
+        sendOptions = "w"; # ra(w)
         service.serviceConfig.LoadCredential = [ "sshKey:${config.sops.secrets."buddy_ssh".path}" ];
       };
     };
   };
+
+  systemd.timers = lib.mapAttrs' (
+    name: c:
+    lib.nameValuePair "syncoid-${utils.escapeSystemdPath name}" ({
+      timerConfig = {
+        # NOTE; This timer should fire at least once every 30 minutes.
+        #
+        # Default interval every 15 minutes-
+        OnCalendar = lib.mkForce "*:00/15:00 UTC";
+        # -with a random offset of 15 minutes to smear target system load.
+        #
+        # WARN; 'RandomizedOffsetSec' is a better option than 'RandomizedDelaySec' because it offsets the next start time
+        # persistently (across reboots) and deterministically (every unit has a uniqe delay).
+        #
+        # NOTE; Validate syntax using;
+        # systemd-analyze timespan "<value>"
+        RandomizedOffsetSec = "15 minutes";
+        Persistent = true;
+      };
+    })
+  ) config.services.syncoid.commands;
 
   environment.systemPackages = [
     # NOTE; Software used by sending syncoid

@@ -60,5 +60,15 @@
     pkgs.mbuffer
     # Figure out what the hell my zpool is doing
     pkgs.zpool-iostat-viz
+    (pkgs.writeShellScriptBin "check-capacity" ''
+      echo "HINT; Verify capacity (CAP) is below 90%"
+      zpool list
+    '')
+    (pkgs.writeShellScriptBin "check-amplification" ''
+      echo "HINT; High operation (IOPS) count while bandwidth (mbps) remains low implies amplification!"
+      sleep 2
+      # (V)erbose + (y)Surpress boot statistics
+      watch -n 1 "zpool iostat -vy"
+    '')
   ];
 }
