@@ -25,10 +25,14 @@ let
         # anyway. Their evaluation could change depending on introduced overlays!
         inherit (flake.outputs) overlays homeModules;
       };
-      # Path where media assets are stored for documentation purposes
-      # NOTE; $flake points to the flake directory inside the repository! The repository is in its entirety copied into /nix/store
-      # but the flake string representation points towards the flake.nix parent folder, aka repo sub folder "flake".
-      documentationAssets = "${builtins.dirOf flake}/documentation/assets";
+
+      # WARN; $flake points to the flake directory inside the repository!
+      # The repository is in its entirety copied into /nix/store, every deploy with a new content hash!
+      # The flake-string-representation is a path towards the flake.nix parent folder, aka sub folder "flake" inside the git repository.
+      # SEEALSO; ../nixosModules/flake.nix
+      # SEEALSO; config._module.args
+      raw_flake = "${flake}";
+      raw_documentation = "${builtins.dirOf flake}/documentation";
     };
   };
 in

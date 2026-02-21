@@ -2,7 +2,7 @@
   lib,
   pkgs,
   config,
-  flake,
+  documentationAssets,
   ...
 }:
 let
@@ -208,7 +208,7 @@ in
         displayName = "Pictures";
         basicSecretFile = config.sops.secrets.immich-oauth-secret.path;
         originLanding = "https://pictures.proesmans.eu/auth/login?autoLaunch=1";
-        imageFile = "${flake.documentationAssets}/immich-logo.png";
+        imageFile = "${documentationAssets}/immich-logo.png";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
           "https://pictures.proesmans.eu/auth/login"
@@ -247,7 +247,7 @@ in
         #
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://wiki.proesmans.eu/";
-        imageFile = "${flake.documentationAssets}/bookstack-logo.png";
+        imageFile = "${documentationAssets}/bookstack-logo.png";
 
         # ERROR; Bookstack only accepts RS256 signing algorithm
         enableLegacyCrypto = true;
@@ -269,7 +269,7 @@ in
         basicSecretFile = config.sops.secrets.gatus-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://status.proesmans.eu/";
-        imageFile = "${flake.documentationAssets}/gatus-logo.png";
+        imageFile = "${documentationAssets}/gatus-logo.png";
 
         # ERROR; PKCE is not supported by Gatus.
         # Disables PKCE.
@@ -287,7 +287,7 @@ in
         basicSecretFile = config.sops.secrets.vaultwarden-oauth-secret.path;
         # WARN; URLs must end with a forward slash if path element is empty!
         originLanding = "https://passwords.proesmans.eu/";
-        imageFile = "${flake.documentationAssets}/vaultwarden-logo.png";
+        imageFile = "${documentationAssets}/vaultwarden-logo.png";
         originUrl = [
           # NOTE; Global url redirects to specific instance URLs
           "https://passwords.proesmans.eu/identity/connect/oidc-signin"
@@ -311,9 +311,10 @@ in
       # Provisioning is rerouted through proxy for certificate validation
       config.systemd.services.haproxy.name
     ];
-
+    serviceConfig.BindReadOnlyPaths = [ documentationAssets ];
     unitConfig.RequiresMountsFor = [
       kanidmStatePath
+      documentationAssets
     ];
   };
 }
