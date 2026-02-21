@@ -342,10 +342,10 @@ in
       smtprelay = { };
     };
 
-    # DEBUG
     proesmans.nix.overlays = [
-      (final: prev: {
-        smtprelay = prev.smtprelay.overrideAttrs (oldAttrs: {
+      (_final: prev: {
+        smtprelay = prev.smtprelay.overrideAttrs (_oldAttrs: {
+          # TODO; Cleanup after version >1.31.1 releases!
           patches = [
             ./relay-cert.patch
           ];

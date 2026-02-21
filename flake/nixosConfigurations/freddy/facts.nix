@@ -1,4 +1,4 @@
-{ self, config, ... }:
+{ ... }:
 {
   hostName = "freddy";
   domainName = "omega.proesmans.eu";

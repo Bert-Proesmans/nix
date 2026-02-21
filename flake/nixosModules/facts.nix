@@ -9,7 +9,7 @@
         specialArgs = { };
         modules = [
           (
-            { config, ... }:
+            { ... }:
             {
               # Allow index-free value declarations
               freeformType = lib.types.attrsOf lib.types.str;
@@ -73,7 +73,7 @@
                   description = "IP addressing configuration";
                   type = lib.types.attrsOf (
                     lib.types.submodule (
-                      { name, ... }:
+                      { ... }:
                       {
                         options = {
                           address = lib.mkOption {

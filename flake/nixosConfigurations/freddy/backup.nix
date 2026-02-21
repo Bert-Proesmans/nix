@@ -178,7 +178,7 @@ in
   };
 
   systemd.timers = lib.mapAttrs' (
-    name: c:
+    name: _c:
     lib.nameValuePair "syncoid-${utils.escapeSystemdPath name}" ({
       timerConfig = {
         # NOTE; This timer should fire at least once every 30 minutes.

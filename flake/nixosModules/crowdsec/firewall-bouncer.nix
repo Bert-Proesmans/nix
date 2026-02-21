@@ -1,8 +1,5 @@
 {
   lib,
-  utils,
-  flake,
-  pkgs,
   config,
   ...
 }:

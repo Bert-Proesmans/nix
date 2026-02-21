@@ -328,7 +328,7 @@ in
 
               web_ui = mkOption {
                 default = null;
-                description = ''<TODO>'';
+                description = "<TODO>";
                 type = submodule [
                   {
                     freeformType = attrsOf (
