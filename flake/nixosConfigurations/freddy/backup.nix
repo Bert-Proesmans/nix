@@ -18,6 +18,7 @@ in
       default-settings = {
         autosnap = true;
         autoprune = true;
+        monitor = false;
 
         # WARN; Assumes snapshot timer fires every 15 (or at denominator of 15) minutes
         frequent_period = 15; # Once every 15 mins
@@ -58,8 +59,6 @@ in
         "zroot/encryptionroot/log" = default-settings // {
           # NOTE; Less important so lower retention
           recursive = "zfs"; # ATOMIC
-
-          daily = 7; # 7 days @ 1 day rate
         };
 
         "zroot/encryptionroot/postgres" = default-settings // {
@@ -67,8 +66,8 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 168; # 7 days @ 1 hour rate
-          daily = 1; # 1 for backup purposes
+          hourly = 0; # none
+          daily = 0; # none
           # No week/month capture
         };
 
@@ -77,8 +76,8 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 168; # 7 days @ 1 hour rate
-          daily = 1; # 1 for backup purposes
+          hourly = 0; # none
+          daily = 0; # none
           # No week/month capture
         };
 
@@ -87,8 +86,8 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 168; # 7 days @ 1 hour rate
-          daily = 1; # 1 for backup purposes
+          hourly = 0; # none
+          daily = 0; # none
           # No week/month capture
         };
 

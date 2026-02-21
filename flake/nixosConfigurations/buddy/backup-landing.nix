@@ -19,8 +19,24 @@
   };
 
   services.sanoid.datasets = {
+    # WARN; Sanoid calculates retention _per bucket_! Combined with receiving only the most recent snapshot, of type frequently,
+    # when syncoid is configured with '--no-stream' => There are no hourly/daily/weekly/monthly snapshots sent to the backup target.
+    # IF we want to persist older and less frequent snapshots we have to configure this ourselves.
+    #
     # SEEALSO; services.sanoid.datasets@backup.nix
-    # Optionally override dataset storage pattern here
+    "storage/backup" = {
+      autoprune = true;
+      autosnap = true; # see WARN above
+      monitor = false;
+
+      # Define what to keep.
+      # NOTE; Backup targets either receive all snapshots or only the most recent (of type frequently)
+      frequently = 1; # the most recent, landed by syncoid with hold
+      hourly = 0; # none
+      daily = 14; # 2 weeks @ 1day rate => locally snapshotted
+      monthly = 3; # 3 months @ 1month rate => locally snapshotted
+      yearly = 0; # none
+    };
     # "storage/backup/<dataset>" = {};
   };
 

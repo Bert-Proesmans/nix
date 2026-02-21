@@ -1,10 +1,11 @@
-{ ... }:
+{ lib, ... }:
 {
   services.sanoid =
     let
       default-settings = {
         autosnap = true;
         autoprune = true;
+        monitor = false;
 
         # WARN; Assumes snapshot timer fires every 15 (or at denominator of 15) minutes
         frequent_period = 15; # Once every 15 mins
@@ -24,21 +25,6 @@
         autoprune = false;
         monitor = false;
       };
-
-      prune-backup-settings = {
-        # NOTE; Let sanoid manage snapshots backuped from other systems
-        autoprune = true;
-        autosnap = false;
-        monitor = false;
-
-        # Define what to keep.
-        # WARN; This config is logically AND'ed to the snapshot schedule on the SOURCE host!
-        frequently = 4; # 1 hour @ 15min rate
-        hourly = 0; # none
-        daily = 60; # 60 days @ 1day rate
-        monthly = 0; # none
-        yearly = 0; # none
-      };
     in
     {
       enable = true;
@@ -54,10 +40,13 @@
           process_children_only = true;
         };
 
-        "storage/backup" = prune-backup-settings // {
+        "storage/backup" = {
           # NOTE; Maintain backup snapshots of other systems
           recursive = true; # NOT ATOMIC
           process_children_only = true;
+
+          # NOTE; Not setting values through default-settings because that implies extra hassle with lib.mkForce elsewhere
+          frequently = lib.mkDefault (lib.assertMsg true "Syncoid schedule for backup is undefined!");
         };
 
         "storage/documents" = default-settings // {
@@ -75,8 +64,6 @@
         "storage/log" = default-settings // {
           # NOTE; Less important so lower retention
           recursive = "zfs"; # ATOMIC
-
-          daily = 7; # 7 days @ 1 day rate
         };
 
         "storage/postgres" = default-settings // {
@@ -84,8 +71,9 @@
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 168; # 7 days @ 1 hour rate
-          daily = 30; # 1 month @ 1 day rate
+          # WARN; Currently not sent off-site!
+          hourly = 0; # none
+          daily = 14; # 2 weeks @ 1 day rate
           # No week/month capture
         };
 
@@ -94,8 +82,9 @@
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 168; # 7 days @ 1 hour rate
-          daily = 30; # 1 month @ 1 day rate
+          # WARN; Currently not sent off-site!
+          hourly = 0; # none
+          daily = 14; # 2 weeks @ 1 day rate
           # No week/month capture
         };
 
