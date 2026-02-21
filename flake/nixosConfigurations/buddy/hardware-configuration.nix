@@ -5,6 +5,15 @@
 
   # Enables (nested) virtualization through hardware acceleration.
   boot.kernelModules = [ "kvm-amd" ];
+  boot.kernelParams = [
+    # kernel: clocksource: timekeeping watchdog on CPU0: Marking clocksource 'tsc' as unstable because the skew is too large:
+    # kernel: clocksource:                       'hpet' wd_nsec: 503380178 wd_now: 2257dd0 wd_last: 1b78390 mask: ffffffff
+    # kernel: clocksource:                       'tsc' cs_nsec: 504262388 cs_now: d82177fe0 cs_last: d22179660 mask: ffffffffffffffff
+    # kernel: clocksource:                       Clocksource 'tsc' skewed 882210 ns (0 ms) over watchdog 'hpet' interval of 503380178 ns (503 ms)
+    # kernel: clocksource:                       'tsc' is current clocksource.
+    # kernel: TSC found unstable after boot, most likely due to broken BIOS. Use 'tsc=unstable'.
+    "tsc=unstable"
+  ];
   hardware.cpu.amd.updateMicrocode = true;
 
   # GPU driver being amdgpu (upstreamed in linux kernel)
