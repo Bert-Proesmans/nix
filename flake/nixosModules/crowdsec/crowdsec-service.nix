@@ -182,6 +182,8 @@ in
 
     systemd.services.crowdsec = {
       partOf = [ config.systemd.targets.crowdsec.name ];
+      # time="2026-02-21T22:37:57Z" level=error msg="/nix/store/<hash>-local_acquisisions.yaml (position 4): datasource of type journalctl: datasource 'journalctl' is not available: exec: \"journalctl\": executable file not found in $PATH"
+      path = lib.mkForce [ pkgs.systemd ];
 
       serviceConfig = {
         # Give crowdsec limited time to shutdown after receiving systemd's stop signal.
