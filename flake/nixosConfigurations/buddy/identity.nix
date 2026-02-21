@@ -11,7 +11,7 @@ let
   ) config.proesmans.facts;
 
   # WARN; kanidm database filepath is fixed and cannot be changed!
-  kanidmStatePath = builtins.dirOf config.services.kanidm.serverSettings.db_path;
+  kanidmStatePath = builtins.dirOf config.services.kanidm.server.settings.db_path;
 in
 {
   sops.secrets = {
@@ -57,22 +57,22 @@ in
       # ERROR; Immich does not properly URL-encode oauth secret value!
       # WORKAROUND; Value must be generated using command:
       #   tr --complement --delete 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkpqrstuvwxyz0123456789' < /dev/urandom | head --bytes 48
-      owner = "kanidm";
+      owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
     bookstack-oauth-secret = {
-      owner = "kanidm";
+      owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
     gatus-oauth-secret = {
-      owner = "kanidm";
+      owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
     vaultwarden-oauth-secret = {
-      owner = "kanidm";
+      owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
   };
@@ -80,7 +80,7 @@ in
   # Allow kanidm user access to the idm certificate managed by the host
   security.acme.certs."alpha.idm.proesmans.eu" = {
     reloadServices = [ config.systemd.services.kanidm.name ];
-    group = "kanidm";
+    group = config.users.groups.kanidm.name;
   };
 
   disko.devices.zpool.storage.datasets."sqlite/kanidm" = {
@@ -99,13 +99,12 @@ in
   };
 
   services.kanidm = {
-    enableServer = true;
-    enableClient = true;
-    package = pkgs.kanidm_1_8.withSecretProvisioning;
+    package = pkgs.kanidm_1_9.withSecretProvisioning;
 
-    # WARN; Setting http_client_address_info requires settings format version 2+
-    serverSettings.version = "2";
-    serverSettings = {
+    server.enable = true;
+    server.settings = {
+      # WARN; Setting http_client_address_info requires settings format version 2+
+      version = "2";
       bindaddress = "127.0.0.1:8443";
       # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       # ERROR; These hostnames cannot be used as web resources under the openid specification
@@ -147,7 +146,8 @@ in
       };
     };
 
-    clientSettings = {
+    client.enable = true;
+    client.settings = {
       # ERROR; MUST MATCH _instance_ DNS hostname exactly due to certificate validation!
       uri = "https://alpha.idm.proesmans.eu";
       verify_hostnames = true;

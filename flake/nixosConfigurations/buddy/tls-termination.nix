@@ -19,12 +19,12 @@
         config.proesmans.facts."02-fart".host.tailscale.address
       ];
       services.idm =
-        assert config.services.kanidm.serverSettings.bindaddress == "127.0.0.1:8443";
+        assert config.services.kanidm.server.settings.bindaddress == "127.0.0.1:8443";
         {
           # WARN; Domain and Origin are separate values from the effective DNS hostname.
           # REF; https://kanidm.github.io/kanidm/master/choosing_a_domain_name.html#recommendations
           hostname =
-            assert config.services.kanidm.serverSettings.origin == "https://idm.proesmans.eu";
+            assert config.services.kanidm.server.settings.origin == "https://idm.proesmans.eu";
             "alpha.idm.proesmans.eu";
           location = "127.0.0.1:8443";
         };

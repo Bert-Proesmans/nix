@@ -17,13 +17,12 @@ in
 
   # WARN; This service is setup as replicated node!
   services.kanidm = {
-    enableServer = true;
-    enableClient = true;
-    package = pkgs.kanidm_1_8;
+    package = pkgs.kanidm_1_9;
 
-    # WARN; Setting http_client_address_info requires settings format version 2+
-    serverSettings.version = "2";
-    serverSettings = {
+    server.enable = true;
+    server.settings = {
+      # WARN; Setting http_client_address_info requires settings format version 2+
+      version = "2";
       bindaddress = "127.0.0.1:8443";
       # HostName; alpha.idm.proesmans.eu, beta.idm.proesmans.eu ...
       # NOTE; Regional hostnames can be used as web resources under the webauthn+cookies specification
@@ -81,7 +80,8 @@ in
 
     };
 
-    clientSettings = {
+    client.enable = true;
+    client.settings = {
       # ERROR; MUST MATCH _instance_ DNS hostname exactly due to certificate validation!
       uri = "https://omega.idm.proesmans.eu";
       verify_hostnames = true;
