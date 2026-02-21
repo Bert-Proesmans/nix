@@ -19,11 +19,11 @@ in
         autosnap = true;
         autoprune = true;
 
-        # NOTE; Assumes snapshot taken every 15minutes
+        # WARN; Assumes snapshot timer fires every 15 (or at denominator of 15) minutes
         frequent_period = 15; # Once every 15 mins
-        frequently = 4; # 1 hour @ 15 mins
-        hourly = 12; # half a day @ 1 hour rate
-        daily = 10; # 30 days @ 1 day rate
+        frequently = 0; # none
+        hourly = 0; # none
+        daily = 10; # 10 days @ 1 day rate
         weekly = 0; # none
         monthly = 0; # none
         yearly = 0; # none
@@ -66,10 +66,9 @@ in
           # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
           recursive = "zfs"; # ATOMIC
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 192; # 2 days @ 15 mins rate
           hourly = 168; # 7 days @ 1 hour rate
-          daily = 90; # 3 months @ 1 day rate
+          daily = 1; # 1 for backup purposes
           # No week/month capture
         };
 
@@ -77,10 +76,9 @@ in
           # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
           recursive = "zfs"; # ATOMIC
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 192; # 2 days @ 15 mins rate
           hourly = 168; # 7 days @ 1 hour rate
-          daily = 90; # 3 months @ 1 day rate
+          daily = 1; # 1 for backup purposes
           # No week/month capture
         };
 
@@ -88,10 +86,9 @@ in
           # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
           recursive = "zfs"; # ATOMIC
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 192; # 2 days @ 15 mins rate
           hourly = 168; # 7 days @ 1 hour rate
-          daily = 90; # 3 months @ 1 day rate
+          daily = 1; # 1 for backup purposes
           # No week/month capture
         };
 

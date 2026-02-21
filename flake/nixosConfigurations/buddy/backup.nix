@@ -6,11 +6,11 @@
         autosnap = true;
         autoprune = true;
 
-        # NOTE; Assumes snapshot taken every 15minutes
+        # WARN; Assumes snapshot timer fires every 15 (or at denominator of 15) minutes
         frequent_period = 15; # Once every 15 mins
         frequently = 0; # none
         hourly = 0; # none
-        daily = 30; # 30 days @ 1 day
+        daily = 10; # 10 days @ 1 day
         weekly = 0; # none
         monthly = 0; # none
         yearly = 0; # none
@@ -31,12 +31,13 @@
         autosnap = false;
         monitor = false;
 
-        # Define what to keep. This config is logically AND'ed to the snapshot schedule on the SOURCE host
-        frequently = 0;
-        hourly = 0;
-        daily = 60;
-        monthly = 0;
-        yearly = 0;
+        # Define what to keep.
+        # WARN; This config is logically AND'ed to the snapshot schedule on the SOURCE host!
+        frequently = 4; # 1 hour @ 15min rate
+        hourly = 0; # none
+        daily = 60; # 60 days @ 1day rate
+        monthly = 0; # none
+        yearly = 0; # none
       };
     in
     {
@@ -64,12 +65,11 @@
           recursive = true; # NOT ATOMIC
           process_children_only = true;
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 672; # 7 days @ 15 mins rate
           hourly = 720; # 30 days @ 1 hour rate
-          daily = 30; # 30 days @ 1 day rate
-          weekly = 24; # 6 months @ 1 week rate
-          monthly = 84; # 7 years @ 1 month rate
+          daily = 0; # none
+          weekly = 0; # none
+          monthly = 24; # 2 years @ 1 month rate
         };
 
         "storage/log" = default-settings // {
@@ -83,10 +83,9 @@
           # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
           recursive = "zfs"; # ATOMIC
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 192; # 2 days @ 15 mins rate
           hourly = 168; # 7 days @ 1 hour rate
-          daily = 90; # 3 months @ 1 day rate
+          daily = 30; # 1 month @ 1 day rate
           # No week/month capture
         };
 
@@ -94,10 +93,9 @@
           # NOTE; Full atomic snapshot for instant recovery, must include write-ahead-log (WAL) files!
           recursive = "zfs"; # ATOMIC
 
-          frequent_period = 15; # Once every 15 mins
           frequently = 192; # 2 days @ 15 mins rate
           hourly = 168; # 7 days @ 1 hour rate
-          daily = 90; # 3 months @ 1 day rate
+          daily = 30; # 1 month @ 1 day rate
           # No week/month capture
         };
 
