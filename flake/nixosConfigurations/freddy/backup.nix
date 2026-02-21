@@ -22,10 +22,13 @@ in
 
         # WARN; Assumes snapshot timer fires every 15 (or at denominator of 15) minutes
         frequent_period = 15; # Once every 15 mins
-        frequently = 0; # none
-        hourly = 0; # none
+        # WARN; Sanoid maintains pruning schedules within snapshots of the same type.
+        # ERROR; Syncoid can not replicate latest snapshots from source if target has made its own snapshots more recently.
+        # NOTE; For replication purposes all datasets require at least 1 snapshot for all types up to yearly.
+        frequently = 1; # replication
+        hourly = 1; # replication
         daily = 10; # 10 days @ 1 day rate
-        weekly = 0; # none
+        weekly = 1; # replication
         monthly = 0; # none
         yearly = 0; # none
       };
@@ -66,9 +69,7 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 0; # none
-          daily = 0; # none
-          # No week/month capture
+          # default
         };
 
         "zroot/encryptionroot/mysql" = default-settings // {
@@ -76,9 +77,7 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 0; # none
-          daily = 0; # none
-          # No week/month capture
+          # default
         };
 
         "zroot/encryptionroot/sqlite" = default-settings // {
@@ -86,9 +85,7 @@ in
           recursive = "zfs"; # ATOMIC
 
           frequently = 192; # 2 days @ 15 mins rate
-          hourly = 0; # none
-          daily = 0; # none
-          # No week/month capture
+          # default
         };
 
       };
@@ -125,7 +122,10 @@ in
       "--no-sync-snap" # No additional snapshot, use sanoid's snapshots
       # WARN; Each snapshot creates a (small) processing overhead while being received, causing high load on the target pool.
       # NOTE; '--no-stream' instructs zfs to _not send each individual snapshot_ but group changes into a single snapshot before sending.
-      "--no-stream" # '-i' instead of '-I'
+      #
+      # ERROR; This effectively sends full snapshots, aka the source sends, target receives and stores, the _full dataset_ each snapshot.
+      # The processing overhead of all snapshots is reduced by tweaking sanoid's schedule to maintain as little as possible.
+      # "--no-stream" # '-i' instead of '-I'
       "--create-bookmark" # Keep cheap pointer to replicated datasets
       "--use-hold" # Don't do anything to the dataset(snapshot) while transmitting
       "--no-rollback" # No permissions to maintain/recoved (bad) dataset on target

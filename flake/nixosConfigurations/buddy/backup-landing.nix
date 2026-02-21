@@ -22,11 +22,16 @@
     # WARN; Sanoid calculates retention _per bucket_! Combined with receiving only the most recent snapshot, of type frequently,
     # when syncoid is configured with '--no-stream' => There are no hourly/daily/weekly/monthly snapshots sent to the backup target.
     # IF we want to persist older and less frequent snapshots we have to configure this ourselves.
+    # ERROR; Generating new snapshots on target makes source and target desync on replication (snapshot) base! You generally cannot
+    # touch the dataset/snapshots on target or you break replication!
+    #
+    # HINT; Make sure that source sends the incremental snapshot stream and that it has at least one snapshot of each interval type
+    # worth for longer retention (week/day/month).
     #
     # SEEALSO; services.sanoid.datasets@backup.nix
     "storage/backup" = {
       autoprune = true;
-      autosnap = true; # see WARN above
+      autosnap = false; # see WARN above
       monitor = false;
 
       # Define what to keep.
