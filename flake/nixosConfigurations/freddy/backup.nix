@@ -140,9 +140,10 @@ in
     ];
 
     # WARN; Sending encrypted streams automatically sets 'encryption' and 'keylocation=prompt' properties on the destination dataset!
-    # You could add 'props' to clone the source properties into target dataset, but that also takes in other options like
-    # 'mountpoint' and 'canmount'..
-    # WARN; Because keylocation=prompt is set on the target dataset, zfs will ask for a loaded key on the target host. This is confusing.
+    # You could add '--props' (to zfs send, through --sendoptions=) to clone the source properties into target dataset, but that also
+    # takes in other options like 'mountpoint' and 'canmount'..
+    # WARN; Because keylocation=prompt is automatically set on the target dataset by zfs receive, zfs will ask for a loaded key on
+    # the target host while attempting to mount. This operational discrepancy with the source system is confusing.
     commands = {
       "zroot/encryptionroot" = {
         # NOTE; Need encryptionroot dataset because the volume keys are stored here
