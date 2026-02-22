@@ -22,6 +22,7 @@
   # Allow for remote management
   services.openssh.enable = true;
   services.openssh.settings.PasswordAuthentication = false;
+  services.openssh.settings.KbdInteractiveAuthentication = false;
 
   # Allow privilege elevation to administrator role
   security.sudo.enable = true;

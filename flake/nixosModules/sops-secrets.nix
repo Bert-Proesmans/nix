@@ -58,6 +58,7 @@ in
 
         services.openssh.enable = lib.mkDefault true;
         services.openssh.settings.PasswordAuthentication = false;
+        services.openssh.settings.KbdInteractiveAuthentication = false;
         services.openssh.settings.PermitRootLogin = "no";
         services.openssh.hostKeys = [
           {
