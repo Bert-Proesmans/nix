@@ -6,12 +6,9 @@
   ...
 }:
 let
-  ip-buddy = config.proesmans.facts.buddy.host.tailscale.address;
   fqdn-buddy = "buddy.internal.proesmans.eu";
 in
 {
-  sops.secrets."buddy_ssh" = { };
-
   environment.etc."rclone.config" = {
     # NOTE; Config holds no secret values, only path references to them
     text = ''
@@ -35,131 +32,16 @@ in
       mode = "0700"; # u+rwx
     };
 
-    "/mnt/remote/buddy-sftp" = {
-      d = {
-        # REF; https://wiki.archlinux.org/title/SFTP_chroot#Setup_the_filesystem
-        user = "root";
-        group = "root";
-        mode = "0000";
-      };
-      # WARN; It's not possible to unlock + mkdir + lock with systemd-tmpfiles! Lines are executed in path lexicographical order.
-      # MUST lock/unlock manually!
-      # h.argument = "i"; # Immutable (chattr)
+    "/mnt/remote".d = {
+      # ERROR; Must restrict this directory because otherwise every user is allowed to read contents of the buddy host!
+      user = "root";
+      group = "root";
+      mode = "0000";
     };
-    "/mnt/remote/buddy-sftp/pictures".d = {
-      # Empty, only create no change
-      # WARN; The mount is at /mnt/remote/buddy-sftp, and fuse seems to fail when the pictures subfolder exists.
-      # The default behaviour of fuse3 should be to ignore existing data but something fails..
-    };
-    "/mnt/remote/buddy-sftp/pictures-external".d = {
-      # Empty, only create no change
-      # WARN; The mount is at /mnt/remote/buddy-sftp, and fuse seems to fail when the pictures subfolder exists.
-      # The default behaviour of fuse3 should be to ignore existing data but something fails..
-    };
-  };
-
-  systemd.services."merger-fs-pre@" = {
-    description = "Landing zone prep for %I";
-    conflicts = [ "shutdown.target" ];
-    before = [ "shutdown.target" ];
-    path = [
-      pkgs.util-linux # mountpoint
-      pkgs.coreutils # chown/chmod
-      pkgs.attr # sefattr
-      pkgs.e2fsprogs # chattr/lsattr
-    ];
-    enableStrictShellChecks = true;
-    scriptArgs = "'%I'";
-    script = ''
-      # ERROR; Path could have dropped root slash during conversion!
-      location="/$1"
-
-      # Code must run _before_ anything is mounted at $location
-      mountpoint --quiet "$location" && exit 0
-
-      # Create directory and make it immutable for all users and systems.
-      # The directory is marked for mergerfs to differentiate mounted/to be mounted.
-      # REF; https://trapexit.github.io/mergerfs/latest/config/branches/#mount-points
-
-      planned=false
-      chown_do=false
-      chmod_do=false
-      xattr_do=false
-
-      if [ ! -d "$location" ]; then
-        # WARN; Branch shouldn't happen if we assume systemd-tmpfiles did its job!
-        planned=true
-        chown_do=true
-        chmod_do=true
-        xattr_do=true
-      fi
-
-      if [ -d "$location" ] && [ "$(stat -c '%u:%g' "$location")" != "0:0" ]; then
-        chown_do=true
-        planned=true
-      fi
-
-      if [ -d "$location" ] && [ "$(stat -c '%a' "$location")" != "0" ]; then
-        chmod_do=true
-        planned=true
-      fi
-
-      if [ -d "$location" ] &&
-        ! getfattr --only-values --name user.mergerfs.branch_mounts_here "$location" >/dev/null 2>&1
-      then
-        xattr_do=true
-        planned=true
-      fi
-
-      [ "$planned" = false ] && exit 0
-
-      mkdir --parents "$location"
-
-      if lsattr -l -d "$location" 2>/dev/null | grep --quiet 'immutable'; then
-        chattr -i "$location"
-      fi
-
-      $chown_do && chown root:root "$location"
-      $chmod_do && chmod 0000 "$location"
-      $xattr_do && setfattr -n user.mergerfs.branch_mounts_here "$location"
-
-      # Finalise with marking immutable
-      chattr +i "$location"
-    '';
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = false;
-      # Run as root
-    };
-    unitConfig.DefaultDependencies = false;
-  };
-
-  systemd.services."merger-fs-post@" = {
-    description = "Mount finalization for %I";
-    conflicts = [ "shutdown.target" ];
-    before = [ "shutdown.target" ];
-    path = [
-      pkgs.util-linux # mountpoint
-      pkgs.attr # setfattr
-    ];
-    enableStrictShellChecks = true;
-    scriptArgs = "'%I'";
-    script = ''
-      # ERROR; Path could have dropped root slash during conversion!
-      location="/$1"
-
-      # Code must run _after_ the mount at $location
-      mountpoint --quiet "$location" || exit 0
-
-      # The directory is marked for mergerfs to differentiate mounted/to be mounted.
-      setfattr --name user.mergerfs.branch "$location"
-    '';
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = false;
-      # Run as root
-    };
-    unitConfig.DefaultDependencies = false;
+    "/mnt/remote/buddy-sftp".d = { };
+    # NOTE; Premount directory creation necessary for mergerfs tags to improve merger intelligence
+    "/mnt/remote/buddy-sftp/chroot/pictures".d = { };
+    "/mnt/remote/buddy-sftp/chroot/pictures-external".d = { };
   };
 
   systemd.mounts = [
@@ -172,24 +54,20 @@ in
       description = "Mount buddy to local filesystem";
       conflicts = [ "umount.target" ];
       # Need these units but won't queue a startjob if they aren't active
-      requisite = [
-        config.systemd.targets."buddy-online".name
-      ];
+      requisite = [ config.systemd.targets."buddy-online".name ];
       wants = [
-        "network.target"
-        "tailscaled-autoconnect.service"
-        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
-        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/chroot/pictures"}.service"
+        # ERROR; SFTP carrier does not support file attributes, marker cannot be set!
+        # "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.service"
       ];
       after = [
         "systemd-tmpfiles-setup.service"
-        "network.target"
-        "tailscaled-autoconnect.service"
-        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/chroot/pictures"}.service"
         config.systemd.targets."buddy-online".name
       ];
       before = [
-        "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/pictures"}.service"
+        # See note above
+        # "merger-fs-post@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.service"
       ];
       what = "buddy:/";
       where = "/mnt/remote/buddy-sftp";
@@ -243,7 +121,7 @@ in
 
   systemd.automounts = [
     # ERROR; Automount seems to be too eager and blocks various operations. MergerFS also causes userspace hangs during toplevel operations.
-    # Better to explicitly mount instead.
+    # Better to explicitly mount when server comes online instead.
     # {
     #   description = "Automount for /mnt/remote/buddy-sftp/pictures";
     #   wantedBy = [ "multi-user.target" ];
@@ -251,64 +129,50 @@ in
     # }
   ];
 
-  systemd.targets."buddy-online" = {
-    description = "Buddy is online";
-  };
-
-  systemd.services."buddy-online-tester" = {
-    description = "Ping buddy";
-    wantedBy = [ "multi-user.target" ];
+  systemd.services."merger-fs-pre@" = {
+    description = "Landing zone prep for %I";
+    conflicts = [ "shutdown.target" ];
+    before = [ "shutdown.target" ];
     path = [
-      pkgs.systemd # systemctl
-      pkgs.iputils # ping
+      pkgs.util-linux # mountpoint
+      pkgs.attr # sefattr
     ];
     enableStrictShellChecks = true;
+    scriptArgs = "'%I'";
     script = ''
-      state="unknown"
+      # ERROR; Path could have dropped root slash during conversion!
+      location="/$1"
 
-      while true; do
-        # Want 3 ping replies within 10 seconds awaiting each response for 2 seconds after request.
-        if ping -c 3 -w 10 -W 2 "${config.proesmans.facts.buddy.host.tailscale.address}" >/dev/null; then
-          new_state="online"
-        else
-          new_state="offline"
-        fi
+      # Code must run _before_ anything is mounted at $location
+      mountpoint --quiet "$location" && exit 1
 
-        if [ "$new_state" != "$state" ]; then
-          if [ "$new_state" = "online" ]; then
-            systemctl start "${config.systemd.targets.buddy-online.name}"
-            echo "AVAILABLE transition" >&2
-          else
-            systemctl stop "${config.systemd.targets.buddy-online.name}"
-            echo "OFFLINE transition" >&2
-          fi
-
-          state="$new_state"
-        fi
-
-        if [ "$state" = "online" ]; then
-          # check less often when stable
-          sleep 60
-        else
-          # retry faster when buddy is offline
-          sleep 10
-        fi
-      done
+      setfattr -n user.mergerfs.branch_mounts_here "$location"
     '';
-    serviceConfig = {
-      Restart = "always";
-      RestartSec = 60;
-    };
+    serviceConfig.Type = "oneshot";
+    serviceConfig.RemainAfterExit = false;
+    unitConfig.DefaultDependencies = false;
   };
 
-  programs.ssh.knownHosts = {
-    "buddy".hostNames = [ fqdn-buddy ];
-    "buddy".publicKey =
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICj+WUMawU/pZ8yGJNeoL8vsc5B+LOi4Y7JTCG4bv4vp";
-  };
+  systemd.services."merger-fs-post@" = {
+    description = "Mount finalization for %I";
+    conflicts = [ "shutdown.target" ];
+    before = [ "shutdown.target" ];
+    path = [
+      pkgs.attr # setfattr
+    ];
+    enableStrictShellChecks = true;
+    scriptArgs = "'%I'";
+    script = ''
+      # ERROR; Path could have dropped root slash during conversion!
+      location="/$1"
 
-  # Make sure the fqdn of buddy resolves through tailscale!
-  networking.hosts."${ip-buddy}" = [ fqdn-buddy ];
+      # The directory is marked for mergerfs to differentiate mounted/to be mounted.
+      setfattr --name user.mergerfs.branch "$location"
+    '';
+    serviceConfig.Type = "oneshot";
+    serviceConfig.RemainAfterExit = false;
+    unitConfig.DefaultDependencies = false;
+  };
 
   programs.fuse = {
     # NOTE; Should put fuse2 and fuse3 on system PATH

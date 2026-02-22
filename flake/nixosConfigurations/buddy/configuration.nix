@@ -12,7 +12,7 @@
     ./hardware-configuration.nix
     ./identity.nix
     ./mail-transfer.nix
-    ./pictures.nix
+    ./pictures-provision.nix
     ./private-network.nix
     ./storage-provision.nix
     ./tls-termination.nix

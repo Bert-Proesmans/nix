@@ -6,11 +6,14 @@
   ...
 }:
 let
-  immichStatePath = "/var/lib/immich";
-  # Location for media while storage node is offline
-  immichVPSOnlineStoragePath = "/var/lib/local-immich";
-  # Location for external libraries
-  immichExternalStatePath = "/var/lib/immich-external";
+  # WARN; These paths are also hardcoded into the database and cannot be randomly changed!
+  immichStatePath = "/var/lib/immich"; # Read-write main library
+  # TODO; Make read-only!
+  immichExternalStatePath = "/var/lib/immich-external"; # external libraries
+  # sub-mount components
+  immichVPSOnlineStoragePath = "/var/lib/freddy-immich"; # Local cache
+  immichRclonePath = "/mnt/remote/buddy-sftp/chroot/pictures"; # Read-write network mounted data
+  buddyImmichExternalPath = "/mnt/remote/buddy-sftp/chroot/pictures-external";
 
   ip-freddy = config.proesmans.facts.freddy.host.tailscale.address;
   fqdn-freddy = "freddy.omega.proesmans.eu";
@@ -20,22 +23,17 @@ in
   disko.devices.zpool.zroot.datasets = {
     "encryptionroot/media/local-immich" = {
       type = "zfs_fs";
-      options.mountpoint = "/var/lib/local-immich";
+      options.mountpoint = immichVPSOnlineStoragePath;
       options.refquota = "10G";
     };
   };
 
-  systemd.tmpfiles.settings."10-immich" = {
-    "/var/lib/immich" = {
-      d = {
-        # REF; https://wiki.archlinux.org/title/SFTP_chroot#Setup_the_filesystem
-        user = "root";
-        group = "root";
-        mode = "0000";
-      };
-      # ERROR; Cannot use systemd-tmpfiles to coordinate fsattributes before mounting!
-      # Must apply immutable attribute manually!
-      # h.argument = "i"; # Immutable (chattr)
+  systemd.tmpfiles.settings = {
+    # NOTE; Upstream service configuration uses systemd-tmpfile configuration for a one-time mode change. big no-no!
+    immich = lib.mkForce { };
+
+    "10-immich-state".d = {
+      # NOTE; Must stub out directory because it might not be mounted yet
     };
   };
 
@@ -212,6 +210,22 @@ in
 
   systemd.mounts = [
     {
+      # Immich external library
+      conflicts = [ "umount.target" ];
+      # TODO; Verify if dependency on rclone's unit is enough to properly handle online/offline switching, and not hang the system.
+      requisite = [ "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount" ];
+      partOf = [ "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount" ];
+      what = buddyImmichExternalPath;
+      where = immichExternalStatePath;
+      type = "none";
+      options = lib.concatStringsSep "," [
+        "ro" # Read-only external library
+        "bind"
+      ];
+      unitConfig.RequiresMountsFor = [ buddyImmichExternalPath ];
+      unitConfig.DefaultDependencies = false;
+    }
+    {
       description = "Immich state directory";
       conflicts = [ "umount.target" ];
       after = [ "network.target" ];
@@ -221,8 +235,8 @@ in
       # 'NC' means no-create on the subject branch
       #
       # NOTE; Minimum free space is set larger than a single picture as to not run out of space halfway writing.
-      what = "${immichVPSOnlineStoragePath}=RW,10M:/mnt/remote/buddy-sftp/pictures=NC";
-      where = "/var/lib/immich";
+      what = "${immichVPSOnlineStoragePath}=RW,10M:${immichRclonePath}=NC";
+      where = immichStatePath;
       # Currently experimenting with mergerFS, I might be holding it wrong..
       # READ THE DOCS; https://trapexit.github.io/mergerfs/latest/quickstart/
       #
@@ -258,8 +272,8 @@ in
         DefaultDependencies = false;
         RequiresMountsFor = [ immichVPSOnlineStoragePath ];
         # ERROR; Attempting to load the sftp mount while the host is offline could lead to system hangs!
-        # DO NOT _just_ depend on the rclone mount without specialized reason!
-        # WantsMountsFor = [ "<buddy-pictures>" ];
+        # NOTE; The mount unit is guarded with buddy-online.target.
+        WantsMountsFor = [ immichRclonePath ];
       };
       mountConfig.TimeoutSec = 30;
     }
@@ -268,9 +282,15 @@ in
   systemd.automounts = [
     {
       # Since /var/lib/immich is not part of local-fs, add an automount so it gets ordered between services anyway.
-      description = "Automount for /var/lib/immich";
+      description = "Automount for ${immichStatePath}";
       wantedBy = [ "multi-user.target" ];
-      where = "/var/lib/immich";
+      where = immichStatePath;
+    }
+    {
+      # /var/lib/immich-external is also not part of local-fs
+      description = "Automount for ${immichExternalStatePath}";
+      wantedBy = [ "multi-user.target" ];
+      where = immichExternalStatePath;
     }
   ];
 
@@ -306,15 +326,6 @@ in
     '';
   };
 
-  systemd.tmpfiles.settings."10-immich-links" = {
-    "${immichExternalStatePath}"."L+" = {
-      # Link into remote mounted storage
-      #
-      # ERROR; Since this is a link, all path elements must be accessible by the immich user!
-      argument = "/mnt/remote/buddy-sftp/pictures-external";
-    };
-  };
-
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
     wantedBy = lib.mkForce [ ]; # DEBUG
     serviceConfig = {
@@ -323,13 +334,12 @@ in
 
       StateDirectory =
         assert immichStatePath == "/var/lib/immich";
-        # TODO; Figure out how to read-lock 'immichVPSOnlineStoragePath'
-        assert immichVPSOnlineStoragePath == "/var/lib/local-immich";
+        assert immichVPSOnlineStoragePath == "/var/lib/freddy-immich";
         [
           "immich/library"
           "immich/profile"
           # Online media cache directory. Added here to simplify file permissions.
-          "local-immich"
+          "freddy-immich"
         ];
       # Prevent others from peeping into the data
       StateDirectoryMode = "0750";

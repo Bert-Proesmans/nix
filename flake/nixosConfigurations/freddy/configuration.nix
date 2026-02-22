@@ -18,6 +18,7 @@
     ./passwords.nix
     ./pictures.nix
     ./private-network.nix
+    ./remote-buddy.nix
     ./remote-builder.nix
     ./remote-fs.nix
     ./tls-termination.nix
