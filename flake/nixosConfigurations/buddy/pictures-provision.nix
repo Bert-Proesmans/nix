@@ -175,4 +175,14 @@ in
     isSystemUser = true;
   };
   users.groups."pictures" = { };
+
+  services.postgresql = {
+    # ERROR; pg_dump: error: query failed: ERROR:  could not access file "$libdir/vchord": No such file or directory
+    # NOTE; To be able to manipulate immich database backups, the vector libraries must be present!
+    extensions = ps: [
+      ps.pgvector
+      ps.vectorchord
+    ];
+    settings.shared_preload_libraries = [ "vchord.so" ];
+  };
 }
