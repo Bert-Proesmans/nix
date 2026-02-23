@@ -107,6 +107,8 @@ in
       serviceConfig = { };
     };
     localSourceAllow = [
+      # WARN; Bookmarks won't cleanup themselves!
+      # TODO; Work out bookmark cleanup automation.
       "bookmark" # Keep reference point at source for later diffing with target
       "hold" # Don't touch source until transfer completes
       # ERROR; zfs-send cannot send incrementals (zfs send -I <snapshot> <snapshot>) without 'send' 🤔

@@ -119,7 +119,10 @@ in
     }
   ];
 
+  # ERROR; The user that triggers an automount impacts mount conditions! eg allow_other situation
   systemd.automounts = [
+    # NOTE; Automounts are not required when units are configured with Wants/RequiresMountsFor!
+    #
     # ERROR; Automount seems to be too eager and blocks various operations. MergerFS also causes userspace hangs during toplevel operations.
     # Better to explicitly mount when server comes online instead.
     # {

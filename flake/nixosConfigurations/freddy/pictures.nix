@@ -246,6 +246,8 @@ in
       # Targetted file work, like immich who has a file reference database, seems to work without any issues.
       type = "fuse.mergerfs";
       options = lib.concatStringsSep "," [
+        "rw"
+        "allow_other"
         # NOTE; I'm not caring about path transformation into specific mount, nor (tricky) behaviour on rename etc.
         # The purpose of mergerfs is to keep immich alive when the sftp mount hangs/fails(network unavailability).
         # This setup is flexible enough to add additional storage later.
@@ -279,19 +281,9 @@ in
     }
   ];
 
+  # ERROR; The user that triggers an automount impacts mount conditions! eg allow_other situation
   systemd.automounts = [
-    {
-      # Since /var/lib/immich is not part of local-fs, add an automount so it gets ordered between services anyway.
-      description = "Automount for ${immichStatePath}";
-      wantedBy = [ "multi-user.target" ];
-      where = immichStatePath;
-    }
-    {
-      # /var/lib/immich-external is also not part of local-fs
-      description = "Automount for ${immichExternalStatePath}";
-      wantedBy = [ "multi-user.target" ];
-      where = immichExternalStatePath;
-    }
+    # NOTE; Automounts are not required when units are configured with Wants/RequiresMountsFor!
   ];
 
   environment.systemPackages = [
@@ -374,6 +366,7 @@ in
       immichStatePath
       immichVPSOnlineStoragePath
     ];
+    unitConfig.WantsMountsFor = [ immichExternalStatePath ];
   };
 
   systemd.services.immich-move-data = {
