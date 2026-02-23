@@ -33,6 +33,7 @@
       autoprune = true;
       autosnap = false; # see WARN above
       monitor = false;
+      recursive = true; # NOT ATOMIC
 
       # Define what to keep.
       # NOTE; Backup targets either receive all snapshots or only the most recent (of type frequently)
