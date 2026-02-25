@@ -12,6 +12,9 @@
       "-s default,100m"
       # cache on disk, as preallocated file
       "-s file,/var/cache/varnishd/cachefile.bin,10G"
+      # open port for admin interface (connect with varnishadm)
+      # SEEALSO; systemd.services.varnish.serviceConfig.IPAddressAllow
+      # "-T 127.0.0.1:42057" # Default
     ];
     listen = [
       {
@@ -175,6 +178,11 @@
         # Proceed with builtin default action
       }
 
+      #
+      # Debug requests with; varnishlog -g request -q 'ReqUrl eq "/<path to thing>"'
+      # eg varnishlog -g request -q 'ReqUrl eq "/api/server/media-types"'
+      #
+
       sub vcl_hit {
         # Called when a cache lookup is succesful..
 
@@ -329,6 +337,7 @@
         "AF_INET"
       ];
       IPAddressDeny = "any"; # WORKAROUND
+      IPAddressAllow = "localhost";
     };
   };
 }
