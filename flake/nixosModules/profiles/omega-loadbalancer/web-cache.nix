@@ -50,8 +50,8 @@
 
           .interval  = 5s;  # check the health of each backend every 5 seconds
           .timeout   = 10s; # timing out after 1 second.
-          .window    = 5;   # If 2 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
-          .threshold = 2;
+          .window    = 5;   # If 4 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
+          .threshold = 4;
         }
       }
 

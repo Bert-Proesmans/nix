@@ -178,9 +178,8 @@ in
 
         listen tls_cache
           description Terminate TLS before forwarding to Varnish
-          # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
-          # to workaround in haproxy.
-          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn http/1.1 accept-proxy
+          # ERROR; WHATEVER THE FUCK FIREFOX IS DOING - negotiating http1 but then sending http2 formatted requests ??
+          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
           mode http
           
           log global
@@ -193,27 +192,25 @@ in
           timeout client 10m
 
           # Let Varnish know about the original client request
-          http-request set-header X-Forwarded-Proto https
-          http-request set-header X-Forwarded-Host %[req.hdr(Host)]
+          http-request set-header X-Forwarded-Proto %[ssl_fc,iif(https,http)]
+          http-request set-header X-Forwarded-Host %[req.hdr(host)]
           http-request set-header X-Forwarded-Server %[hostname]
 
-          # Detect http1.1 websocket and redirect
-          acl is_websocket hdr(Upgrade) -i WebSocket
-          acl is_upgrade hdr_beg(Connection) -i Upgrade
-          # ERROR; 503 Service Unavailable
-          # The host header must be fixed or connection fails due to TLS verification
-          # http-request set-header Host alpha.pictures.proesmans.eu if is_websocket || is_upgrade
-          # use_backend forward_to_buddy if is_websocket || is_upgrade
-          http-request set-header Host omega.pictures.proesmans.eu if is_websocket || is_upgrade
-          use_backend forward_to_freddy if is_websocket || is_upgrade
+          # NOTE; I gave up matching headers, since that produced very strange results!
+          acl is_pictures_host hdr_end(host) -i pictures.proesmans.eu
+          acl is_pictures_ws_path path_beg -i /api/socket.io/
+          
+          http-request set-header Host omega.pictures.proesmans.eu if is_pictures_host
+          use_backend forward_to_freddy if is_pictures_host is_pictures_ws_path
 
+          # Default
           server local-varnish unix@/run/varnishd/frontend.sock send-proxy-v2
 
         listen forward_to_buddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
           # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
           # to workaround in haproxy.
-          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn http/1.1 accept-proxy
+          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
           mode http
 
           no log
@@ -237,13 +234,13 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
 
         listen forward_to_freddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
           # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
           # to workaround in haproxy.
-          bind unix@/run/haproxy/forward_to_freddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn http/1.1 accept-proxy
+          bind unix@/run/haproxy/forward_to_freddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
           mode http
 
           no log
@@ -267,7 +264,7 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server buddy ${upstream.freddy.location} send-proxy-v2 sni req.hdr(host) alpn http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server freddy ${upstream.freddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
       '';
     };
 
