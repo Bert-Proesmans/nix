@@ -34,10 +34,13 @@ in
 
     "/mnt/remote".d = {
       # ERROR; Must restrict this directory because otherwise every user is allowed to read contents of the buddy host!
+      # HINT; Use setfacl to allowlist users that need access through this path, for example fuse users (the kernel validates the entire path chain!)
       user = "root";
       group = "root";
       mode = "0000";
     };
+    # NOTE; Open up mask to selectively allow through users
+    "/mnt/remote"."a+".argument = "mask::r-x";
     "/mnt/remote/buddy-sftp".d = { };
     # NOTE; Premount directory creation necessary for mergerfs tags to improve merger intelligence
     "/mnt/remote/buddy-sftp/chroot/pictures".d = { };

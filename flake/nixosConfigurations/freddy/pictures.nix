@@ -32,9 +32,17 @@ in
     # NOTE; Upstream service configuration uses systemd-tmpfile configuration for a one-time mode change. big no-no!
     immich = lib.mkForce { };
 
-    "10-immich-state".d = {
-      # NOTE; Must stub out directory because it might not be mounted yet
-    };
+    "10-immich-state" =
+      assert config.users.users."immich".name == "immich";
+      {
+        # ERROR; MergerFS destination mount is seemingly empty/has partial files available.
+        # NOTE; FUSE/MergerFS doesn't work like bind and requires all path element to be accessible by the querying user!
+        #
+        # NOTE; Using file-ACL, immich is allowed through the zero permissions remote landing zone.
+        "/mnt/remote"."a+".argument = "user:immich:r-x";
+        # NOTE; Create directory structure for rclone mount
+        "${immichRclonePath}".d = { };
+      };
   };
 
   # @@ IMMICH media location @@
