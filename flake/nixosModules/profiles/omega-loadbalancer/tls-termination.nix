@@ -235,7 +235,7 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
 
         listen forward_to_freddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
@@ -265,7 +265,7 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server freddy ${upstream.freddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server freddy ${upstream.freddy.location} send-proxy-v2 alpn h2,http/1.1 sni req.hdr(host) ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt check no-check-ssl
       '';
     };
 
