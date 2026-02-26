@@ -211,7 +211,7 @@ in
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
           # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
           # to workaround in haproxy.
-          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 accept-proxy
           mode http
 
           no log
@@ -238,10 +238,9 @@ in
           server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
 
         listen forward_to_freddy
-          description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
-          # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
-          # to workaround in haproxy.
-          bind unix@/run/haproxy/forward_to_freddy.sock group ${config.users.groups.haproxy.name} mode 660 alpn h2,http/1.1 accept-proxy
+          description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to freddy with TLS
+          bind unix@/run/haproxy/forward_to_freddy.sock group ${config.users.groups.haproxy.name} mode 660 accept-proxy
+          # bind :8080 v4v6 # DEBUG
           mode http
 
           no log
