@@ -82,7 +82,9 @@
           
           # inspect clienthello to get SNI
           tcp-request inspect-delay 5s
-          tcp-request content accept if { req_ssl_hello_type 1 }
+          # reject stream if no clienthello was provided!
+          tcp-request content accept if { req.ssl_hello_type 1 } { req.ssl_sni -m found }
+          tcp-request content reject
 
           # route by SNI
           use_backend passthrough_kanidm if { req.ssl_sni -i ${lib.escapeShellArg services.idm.hostname} idm.proesmans.eu }
