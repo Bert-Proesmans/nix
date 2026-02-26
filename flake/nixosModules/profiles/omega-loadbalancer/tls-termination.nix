@@ -172,16 +172,15 @@ in
 
         ## CACHING BACKEND ##
 
-        crt-store omega
-          crt-base '${config.security.acme.certs."omega-services.proesmans.eu".directory}'
-          key-base '${config.security.acme.certs."omega-services.proesmans.eu".directory}'
+        crt-store cache-omega
+          crt-base '${config.security.acme.certs."cache-omega-services.proesmans.eu".directory}'
+          key-base '${config.security.acme.certs."cache-omega-services.proesmans.eu".directory}'
           # NOTE; Wildcard + multiple domains certificate
           load crt 'fullchain.pem' key 'key.pem'
 
         listen tls_cache
           description Terminate TLS before forwarding to Varnish
-          # ERROR; WHATEVER THE FUCK FIREFOX IS DOING - negotiating http1 but then sending http2 formatted requests ??
-          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
+          bind unix@/run/haproxy/tls_cache.sock mode 600 ssl crt '@cache-omega/fullchain.pem' alpn h2,http/1.1 accept-proxy
           mode http
           
           log global
@@ -270,14 +269,23 @@ in
       '';
     };
 
+  security.acme = {
+    certs."cache-omega-services.proesmans.eu" = {
+      group = config.users.groups.haproxy.name;
+      reloadServices = [
+        config.systemd.services.haproxy.name
+      ];
+    };
+  };
+
   systemd.services.haproxy = {
-    requires = [ "acme-omega-services.proesmans.eu.service" ];
-    after = [ "acme-omega-services.proesmans.eu.service" ];
+    # NOTE; Only cache-omega because haproxy terminates for varnish only
+    requires = [ "acme-cache-omega-services.proesmans.eu.service" ];
+    after = [ "acme-cache-omega-services.proesmans.eu.service" ];
     serviceConfig = {
       RestartSec = "5s";
       SupplementaryGroups = [
         # Allow Haproxy access to /run/nginx/virtualhosts.sock
-        # Allow access to the ACME cert "omega-services.proesmans.eu"
         config.users.groups.nginx.name
         # Allow Haproxy access to /run/varnishd/frontend.sock
         config.users.groups.varnish.name
@@ -316,7 +324,7 @@ in
       "default.omega.proesmans.eu" = {
         default = true;
         # WARN; Nginx only receives TLS requests and a default instance also needs correct TLS configuration.
-        useACMEHost = "omega-services.proesmans.eu";
+        useACMEHost = "local-omega-services.proesmans.eu";
         onlySSL = true;
         # ERROR; Browsers reuse the same connection(s) (in HTTP/2 MODE) when servers present a certificate that is valid
         # for the typed domain. Haproxy, proxying based on TLS SNI, could send the wrong request to an earlier forwarded upstream.
@@ -342,18 +350,17 @@ in
   };
 
   security.acme = {
-    certs."omega-services.proesmans.eu" = {
+    certs."local-omega-services.proesmans.eu" = {
       group = config.users.groups.nginx.name;
       reloadServices = [
-        config.systemd.services.haproxy.name
         config.systemd.services.nginx.name
       ];
     };
   };
 
   systemd.services.nginx = {
-    requires = [ "acme-omega-services.proesmans.eu.service" ];
-    after = [ "acme-omega-services.proesmans.eu.service" ];
+    requires = [ "acme-local-omega-services.proesmans.eu.service" ];
+    after = [ "acme-local-omega-services.proesmans.eu.service" ];
 
     serviceConfig = {
       # Restrict nginx from doing anything outside of muxing between unix socket and upstream services

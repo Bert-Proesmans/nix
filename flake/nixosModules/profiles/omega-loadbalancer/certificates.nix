@@ -19,13 +19,24 @@
       dnsResolver = "1.1.1.1:53";
     };
 
-    certs."omega-services.proesmans.eu" = {
-      domain = lib.mkForce "omega.proesmans.eu";
+    certs."local-omega-services.proesmans.eu" = {
+      # Not wildcard domain because service proxying is split between different machines!
+      # REF; https://serverfault.com/a/1015832
+      # SEEALSO; servic
+      extraDomainNames = lib.mkForce [
+        "default.omega.proesmans.eu"
+        "status.proesmans.eu"
+        "omega.status.proesmans.eu"
+      ];
+    };
+
+    certs."cache-omega-services.proesmans.eu" = {
+      # WARN; Not wildcard domain because service proxying is split between different machines!
+      # REF; https://serverfault.com/a/1015832
+      # SEEALSO; services.nginx.virtualHosts."default.omega.proesmans.eu"
       extraDomainNames = lib.mkForce [
         "pictures.proesmans.eu"
         "omega.pictures.proesmans.eu"
-        "status.proesmans.eu"
-        "omega.status.proesmans.eu"
       ];
     };
   };

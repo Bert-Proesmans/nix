@@ -235,7 +235,7 @@ in
   };
 
   services.nginx.virtualHosts."omega.status.proesmans.eu" = {
-    useACMEHost = "omega-services.proesmans.eu";
+    useACMEHost = "local-omega-services.proesmans.eu";
     onlySSL = true;
     serverAliases = [ "status.proesmans.eu" ];
     locations."/" = {
