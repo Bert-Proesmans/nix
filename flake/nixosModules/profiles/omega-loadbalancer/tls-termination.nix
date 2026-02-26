@@ -311,9 +311,19 @@ in
     ];
 
     virtualHosts = {
-      "default" = {
+      "default.omega.proesmans.eu" = {
         default = true;
-        locations."/".return = "404";
+        # WARN; Nginx only receives TLS requests and a default instance also needs correct TLS configuration.
+        useACMEHost = "omega-services.proesmans.eu";
+        onlySSL = true;
+        # ERROR; Browsers reuse the same connection(s) (in HTTP/2 MODE) when servers present a certificate that is valid
+        # for the typed domain. Haproxy, proxying based on TLS SNI, could send the wrong request to an earlier forwarded upstream.
+        # WARN; In my setup I use multiple certificates, the problematic situation is using _the same_ wildcard certificate for
+        # services hosted on two different systems (like STATUS <-> PICTURES).
+        # Returning 421 "Misdirected Request" will trigger the browser to use another connection.
+        # REF; https://serverfault.com/a/1015832
+        # REF; https://bugzilla.mozilla.org/show_bug.cgi?id=1222136
+        locations."/".return = "421 'Misdirected Request'";
       };
     };
   };
