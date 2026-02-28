@@ -281,12 +281,12 @@
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 10s; # serving from cache
+          set beresp.ttl = 10m; # serving from cache
           set beresp.grace = 1h; # serving from cache with attempting refresh on client request
         }
 
         # These are specifically the media files!
-        if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original)") {
+        if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)") {
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
