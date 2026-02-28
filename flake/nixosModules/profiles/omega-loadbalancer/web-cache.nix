@@ -99,6 +99,13 @@
           return (pass);
         }
 
+        if (req.http.Range) {
+          # NOTE; Varnish will fire a normal (full-range) request to the backend to cache the entire object. Clients will be able
+          # to request specific ranges for as long as the object is in cache.
+          # WARN; The cache object is locked while streaming to the first requesting client. I'm not sure if/how this can be fixed.
+          # return (pass);
+        }
+
         # --- Some generic URL manipulation ---
         # Normalize the query arguments
         set req.url = std.querysort(req.url);
@@ -182,6 +189,8 @@
       #
       # Debug requests with; varnishlog -g request -q 'ReqUrl eq "/<path to thing>"'
       # eg varnishlog -g request -q 'ReqUrl eq "/api/server/media-types"'
+      # eg varnishlog -g request -q 'ReqUrl ~ "video/playback$"'
+      # eg varnishlog -g request -q 'RespStatus eq 206'
       #
 
       sub vcl_hit {
@@ -244,6 +253,12 @@
         # Allow serving stale content in case the backend goes down.
         # The cache will still attempt to revalidate these objects at client request.
         set beresp.grace = 1m;
+
+        if (bereq.http.Range) {
+          # Response containers data for requested range. Disable store-and-forward, stream instantly instead.
+          # NOTE; do_stream = true _does not_ skip caching the object! To skip cache entirely it's still required to return(pass).
+          set beresp.do_stream = true;
+        }
 
         if (beresp.http.ETag || beresp.http.Last-Modified) {
           # Response has appropriate headers for efficient stale checks.
