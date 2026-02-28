@@ -206,40 +206,23 @@ in
           acl is_pictures_ws_path path_beg -i /api/socket.io/
           
           http-request set-header Host omega.pictures.proesmans.eu if is_pictures_host
-          use_backend forward_to_freddy if is_pictures_host is_pictures_ws_path
+          # ERROR; Split backend from path varnish -> haproxy due to http version with connection multiplexer mismatches!
+          use_backend direct_to_freddy if is_pictures_host is_pictures_ws_path
 
           # Default
           server local-varnish unix@/run/varnishd/frontend.sock send-proxy-v2
 
-        listen forward_to_buddy
-          description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to buddy with TLS
-          # WARN; Dropped http2 because Firefox does not properly handshake websockets over http2. And it's too much hassle
-          # to workaround in haproxy.
-          bind unix@/run/haproxy/forward_to_buddy.sock group ${config.users.groups.haproxy.name} mode 660 accept-proxy
+
+        backend direct_to_freddy
+          description Separate backend to properly split websocket from cache traffic. Pushing both over the same backend causes h1 packets on h2 multiplexer and other way around.
           mode http
 
-          no log
-
           option http-server-close
-          # Larger timeout for upload/download
-          timeout server 10m
-          timeout client 10m
+          # no log
+          log global
 
-          # Haproxy sets up its own TLS tunnel instead of forwarding the tunnel creation.
-          #
-          # NOTE; sni override is explicitly required if request headers, like host, were manipulated for upstream use! Before entering
-          # this (backend) block the sni must be known!
-          #
-          # ERROR; sni argument is processed _before_ per-request set-headers are in effect!
-          # DO NOT USE 'sni %[var(req.new_host)]' => Doesn't evaluate because variable doesn't exist when upstream connection
-          # is created.
-          # USE 'sni req.hdr(host)' => If the frontend has corrected to the right upstream hostname
-          #
-          # NOTE; Using http2 protocol with reused backend connections should(?) reduce tcp connection overhead lowering total latency through channel multiplexing.
-          # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
-          #
-          # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server buddy ${upstream.buddy.location} send-proxy-v2 sni req.hdr(host) alpn h2,http/1.1 check ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt
+          server freddy ${upstream.freddy.location} send-proxy-v2 alpn h2,http/1.1 sni req.hdr(host) ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt check no-check-ssl
+
 
         listen forward_to_freddy
           description Varnish community edition cannot upstream-connect over TLS, so this stanza wraps non-TLS requests to freddy with TLS
@@ -247,9 +230,12 @@ in
           # bind :8080 v4v6 # DEBUG
           mode http
 
-          no log
+          # no log
+          log global
+          option httplog
+          option dontlognull
 
-          option http-server-close
+          no option checkcache
           # Larger timeout for upload/download
           timeout server 10m
           timeout client 10m
