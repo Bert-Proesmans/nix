@@ -52,9 +52,10 @@
             "User-Agent: Varnish Health Probe";
 
           .interval  = 5s;  # check the health of each backend every 5 seconds
-          .timeout   = 10s; # timing out after 1 second.
-          .window    = 5;   # If 4 out of the last 5 polls succeeded the backend is considered healthy, otherwise it will be marked as sick
-          .threshold = 4;
+          .timeout   = 10s; # timing out after 10 seconds.
+          .window    = 10;   # If 8 out of the last 10 polls succeeded the backend is considered healthy
+          .threshold = 8;
+          .initial = 6;
         }
       }
 
