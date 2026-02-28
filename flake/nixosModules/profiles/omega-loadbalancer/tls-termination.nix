@@ -63,9 +63,13 @@ in
       # timeout server-fin 1s #
       config = ''
         global
+          # DEBUG
+          # stats socket /run/haproxy/haproxy.sock mode 600 expose-fd listeners level admin
+          
           log stdout format raw local0 info
           # DEBUG
           # log stdout format raw local0 notice
+
           # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
           # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
           #
@@ -371,4 +375,10 @@ in
       IPAddressAllow = "127.0.0.0/8";
     };
   };
+
+  environment.systemPackages = [
+    # NOTE; Querying haproxy admin socket requires socat eg;
+    # echo "show errors" | sudo -u haproxy socat stdio /run/haproxy/haproxy.sock
+    pkgs.socat
+  ];
 }
