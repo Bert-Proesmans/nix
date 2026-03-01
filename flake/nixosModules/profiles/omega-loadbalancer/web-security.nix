@@ -40,6 +40,18 @@ in
           labels.type = "haproxy";
         })
       ];
+
+      parsers = {
+        # NOTE; Parsing happening on each log line
+        s02Enrich = [
+          # NOTE; The scenario http-probing triggers after collecting multiple infringements.
+          # This whitelist processor must run on _each_ log line to prevent the remediation!
+          (import ./crowdsec/s02-immich-thumbnail-whitelist.nix)
+        ];
+      };
+      postOverflows = {
+        # NOTE; Section for expensive operations
+      };
     };
 
     hub = {
