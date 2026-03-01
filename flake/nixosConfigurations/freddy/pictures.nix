@@ -395,7 +395,7 @@ in
       config.systemd.targets."buddy-online".name
     ];
     # systemd-analyze calendar <pattern>
-    # startAt = "*-*-* *:00/10:00"; # DEBUG
+    startAt = "*-*-* *:01/28:00";
     path = [
       pkgs.mergerfs-tools # mergerfs.balance
       pkgs.rsync
@@ -412,8 +412,8 @@ in
 
       # NOTE; More branches will require some type of disk usage balancing.
       # eg; mergerfs.balance "$immich_state_path" (BUT this is not a perfect match for use-case)
-      source_path="/var/lib/local-immich"
-      target_path="/mnt/remote/buddy-sftp/pictures"
+      source_path="${immichVPSOnlineStoragePath}"
+      target_path="${immichRclonePath}"
       rsync ${
         lib.concatStringsSep " " [
           "--compress" # Attempt to transfer less bits
