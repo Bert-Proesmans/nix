@@ -45,6 +45,12 @@ in
       };
   };
 
+  sops.secrets = {
+    # Passwords are injected using root privileges.
+    "immich-smtp" = { };
+    "immich-oauth-secret" = { };
+  };
+
   # @@ IMMICH media location @@
   # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
   # "library" => Originals are stored here => main dataset
@@ -172,42 +178,41 @@ in
       map.enabled = true;
       map.lightStyle = "https://tiles.immich.cloud/v1/style/light.json";
       newVersionCheck.enabled = false;
-      # notifications.smtp = {
-      #   enabled = true;
-      #   from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
-      #   replyTo = "pictures@proesmans.eu";
-      #   transport = {
-      #     host = fqdn-freddy;
-      #     ignoreCert = false;
-      #     username = "immich";
-      #     password._secret = config.sops.secrets."immich-smtp".path;
-      #     port = config.proesmans.facts.freddy.service.mail.port; # TLS ON
-      #     secure = true; # TLS ON
-      #   };
-      # };
-      # oauth = {
-      #   enabled = true;
-      #   autoRegister = true;
-      #   buttonText = "Login met Proesmans account";
-      #   clientId = "photos";
-      #   # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
-      #   clientSecret._secret = config.sops.secrets."immich-oauth-secret".path;
-      #   defaultStorageQuota = 500;
-      #   # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
-      #   # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
-      #   # issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
-      #   issuerUrl = "https://alpha.idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
-      #   mobileOverrideEnabled = false;
-      #   mobileRedirectUri = "";
-      #   profileSigningAlgorithm = "none";
-      #   scope = "openid email profile";
-      #   signingAlgorithm = "RS256";
-      #   # NOTE; Immich currently ONLY applies these claims during account creation!
-      #   # ERROR; storage label _must_ be unique for each user (or unset)!
-      #   # Trying to group media from multiple users behind the same label is a wrong assumption.
-      #   storageLabelClaim = "preferred_username";
-      #   storageQuotaClaim = "immich_quota";
-      # };
+      notifications.smtp = {
+        enabled = true;
+        from = "Pictures | Proesmans.eu <pictures@proesmans.eu>";
+        replyTo = "pictures@proesmans.eu";
+        transport = {
+          host = fqdn-freddy;
+          ignoreCert = false;
+          username = "immich";
+          password._secret = config.sops.secrets."immich-smtp".path;
+          port = config.proesmans.facts.freddy.service.mail.port; # TLS ON
+          secure = true; # TLS ON
+        };
+      };
+      oauth = {
+        enabled = true;
+        autoRegister = true;
+        buttonText = "Login met Proesmans account";
+        clientId = "photos";
+        # Set placeholder value for secret, sops-template will replace this value at activation stage (secret decryption)
+        clientSecret._secret = config.sops.secrets."immich-oauth-secret".path;
+        defaultStorageQuota = 500;
+        # ERROR; OpenID specification does not allow redirects for openid-configuration endpoint!
+        # It's also unspecified that redirects are accepted on other defined endpoints eg, /token, /userinfo
+        issuerUrl = "https://idm.proesmans.eu/oauth2/openid/photos/.well-known/openid-configuration";
+        mobileOverrideEnabled = false;
+        mobileRedirectUri = "";
+        profileSigningAlgorithm = "none";
+        scope = "openid email profile";
+        signingAlgorithm = "RS256";
+        # NOTE; Immich currently ONLY applies these claims during account creation!
+        # ERROR; storage label _must_ be unique for each user (or unset)!
+        # Trying to group media from multiple users behind the same label is a wrong assumption.
+        storageLabelClaim = "preferred_username";
+        storageQuotaClaim = "immich_quota";
+      };
       # passwordLogin.enabled = false;
       passwordLogin.enabled = true; # Enable for maintenance work
       reverseGeocoding.enabled = true;
