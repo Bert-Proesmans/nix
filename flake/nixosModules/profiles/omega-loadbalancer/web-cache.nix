@@ -91,10 +91,11 @@
           return (synth(404));
         }
 
-        # --- Skip caching status endpoints ---
-        if(req.url ~ "^/status") {
+        # --- Skip caching ---
+        if (req.method != "GET" && req.method != "HEAD") {
           return (pass);
         }
+        
         if(req.http.X-Backend == "pictures" && req.url ~ "^/api/server/ping") {
           return (pass);
         }
@@ -317,6 +318,13 @@
         }
 
         # builtin.vcl does nothing..
+      }
+
+      sub vcl_synth {
+        # Up to Varnish current (v7.7) only action 'deliver' adds a http-header 'via'.
+        # Since Varnish v7.2 there is a via header added/appended to the request before vcl_recv, so we can reuse that header value
+        # copied to the response.
+        set resp.http.via = req.http.via;
       }
     '';
   };
