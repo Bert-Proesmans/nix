@@ -114,6 +114,7 @@ in
     settings = {
       backup.database.enabled = false;
       ffmpeg = {
+        # WARN; Encode/Decode acceleration does not work on ORACLE Ampere hosts!
         accel = "vaapi";
         accelDecode = true;
         # preferredHwDevice = "renderD128"; # /dev/dri node
@@ -143,7 +144,13 @@ in
           #"webm" # Too new (related to vp8/vp9/av1), optimized for device support
         ];
       };
-      image.preview.size = 1080;
+      image = {
+        # Thumbnail/re-encoding settings
+        preview.size = 1080;
+        # NOTE; Progressive setting only works on JPEG types (preview images are JPEG by default)
+        preview.progressive = true;
+        thumbnail.progressive = true;
+      };
       library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00 (@configured timezone)
       library.scan.enabled = true;
       logging.enabled = true;
