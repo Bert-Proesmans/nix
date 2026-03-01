@@ -16,8 +16,10 @@
       UUID_pattern = "[A-Fa-f0-9]{8}-(?:[A-Fa-f0-9]{4}-){3}[A-Fa-f0-9]{12}";
     in
     {
-      reason = "GET <asset>/video/playback";
+      reason = "Early abort GET <asset>/<thumbnail>";
       expression = [
+        # eg /api/assets/3f43e1e8-8360-416e-a0cd-e3694ccb4054/thumbnail?size=thumbnail&c=nRgGE4KBmB9SqvQNn3z4yWY%3D&edited=true
+        "evt.Meta.http_verb == 'GET' && evt.Meta.http_status == '400' && evt.Meta.http_path matches '/api/assets/${UUID_pattern}/thumbnail'"
         # eg /api/assets/85095e95-619c-448b-9f06-ec32a4f408f2/video/playback?c=XQgKBQDlmw9hx12Gqol5h49y90hI
         "evt.Meta.http_verb == 'GET' && evt.Meta.http_status == '400' && evt.Meta.http_path matches '/api/assets/${UUID_pattern}/video/playback'"
       ];
