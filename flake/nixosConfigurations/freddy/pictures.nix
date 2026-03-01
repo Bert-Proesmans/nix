@@ -327,7 +327,6 @@ in
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
-    wantedBy = lib.mkForce [ ]; # DEBUG
     serviceConfig = {
       # NOTE; Immich state layout contains links into temporary directory
       PrivateTmp = true;
@@ -389,7 +388,7 @@ in
       config.systemd.targets."buddy-online".name
     ];
     # systemd-analyze calendar <pattern>
-    # startAt = "*-*-* *:00/10:00";
+    # startAt = "*-*-* *:00/10:00"; # DEBUG
     path = [
       pkgs.mergerfs-tools # mergerfs.balance
       pkgs.rsync
