@@ -58,6 +58,8 @@ in
       conflicts = [ "umount.target" ];
       # Need these units but won't queue a startjob if they aren't active
       requisite = [ config.systemd.targets."buddy-online".name ];
+      # WARN; The mount _does_ autostop if connection with buddy dissapears and shutdown can happen cleanly!
+      wantedBy = [ config.systemd.targets."buddy-online".name ];
       wants = [
         "merger-fs-pre@${utils.escapeSystemdPath "/mnt/remote/buddy-sftp/chroot/pictures"}.service"
         # ERROR; SFTP carrier does not support file attributes, marker cannot be set!
