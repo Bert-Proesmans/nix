@@ -222,8 +222,8 @@ in
         storageLabelClaim = "preferred_username";
         storageQuotaClaim = "immich_quota";
       };
-      # passwordLogin.enabled = false;
-      passwordLogin.enabled = true; # Enable for maintenance work
+      passwordLogin.enabled = false;
+      # passwordLogin.enabled = true; # Enable for maintenance work
       reverseGeocoding.enabled = true;
       server.externalDomain = "https://pictures.proesmans.eu";
       server.loginPageMessage = "Proesmans fotos, klik op de knop onderaan om verder te gaan";
