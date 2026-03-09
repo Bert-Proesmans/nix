@@ -363,6 +363,35 @@ in
         ];
       # Prevent others from peeping into the data
       StateDirectoryMode = "0750";
+
+      ExecStartPre =
+        let
+          # There is no declarative way to configure the temporary directory with these constraints;
+          # - In a dedicated filesystem namespace for the service
+          # - While Immich gets full control over 'immichStatePath/upload'
+          # - While 'immichStatePath/upload/.immich' exists when immich starts up
+          #
+          # So a preStart script must be used!
+          setupUploadsPath = pkgs.writeShellApplication {
+            name = "setup-immich-uploads";
+            runtimeInputs = [ pkgs.coreutils ];
+            text = ''
+              # NOTE; Script must run as immich user!
+
+              TEMP="''${TMPDIR:-/var/tmp}"
+              mkdir --parents "$TEMP/upload"
+              # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
+              # the immich startup check.
+              touch "$TEMP/upload/.immich"
+              # Create link "${immichStatePath}/upload" pointing to "$TEMP/upload"
+              ln --symbolic --force --no-target-directory "$TEMP/upload" "${immichStatePath}/upload"
+            '';
+          };
+        in
+        [
+          # WARN; Temporary directory access required!
+          (lib.getExe setupUploadsPath)
+        ];
     };
 
     unitConfig.RequiresMountsFor = [
