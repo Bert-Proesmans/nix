@@ -244,9 +244,27 @@
 
       sub vcl_backend_response {
         # SEEALSO; sub vcl_recv
-        if (beresp.status == 500 || beresp.status == 502 || beresp.status == 503 || beresp.status == 504) {
-          # Don't cache 50x responses
-          return (abandon);
+
+        # NOTE; There are no defined status codes at 6xx and beyond
+        if (beresp.status >= 500) {
+          if (bereq.is_bgfetch) {
+            # The client received a cached object, and that triggered an asynchoronus background update. 
+            # If the response is 5xx we have to abandon, otherwise the previously cached object would be erased from the cache.
+            # WARN; 5xx response is also _just_ a response
+            return (abandon);
+          }
+
+          # Don't cache 50x response bodies.
+          # WARN; Varnish _caches_ the uncacheable state (hit-for-miss)! This allows in-flight requests to also merge together,
+          # just like normal caching behaviour, and improve (lower) latency.
+          set beresp.uncacheable = true;
+        }
+
+        if(beresp.status == 404) {
+          # Temporarily cache resource not found, it's a retryable state.
+          set beresp.ttl = 1m;
+          set beresp.grace = 10m;
+          return (deliver);
         }
 
         # Attempt a default TTL otherwise a hit-for-miss is served.
