@@ -19,7 +19,20 @@ let
   fqdn-freddy = "freddy.omega.proesmans.eu";
 in
 {
-
+  # @@ IMMICH media location @@
+  # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
+  # "library" => Originals are stored here => main dataset
+  # "profile" => Original profile images are stored here => main dataset
+  # "thumbs" => re-encoded material => cache dataset
+  # "encoded-video" => re-encoded material => cache dataset
+  # "upload" => uploaded fragments => /var/tmp
+  # "backups" => currently disabled, could mount a remote fs into this location one day
+  #
+  # NOTE; External libraries can be located anywhere, as long as the immich service user has read access. Prefer to make these location
+  # read-only.
+  #
+  # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
+  # The state directory will point to the storage pool dataset, and symlinks will point to the other datasets.
   disko.devices.zpool.zroot.datasets = {
     "encryptionroot/media/local-immich" = {
       type = "zfs_fs";
@@ -42,6 +55,16 @@ in
         "/mnt/remote"."a+".argument = "user:immich:r-x";
         # NOTE; Create directory structure for rclone mount
         "${immichRclonePath}".d = { };
+
+        # WARN; Immich library directories are not auto-constructed to trigger a hard fail should something go terribly
+        # wrong with mounting!
+        # NOTE; Immich expects the following directories/files to exist during startup
+        # - immichVPSOnlineStoragePath/encoded-video/.immich
+        # - immichVPSOnlineStoragePath/library/.immich
+        # - immichVPSOnlineStoragePath/profile/.immich
+        # - immichVPSOnlineStoragePath/thumbs/.immich
+        # - immichVPSOnlineStoragePath/upload/.immich
+        # - immichVPSOnlineStoragePath/backups/.immich
       };
   };
 
@@ -51,20 +74,6 @@ in
     "immich-oauth-secret" = { };
   };
 
-  # @@ IMMICH media location @@
-  # Immich expects a specific directory structure inside its state directory (immichStatePath == config.services.immich.mediaLocation)
-  # "library" => Originals are stored here => main dataset
-  # "profile" => Original profile images are stored here => main dataset
-  # "thumbs" => re-encoded material => cache dataset
-  # "encoded-video" => re-encoded material => cache dataset
-  # "upload" => uploaded fragments => /var/tmp
-  # "backups" => currently disabled, could mount a remote fs into this location one day
-  #
-  # NOTE; External libraries can be located anywhere, as long as the immich service user has read access. Prefer to make these location
-  # read-only.
-  #
-  # NOTE; Immich calculates free space from the filesystem where its state directory exists on.
-  # The state directory will point to the storage pool dataset, and symlinks will point to the other datasets.
   services.immich = {
     enable = true;
     host = "127.0.0.1";
@@ -122,7 +131,7 @@ in
       ffmpeg = {
         # WARN; Encode/Decode acceleration does not work on ORACLE Ampere hosts!
         accel = "vaapi";
-        accelDecode = true;
+        accelDecode = false;
         # preferredHwDevice = "renderD128"; # /dev/dri node
         cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
         targetAudioCodec = "aac"; # optimized for device compatibility
@@ -354,31 +363,6 @@ in
         ];
       # Prevent others from peeping into the data
       StateDirectoryMode = "0750";
-
-      ExecStartPre =
-        let
-          # There is no declarative way to configure the temporary directories. Also Immich expects full control over 'immichStatePath'
-          # while its contents remain 100% persistent. Not all directory contents are fully persisted to optimize disk space usage.
-          setupUploadsPath = pkgs.writeShellApplication {
-            name = "setup-immich-uploads";
-            runtimeInputs = [ pkgs.coreutils ];
-            text = ''
-              # NOTE; Script must run as immich user!
-
-              TEMP="''${TMPDIR:-/var/tmp}"
-              mkdir --parents "$TEMP/upload"
-              # ERROR; The hidden '.immich' file must exist/be recreated for every folder inside 'immichStatePath', this is part of
-              # the immich startup check.
-              touch "$TEMP/upload/.immich"
-              # Create link "${immichStatePath}/upload" pointing to "$TEMP/upload"
-              ln --symbolic --force --no-target-directory "$TEMP/upload" "${immichStatePath}/upload"
-            '';
-          };
-        in
-        [
-          # WARN; Temporary directory access required!
-          (lib.getExe setupUploadsPath)
-        ];
     };
 
     unitConfig.RequiresMountsFor = [
@@ -437,6 +421,8 @@ in
           "--partial-dir=.rsync-partial"
           "--relative"
           "--remove-source-files"
+          # Exclude '<source>/.immich' since immich wants this locally
+          "--exclude '.immich'"
 
           # SOURCE
           # Manually include the directories to sync over
