@@ -245,26 +245,32 @@
       sub vcl_backend_response {
         # SEEALSO; sub vcl_recv
 
-        # NOTE; There are no defined status codes at 6xx and beyond
-        if (beresp.status >= 500) {
-          if (bereq.is_bgfetch) {
-            # The client received a cached object, and that triggered an asynchoronus background update. 
-            # If the response is 5xx we have to abandon, otherwise the previously cached object would be erased from the cache.
-            # WARN; 5xx response is also _just_ a response
-            return (abandon);
-          }
-
-          # Don't cache 50x response bodies.
-          # WARN; Varnish _caches_ the uncacheable state (hit-for-miss)! This allows in-flight requests to also merge together,
-          # just like normal caching behaviour, and improve (lower) latency.
-          set beresp.uncacheable = true;
-        }
-
         if(beresp.status == 404) {
           # Temporarily cache resource not found, it's a retryable state.
           set beresp.ttl = 1m;
           set beresp.grace = 10m;
           return (deliver);
+        }
+
+        # NOTE; There are no defined status codes from 600 and beyond
+        if (beresp.status >= 500) {
+          if (bereq.is_bgfetch) {
+            # The client earlier received a cached object (grace), and that flow triggered this background update asynchronously.
+            # If the response is 5xx we have to abandon, otherwise the previously cached object would be erased and
+            # replaced with the current response.
+            # WARN; 5xx response is also _just_ a response
+            return (abandon);
+          }
+
+          # ERROR; Setting uncacheable to true stores a hit-for-miss object which _does not_ coalesce requests and forces new backend
+          # requests for each frontend request! This does not shed load from the server nor improve latency!
+          # set beresp.uncacheable = true; # Doesn't work as intuitive expectation
+
+          # Temporarily cache _generic_ backend error responses.
+          set beresp.ttl = 30s;
+          # NOTE; The error keyword does the same as "synth", but it's explicitly mentioned that the production of "error" can
+          # become cached.
+          return (error(beresp.status));
         }
 
         # Attempt a default TTL otherwise a hit-for-miss is served.
@@ -281,7 +287,8 @@
 
         if (beresp.http.ETag || beresp.http.Last-Modified) {
           # Response has appropriate headers for efficient stale checks.
-          # 'Keep' will not offer the object to the client, but ask the server for update metadata instead of the full object.
+          # Because updates are efficiently queried the (potentially large) object can be kept longer in cache to alleviate
+          # server bandwidth.
           set beresp.keep = 1w;
         }
 
@@ -290,30 +297,28 @@
           # Force enable caching, do not follow server directives
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          if (beresp.ttl <= 0s) {
-            set beresp.ttl = 2d;
-          }
+          set beresp.ttl = 2d;
         }
 
-        # WARN; Other items are also returned outside of media underneath /api/assets/ !!
         if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/") {
-          # Force enable caching because immich returns HTTP "cache-control: private"
+          set beresp.ttl = 1m;
+          set beresp.grace = 1h;
+
+          # Force enable caching because immich returns HTTP "cache-control: private" for all assets
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 10s; # serving from cache
-          set beresp.grace = 1h; # serving from cache with attempting refresh on client request
         }
 
         # These are specifically the media files!
         if (bereq.http.X-Backend == "pictures" && 
             (bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)" || bereq.url ~ "^/_app/")
         ) {
+          set beresp.ttl = 1w; # serving from cache
+          set beresp.grace = 1d; # serving stale data from cache with background refresh at next client request
+
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 1w; # serving from cache
-          set beresp.grace = 1w; # serving from cache with attempting refresh on client request
-          set beresp.keep = 1w; # no serving, best case refresh if no metadata change
         }
 
         # builtin.vcl handles HTTP content-range normalization
