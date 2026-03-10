@@ -88,6 +88,7 @@
           set req.http.Host = "omega.pictures.proesmans.eu";
           set req.http.X-Forwarded-Host = "omega.pictures.proesmans.eu";
         } else {
+          # NOTE; No caching, immediate return
           return (synth(404));
         }
 
@@ -154,7 +155,10 @@
         }
 
         # Set headers for request-response debugging
-        set req.http.grace = "none"; # DEBUG, see sub vcl_deliver
+        
+        # No grace timer
+        # SEEALSO sub vcl_deliver
+        set req.http.grace = "none";
 
         # builtin.vcl handles HTTP host normalization
         # builtin.vcl handles HTTP method filtering
@@ -196,41 +200,43 @@
 
       sub vcl_hit {
         # Called when a cache lookup is succesful..
+        #
+        # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
+        # REF; https://vinyl-cache.org/docs/7.7/users-guide/vcl-grace.html
 
-        if (obj.ttl >= 0s) {
-          # Object still fresh (within cache expiry time)
-          return (deliver);
+        # obj.ttl + obj.grace is _always_ > 0s here
+        
+        if (obj.ttl <= 0s) {
+          # Grace timer has started running down
+          set req.http.grace = "limited";
+        } else {
+          # Grace timer still needs to start
+          set req.http.grace = "full";  
         }
 
         # builtin.vcl proceeds to deliver..
       }
 
       sub vcl_miss {
-        # Called when an asynchronous backend request has fired!
-        # REF; https://varnish-cache.org/docs/trunk/users-guide/vcl-grace.html#the-effect-of-grace-and-keep
+        # Called when
+        # - hit-for-miss
+        # - grace period has run out (no background fetch running)
+        #
+        # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
+        # REF; https://vinyl-cache.org/docs/7.7/users-guide/vcl-grace.html
 
-        # TODO; Better understand caching mechanics, lots of changes in >=v6.0 with differences in flows and outcome.
-
-        # if (std.healthy(req.backend_hint)) {
-        #   if (obj.ttl + 10s > 0s) {
-        #     # Prevent thundering herd when object expires, an asynchronous request to upstream is ongoing
-        #     set req.http.grace = "normal(limited)";
-        #     return (deliver);
-        #   }
-        # } else {
-        #   if (obj.ttl + obj.grace > 0s) {
-        #     # Keep returning data for full grace period
-        #     set req.http.grace = "full";
-        #     return (deliver);
-        #   }  
-        # }
+        if (!req.is_hitmiss) {
+          # Grace has run out
+          set req.http.grace = "empty";
+        }
 
         # builtin.vcl proceeds to fetch..
       }
 
       sub vcl_backend_fetch {
         # Reinsertion of fixed up headers should happen here logically (right before actual fetch)
-        # REF; https://varnish-cache.org/docs/7.7/reference/states.html
+        #
+        # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
 
 
         if (bereq.http.X-Upstream-Cookies) {
