@@ -74,6 +74,11 @@ in
       owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
+
+    forgejo-oauth-secret = {
+      owner = config.users.users.kanidm.name;
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
   };
 
   # Allow kanidm user access to the idm certificate managed by the host
@@ -189,6 +194,9 @@ in
 
         "immich.access" = { };
         "immich.quota.large" = { };
+
+        "forgejo.users" = { };
+        "forgejo.admins" = { };
       };
       persons."bert" = {
         displayName = "Bert Proesmans";
@@ -200,6 +208,7 @@ in
           "household.alpha"
           "immich.access"
           "immich.quota.large"
+          "forgejo.users"
         ];
       };
 
@@ -299,6 +308,28 @@ in
           # Refresh token to link application session to kanidm account lifetime
           "offline_access"
         ];
+      };
+
+      systems.oauth2."codeforge" = {
+        displayName = "Code forge";
+        basicSecretFile = config.sops.secrets.forgejo-oauth-secret.path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://forge.proesmans.eu/";
+        # imageFile = "${documentationAssets}/forgejo-logo.png"; # TODO
+        # WARN; Username cannot have at (@) character in their name
+        preferShortUsername = true;
+        originUrl = [
+          # NOTE; Global url redirects to specific instance URLs
+          "https://forge.proesmans.eu/user/oauth2/kanidm/callback"
+          "https://omega.forge.proesmans.eu/user/oauth2/kanidm/callback"
+        ];
+        scopeMaps."forgejo.users" = [
+          "openid"
+          "email"
+          "profile"
+          "ssh_publickeys"
+        ];
+        scopeMaps."forgejo.admins" = [ "admin" ];
       };
     };
   };
