@@ -418,6 +418,8 @@ in
       pkgs.mergerfs-tools # mergerfs.balance
       pkgs.rsync
       pkgs.findutils # find
+      pkgs.coreutils # df cut tr
+      pkgs.gawk
     ];
     enableStrictShellChecks = true;
     script = ''
@@ -432,6 +434,14 @@ in
       # eg; mergerfs.balance "$immich_state_path" (BUT this is not a perfect match for use-case)
       source_path="${immichVPSOnlineStoragePath}"
       target_path="${immichRclonePath}"
+
+      in_use_percentage=$(df --output='pcent' "$source_path" | awk 'FNR == 2 {print}' | cut --delimiter='%' --fields=1 | tr --delete '[:space:]')
+      if [ 10 -gt "$in_use_percentage" ]; then
+        echo "Directory fill percentage is below 10; actual value '$in_use_percentage'"
+        echo "Skipping data migration.."
+        exit 0
+      fi
+
       rsync ${
         lib.concatStringsSep " " [
           "--compress" # Attempt to transfer less bits
