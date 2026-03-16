@@ -86,8 +86,6 @@ in
       enable = true;
       name = "immich";
       createDB = true;
-      enableVectorChord = true; # New vector extension
-      enableVectors = false; # Explicit disable, vectorchord is the current approach
     };
 
     environment = {
