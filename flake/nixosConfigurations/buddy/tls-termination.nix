@@ -120,7 +120,7 @@
     recommendedProxySettings = true;
     recommendedGzipSettings = true;
     recommendedBrotliSettings = true;
-    sslDhparam = config.security.dhparams.params.nginx.path;
+    sslDhparam = true;
     appendHttpConfig = ''
       # Enable access logging for crowdsec
       access_log syslog:server=unix:/dev/log;
