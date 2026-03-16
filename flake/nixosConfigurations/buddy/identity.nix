@@ -211,6 +211,14 @@ in
           "forgejo.users"
         ];
       };
+      persons."proesmans-hub" = {
+        # NOTE; Account for holding and managing a bunch of resources
+        displayName = "Proesmans HUB";
+        mailAddresses = [ "proesmans@hub.proesmans.eu" ];
+        groups = [
+          "immich.access"
+        ];
+      };
 
       systems.oauth2."photos" = {
         displayName = "Pictures";
