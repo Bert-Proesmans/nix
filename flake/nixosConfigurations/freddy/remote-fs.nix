@@ -152,9 +152,9 @@ in
         #
         # Read the objects (from source) in small chunks because of low bandwith (~5mbps).
         # Reading small chunks keeps sftp connection snappy.
-        "--vfs-read-chunk-size=500K"
+        "--vfs-read-chunk-size=512K"
         # Chunk doubling size limit (from source). Unused when parallel streams are in use for downloading, see below
-        "--vfs-read-chunk-size-limit=500K"
+        "--vfs-read-chunk-size-limit=512K"
         # The number of parallel streams to read (from source) at simultanuously
         "--vfs-read-chunk-streams=4"
         # Number of parallel streams to write (to source) simultanuously
