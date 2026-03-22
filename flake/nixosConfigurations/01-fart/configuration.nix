@@ -25,6 +25,8 @@
   services.openssh.settings.PasswordAuthentication = false;
   services.openssh.settings.KbdInteractiveAuthentication = false;
 
+  users.mutableUsers = false;
+
   # Allow privilege elevation to administrator role
   security.sudo.enable = true;
   # Allow for passwordless sudo

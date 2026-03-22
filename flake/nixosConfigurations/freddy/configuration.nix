@@ -32,6 +32,7 @@
   sops.defaultSopsFile = ./secrets.encrypted.yaml;
   proesmans.sopsSecrets.sshHostkeyControl.enable = true;
   proesmans.home-manager.enable = true;
+  users.mutableUsers = false;
 
   # Allow privilege elevation to administrator role
   security.sudo.enable = true;
