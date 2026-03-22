@@ -237,11 +237,13 @@ in
 
   systemd.mounts = [
     {
-      # Immich external library
+      description = "Immich external library";
       conflicts = [ "umount.target" ];
       # TODO; Verify if dependency on rclone's unit is enough to properly handle online/offline switching, and not hang the system.
-      requisite = [ "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount" ];
-      partOf = [ "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount" ];
+      requisite = [ config.systemd.services."rclone-ftp@buddy".name ];
+      partOf = [ config.systemd.services."rclone-ftp@buddy".name ];
+      after = [ config.systemd.services."rclone-ftp@buddy".name ];
+
       what = buddyImmichExternalPath;
       where = immichExternalStatePath;
       type = "none";
@@ -249,12 +251,13 @@ in
         "ro" # Read-only external library
         "bind"
       ];
-      unitConfig.RequiresMountsFor = [ buddyImmichExternalPath ];
       unitConfig.DefaultDependencies = false;
     }
+
     {
       description = "Immich state directory";
       conflicts = [ "umount.target" ];
+      wants = [ config.systemd.services."rclone-ftp@buddy".name ];
       after = [ "network.target" ];
 
       # NOTE; Local cache, followed by networked storage
@@ -300,9 +303,6 @@ in
       unitConfig = {
         DefaultDependencies = false;
         RequiresMountsFor = [ immichVPSOnlineStoragePath ];
-        # ERROR; Attempting to load the sftp mount while the host is offline could lead to system hangs!
-        # NOTE; The mount unit is guarded with buddy-online.target.
-        WantsMountsFor = [ immichRclonePath ];
       };
       mountConfig.TimeoutSec = 30;
     }
@@ -346,6 +346,8 @@ in
   };
 
   systemd.services.immich-server = lib.mkIf config.services.immich.enable {
+    # Set to empty list to disable service autostart
+    # wantedBy = lib.mkForce [ ]; # DEBUG
     serviceConfig = {
       # NOTE; Immich state layout contains links into temporary directory
       PrivateTmp = true;
@@ -403,12 +405,13 @@ in
     description = "Move Immich media";
     # Need these units but won't queue a startjob if they aren't active
     requisite = [
-      # Both of these units combined active are precondition for the mover script
       config.systemd.targets."buddy-online".name
-      "${utils.escapeSystemdPath "/mnt/remote/buddy-sftp"}.mount"
+      # WARN; The SFTP mount could linger in a non-working state!
+      config.systemd.services."rclone-ftp@buddy".name
     ];
     after = [
       config.systemd.targets."buddy-online".name
+      config.systemd.services."rclone-ftp@buddy".name
     ];
     # systemd-analyze calendar <pattern>
     startAt = "*-*-* *:01/28:00";
