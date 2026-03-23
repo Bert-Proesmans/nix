@@ -319,8 +319,13 @@
         if (bereq.http.X-Backend == "pictures" && 
             (bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)" || bereq.url ~ "^/_app/")
         ) {
-          set beresp.ttl = 1w; # serving from cache
-          set beresp.grace = 1d; # serving stale data from cache with background refresh at next client request
+          # NOTE; The values below might seem backwards.
+          # I want a low TTL for LRU cache eviction, while a high grace time keeps the assets available until the upstream server
+          # comes back online.
+          # There is no background refresh while TTL is still above 0!
+          # 
+          set beresp.ttl = 3d; # serving from cache
+          set beresp.grace = 1w; # serving stale data from cache with background refresh at next client request
 
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
