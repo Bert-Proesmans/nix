@@ -436,13 +436,29 @@ in
       source_path="${immichVPSOnlineStoragePath}"
       target_path="${immichRclonePath}"
 
+      state_file="$STATE_DIRECTORY/state"
+      # 24 hours
+      force_interval_sec=$((24*60*60))
+      # Timestamp value (seconds)
+      now=$(date +%s)
+      # Timestamp value (seconds)
+      last_success=0
+
+      if [ -f "$state_file" ]; then
+        last_success=$(cat "$state_file" || echo 0)
+      fi
+
       in_use_percentage=$(df --output='pcent' "$source_path" | awk 'FNR == 2 {print}' | cut --delimiter='%' --fields=1 | tr --delete '[:space:]')
-      if [ 10 -gt "$in_use_percentage" ]; then
+      if [ $((now - last_success)) -ge $force_interval_sec ]; then
+        echo "time trigger: last full sweep >24h"
+      elif [ 10 -gt "$in_use_percentage" ]; then
         echo "Directory fill percentage is below 10; actual value '$in_use_percentage'"
         echo "Skipping data migration.."
         exit 0
       fi
 
+      # WARN; Files are copied iif their size and modificaton time remains unchanged between analyze and pre-copy step
+      # WARN; Files are removed (--remove-source-files) iif their size and modificaton time remains unchanged between analyze and pre-removal step
       rsync ${
         lib.concatStringsSep " " [
           "--compress" # Attempt to transfer less bits
@@ -461,7 +477,7 @@ in
           "--partial-dir=.rsync-partial"
           "--relative"
           "--remove-source-files"
-          # Exclude '<source>/.immich' since immich wants this locally
+          # Exclude '<source>/.immich' since immich verifies existence of this file locally (startup check on host freddy)
           "--exclude '.immich'"
 
           # SOURCE
@@ -477,6 +493,12 @@ in
       # WARN; rsync doesn't clean-up empty directories!
       # WARN; mindepth=1 to not delete the toplevel directories themselves!
       find "$source_path/"{encoded-video,library,profile,thumbs} -mindepth 1 -type d -empty -delete
+
+      date +%s > "$state_file"
+      echo "DONE"
     '';
+
+    serviceConfig.StateDirectory = [ "immich-move-data" ];
+    serviceConfig.StateDirectoryMode = "0700";
   };
 }
