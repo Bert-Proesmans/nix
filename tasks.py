@@ -203,10 +203,8 @@ def deploy(
         Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    assert encrypted_file.is_file(), f"""
-        There is no file containing decrypter keys.
-        Create a decrypter key for host {hostname} first!
-    """
+    if not encrypted_file.is_file():
+        raise FileNotFoundError(f"No decrypter keys file found. Create a decrypter key for host {hostname} first!")
 
     host_attr_path = (
         f"{FLAKE}#nixosConfigurations.{hostname}.config.system.build.toplevel"
@@ -251,9 +249,8 @@ def deploy(
         capture_output=True,
     ).stdout.strip()
 
-    assert age_key, """
-        Expected decrypting an AGE private key, but decrypted an empty string. Something went unexpectedly wrong!
-    """
+    if not age_key:
+        raise RuntimeError("Decrypted AGE private key is empty")
 
     with TemporaryDirectory() as deploy_directory:
         # Prepare filepath and secure file access to store sensitive key material
@@ -385,10 +382,8 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
         None,
     )
 
-    assert ssh_connection_string, """
-        There is no ssh moniker found for the provided host attribute.
-        Make sure the desired host returns the expected option host-facts.<moniker>.hostName using the nixos configuration options `proesmans.facts.hostName = "<TODO>";`
-    """
+    if not ssh_connection_string:
+        raise LookupError(f"No ssh moniker found for host attribute. Set `proesmans.facts.hostName` in nixos config")
 
     if not ask_user_input(
         f"Update filesystems for {flake_attr} on {ssh_connection_string}?"
@@ -412,9 +407,8 @@ def dev_rebuild(c: Any) -> None:
     Rebuild the current machine with the host configuration for "development"
     """
     this_hostname = platform.node()
-    assert this_hostname == "development", """
-        This machine does not have the hostname 'development'. This script will exit to prevent clobbering configuration!
-    """
+    if this_hostname != "development":
+        raise RuntimeError(f"Hostname is '{this_hostname}', not 'development'. Refusing to clobber configuration")
     c.run(f"sudo nixos-rebuild --flake {FLAKE}#development switch")
     alert_finish()
 
@@ -520,10 +514,8 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
         None,
     )
 
-    assert ssh_connection_string, """
-        There is no ssh moniker found for the provided hostname.
-        Make sure the desired host returns the expected option host-facts.<moniker>.hostName using the nixos configuration options `proesmans.facts.hostName = "<TODO>";`
-    """
+    if not ssh_connection_string:
+        raise LookupError(f"No ssh moniker found for hostname. Set `proesmans.facts.hostName` in nixos config")
 
     if not yes:
         ask = input(
@@ -604,12 +596,8 @@ def secret_edit(
         Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    assert encrypted_file.name.endswith(
-        "encrypted.yaml"
-    ) or encrypted_file.name.endswith("encrypted.json"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
-        Update the provided path argument to align with the convention!
-    """
+    if not (encrypted_file.name.endswith("encrypted.yaml") or encrypted_file.name.endswith("encrypted.json")):
+        raise ValueError(f"Filename must end with *.encrypted.yaml or *.encrypted.json: {encrypted_file.name}")
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
@@ -654,15 +642,11 @@ def ssh_key_create(
         Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    assert encrypted_file.name.endswith("encrypted.yaml"), """
-        The convention is to end the filename of encrypted sensitive content with *.encrypted.yaml.
-        Update the provided path argument to align with the convention!
-    """
+    if not encrypted_file.name.endswith("encrypted.yaml"):
+        raise ValueError(f"Filename must end with *.encrypted.yaml: {encrypted_file.name}")
 
-    assert key, """
-        You must provide a name for the secret value. The value is currently set to an empty string!
-        Pass either no argument, or enter a name as argument to this function.
-    """
+    if not key:
+        raise ValueError("Secret key name cannot be empty")
 
     with TemporaryDirectory() as tmpdir:
         # Prepare filepath and secure file access to store sensitive key material
@@ -695,9 +679,8 @@ def ssh_key_create(
         with open(pub_host_key, "r") as file_handle:
             public_key = file_handle.read()
 
-    assert ssh_private_key and public_key, """
-        Empty ssh key files were generated, something went unexpectedly wrong!
-    """
+    if not (ssh_private_key and public_key):
+        raise RuntimeError("Generated SSH key files are empty")
 
     # ERROR; File must exist for 'sops set' to work
     if not encrypted_file.is_file():
@@ -788,9 +771,8 @@ def decrypter_key_create(c: Any, hostname: str, key: str = None) -> None:
         capture_output=True,  # Redirect stdout/stderr
     ).stdout.strip()
 
-    assert age_key, """
-        Unexpected empty output from rage-keygen command!
-    """
+    if not age_key:
+        raise RuntimeError("rage-keygen produced empty output")
 
     # Print everything except last line (presumably private key) to the terminal
     # for the user to further process.
