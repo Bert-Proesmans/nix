@@ -128,9 +128,8 @@ in
       backup.database.enabled = false;
       ffmpeg = {
         # WARN; Encode/Decode acceleration does not work on ORACLE Ampere hosts!
-        accel = "vaapi";
+        accel = "disabled";
         accelDecode = false;
-        # preferredHwDevice = "renderD128"; # /dev/dri node
         cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
         targetAudioCodec = "aac"; # optimized for device compatibility
         targetResolution = "720"; # 720p, optimized for filesize
