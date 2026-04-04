@@ -39,9 +39,13 @@
         .path = "/run/haproxy/forward_to_freddy.sock";  # run it back to haproxy
         .proxy_header = 2;
 
-        .connect_timeout        = 10s;   # How long to wait for a backend connection?
+        # WARN; Assign values larger than worst situation, consider eg
+        # - Media transcoding
+        # - I/O stall (networked storage)
+        # - Worker limit hit
+        .connect_timeout        = 30s;   # How long to wait for a backend connection?
         .first_byte_timeout     = 65s;   # How long to wait before we receive a first byte from our backend?
-        .between_bytes_timeout  = 2s;    # How long to wait between bytes received from our backend?
+        .between_bytes_timeout  = 30s;   # How long to wait between bytes received from our backend?
 
         .probe = {
           # Debug with; varnishadm backend.list
@@ -151,7 +155,7 @@
         if (std.healthy(req.backend_hint)) {
           // Prevent thundering herd on new/stale requests by allowing request coalescing
           // REF; https://varnish-cache.org/docs/trunk/users-guide/increasing-your-hitrate.html#cache-misses
-          set req.grace = 10s;
+          set req.grace = 30s;
         }
 
         # Set headers for request-response debugging
@@ -208,10 +212,10 @@
         
         if (obj.ttl <= 0s) {
           # Grace timer has started running down
-          set req.http.grace = "limited";
+          set req.http.grace = "depleting";
         } else {
           # Grace timer still needs to start
-          set req.http.grace = "full";  
+          set req.http.grace = "reset";  
         }
 
         # builtin.vcl proceeds to deliver..
@@ -227,7 +231,7 @@
 
         if (!req.is_hitmiss) {
           # Grace has run out
-          set req.http.grace = "empty";
+          set req.http.grace = "depleted";
         }
 
         # builtin.vcl proceeds to fetch..
@@ -343,6 +347,10 @@
         # Proceed with builtin default action
       }
 
+      # NOTE; I could validate sessions before delivering global cache using 'restart' state.
+      # Doable but not _clean_ though; requires manipulating the initial request if authorization status is unset + processing the
+      # validation response + restarting the original request..
+      # It's some state-machine trickery because there is no sub-request system?
       sub vcl_deliver {
         # Add client-side debugging values
         set resp.http.X-Cache = "MISS";

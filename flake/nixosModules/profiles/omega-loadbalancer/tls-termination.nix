@@ -191,7 +191,9 @@ in
           option httplog
           option dontlognull
 
-          option http-server-close
+          # This path processes range-requests, and some servers do not handle those well while HTTP header Connection-Close is set
+          option http-keep-alive
+
           # Larger timeout for upload/download
           timeout server 10m
           timeout client 10m
@@ -217,7 +219,6 @@ in
           description Separate backend to properly split websocket from cache traffic. Pushing both over the same backend causes h1 packets on h2 multiplexer and other way around.
           mode http
 
-          option http-server-close
           # no log
           log global
 
@@ -254,7 +255,12 @@ in
           # Http3 (quic) improves this further (no head-of-line blocking) but requires haproxy enterprise.
           #
           # In HTTP proxy mode we _must_ verify the endpoint certificate!
-          server freddy ${upstream.freddy.location} send-proxy-v2 alpn h2,http/1.1 sni req.hdr(host) ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt check no-check-ssl
+          #
+          # Maximum _concurrent requests_ (maximum _concurrent connections_ is enabled setting strict-maxconn) is set to 8 to not clog the upstream pipe 
+          # while head-of-line blocking happens on request overload and heavy file transfer. The semantic change is because http/2 and newer multiplex requests over a single connection.
+          # The number 8 is currently randomly chosen. TODO; Validate maximum requests amount
+          #
+          server freddy ${upstream.freddy.location} send-proxy-v2 alpn h2,http/1.1 sni req.hdr(host) ssl verify required ca-file /etc/ssl/certs/ca-bundle.crt check no-check-ssl maxconn 8
       '';
     };
 
