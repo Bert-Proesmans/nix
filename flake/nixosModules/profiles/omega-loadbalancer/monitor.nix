@@ -10,28 +10,28 @@ let
 in
 {
   services.gatus.settings.announcements = [
-    {
-      timestamp = "2026-03-12T12:00:00Z";
-      type = "operational";
-      message = ''
-        The [Pictures service](https://pictures.proesmans.eu) high-availability work has concluded.
-        Old pictures will not always be available, but once loaded they remain for a long time available (even offline) on your computer and smartphone.
+    # {
+    #   timestamp = "2026-03-12T12:00:00Z";
+    #   type = "operational";
+    #   message = ''
+    #     The [Pictures service](https://pictures.proesmans.eu) high-availability work has concluded.
+    #     Old pictures will not always be available, but once loaded they remain for a long time available (even offline) on your computer and smartphone.
 
-        Uptime metrics are improving over time.
-      '';
-    }
-    {
-      timestamp = "2025-12-28T12:00:00Z";
-      # outage, warning, information, operational, none
-      type = "warning";
-      # Markdown aware
-      message = ''
-        The [Pictures service](https://pictures.proesmans.eu) is being reworked to have higher availability.
-        Outages will occur while this process is ongoing.
+    #     Uptime metrics are improving over time.
+    #   '';
+    # }
+    # {
+    #   timestamp = "2025-12-28T12:00:00Z";
+    #   # outage, warning, information, operational, none
+    #   type = "warning";
+    #   # Markdown aware
+    #   message = ''
+    #     The [Pictures service](https://pictures.proesmans.eu) is being reworked to have higher availability.
+    #     Outages will occur while this process is ongoing.
 
-        Service migration is expected to finish by january 4th, 2026.
-      '';
-    }
+    #     Service migration is expected to finish by january 4th, 2026.
+    #   '';
+    # }
   ];
 
   services.gatus.settings.maintenance = {
@@ -149,7 +149,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 250ms"
+            "[RESPONSE_TIME] < 400ms"
             "[BODY] == true"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -166,7 +166,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 250ms"
+            "[RESPONSE_TIME] < 400ms"
             "[BODY] == true"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -182,7 +182,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 250ms"
+            "[RESPONSE_TIME] < 400ms"
             "[BODY].res == pong"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -198,7 +198,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 250ms"
+            "[RESPONSE_TIME] < 400ms"
             "[BODY] == pat(*<title>Wiki | Proesmans.EU</title>*)"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
@@ -214,7 +214,7 @@ in
           interval = "5m";
           conditions = [
             "[STATUS] == 200"
-            "[RESPONSE_TIME] < 250ms"
+            "[RESPONSE_TIME] < 400ms"
             "len([BODY]) > 0"
             # ERROR; .eu toplevel domain registry doesn't publish expiration dates publicly
             # "[DOMAIN_EXPIRATION] > 720h"
