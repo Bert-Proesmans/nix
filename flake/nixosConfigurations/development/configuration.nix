@@ -73,6 +73,7 @@
     pkgs.resilio-sync # rslsync
     pkgs.hydra-check
     pkgs.swaks # smtp client test-tool
+    pkgs.quarto # Quarto pandoc wrapper
   ];
 
   nixpkgs.config.allowUnfreePredicate =
