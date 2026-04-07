@@ -79,11 +79,17 @@
   nixpkgs.overlays = [
     (final: previous: {
       quarto = previous.quarto.overrideAttrs (old: rec {
-        version = "1.9.36";
+        # Last version with dependency pandoc v3.7.0.2 (currently on nixos-unstable), cannot go newer without pandoc upgrade!
+        #
+        # Pandoc is not yet staged for upgrade to v3.8.3.. Follow pandoc-cli jobs on haskell-updates project
+        # REF; https://hydra.nixos.org/jobset/nixpkgs/haskell-updates#tabs-jobs
+        #
+        # NOTE; Use 'quarto check' to verify correctness of the entire pipeline!
+        version = "1.9.16";
 
         src = previous.fetchurl {
           url = "https://github.com/quarto-dev/quarto-cli/releases/download/v${version}/quarto-${version}-linux-amd64.tar.gz";
-          hash = "sha256-OdLkVGJ0vjmifM7u7SGmC2k8TEd6jIy0P7NDJkQvORA=";
+          hash = "sha256-Up/4/WTP2MYCNWfIf3Og0TthNYyk1sYPHNNksqKvJU8=";
         };
       });
     })
