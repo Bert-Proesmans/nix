@@ -76,6 +76,19 @@
     pkgs.quarto # Quarto pandoc wrapper
   ];
 
+  nixpkgs.overlays = [
+    (final: previous: {
+      quarto = previous.quarto.overrideAttrs (old: rec {
+        version = "1.9.36";
+
+        src = previous.fetchurl {
+          url = "https://github.com/quarto-dev/quarto-cli/releases/download/v${version}/quarto-${version}-linux-amd64.tar.gz";
+          hash = "sha256-OdLkVGJ0vjmifM7u7SGmC2k8TEd6jIy0P7NDJkQvORA=";
+        };
+      });
+    })
+  ];
+
   nixpkgs.config.allowUnfreePredicate =
     pkg:
     builtins.elem (lib.getName pkg) [
