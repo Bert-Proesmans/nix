@@ -172,12 +172,16 @@
       #
       commit.gpgSign = false;
       tag.gpgSign = false;
-      gpg.format = "ssh";
-      # user.signingKey = null;
-      #
+
       transfer.fsckobjects = true;
       fetch.fsckobjects = true;
       receive.fsckObjects = true;
+    };
+
+    signing = {
+      format = "ssh";
+      # key = null;
+      #
     };
 
     ignores = [
