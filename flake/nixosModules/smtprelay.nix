@@ -342,17 +342,6 @@ in
       smtprelay = { };
     };
 
-    proesmans.nix.overlays = [
-      (_final: prev: {
-        smtprelay = prev.smtprelay.overrideAttrs (_oldAttrs: {
-          # TODO; Cleanup after version >1.31.1 releases!
-          patches = [
-            ./relay-cert.patch
-          ];
-        });
-      })
-    ];
-
     systemd.services.smtprelay = {
       description = "SMTP relay/proxy server";
       wantedBy = [ "multi-user.target" ];
