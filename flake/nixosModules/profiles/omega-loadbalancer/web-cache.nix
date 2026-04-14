@@ -329,7 +329,7 @@
           # There is no background refresh while TTL is still above 0!
           # 
           set beresp.ttl = 3d; # serving from cache
-          set beresp.grace = 1w; # serving stale data from cache with background refresh at next client request
+          set beresp.grace = 2w; # serving stale data from cache with background refresh at next client request
 
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
