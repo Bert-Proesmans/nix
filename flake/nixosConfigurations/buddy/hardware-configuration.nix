@@ -1,8 +1,16 @@
-{ lib, config, ... }:
+{
+  lib,
+  pkgs,
+  config,
+  ...
+}:
 {
   # Define the platform type of the target configuration
   nixpkgs.hostPlatform = lib.systems.examples.gnu64;
 
+  # Move to kernel >=6.19.10 to fix iommu warnings on zen.
+  # default kernel modules are 6.18.x at this point.
+  boot.kernelPackages = pkgs.linuxPackages_6_19;
   # Enables (nested) virtualization through hardware acceleration.
   boot.kernelModules = [ "kvm-amd" ];
   boot.kernelParams = [
