@@ -28,7 +28,7 @@
       hostName = "me.caddy.localhost";
       extraConfig = ''
         # ERROR; whoami binds to IPv4, no ipv6 binding
-        reverse_proxy 127.0.0.1:8000
+        reverse_proxy 127.0.0.1:8008
 
         forward_auth http://[::1]:4456 {
           # NOTE; Caddy automatically sets the following headers on proxy;
@@ -53,7 +53,7 @@
 
   services.whoami = {
     enable = true;
-    port = 8000;
+    port = 8008;
   };
 
   systemd.services.heimdall-proxy =
