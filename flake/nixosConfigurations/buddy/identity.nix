@@ -75,6 +75,11 @@ in
       restartUnits = [ config.systemd.services.kanidm.name ];
     };
 
+    gateway-oauth-secret = {
+      owner = config.users.users.kanidm.name;
+      restartUnits = [ config.systemd.services.kanidm.name ];
+    };
+
     forgejo-oauth-secret = {
       owner = config.users.users.kanidm.name;
       restartUnits = [ config.systemd.services.kanidm.name ];
@@ -189,6 +194,9 @@ in
         # Known group with static membership, members can perform password reset for others
         "idm_service_desk" = { }; # Builtin
 
+        # Group assigned for testing servicei integrations
+        "debug.users" = { };
+
         "household.alpha" = { };
         "household.beta" = { };
 
@@ -205,6 +213,7 @@ in
           # Allow credential reset on other persons
           # NOTE; Someday this will be incorporated into the web-ui 😅
           "idm_service_desk" # tainted role
+          "debug.users"
           "household.alpha"
           "immich.access"
           "immich.quota.large"
@@ -315,6 +324,21 @@ in
           "profile"
           # Refresh token to link application session to kanidm account lifetime
           "offline_access"
+        ];
+      };
+
+      systems.oauth2."gateway" = {
+        displayName = "Security service";
+        basicSecretFile = config.sops.secrets.gateway-oauth-secret.path;
+        # WARN; URLs must end with a forward slash if path element is empty!
+        originLanding = "https://vouch.debug.localhost/";
+        originUrl = [
+          "https://vouch.debug.localhost/auth"
+        ];
+        scopeMaps."debug.users" = [
+          "openid"
+          "email"
+          "profile"
         ];
       };
 
