@@ -339,6 +339,7 @@ in
           "openid"
           "email"
           "profile"
+          "offline_access"
         ];
       };
 
