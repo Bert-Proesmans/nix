@@ -472,13 +472,17 @@ def unlock(c: Any, flake_attr: str) -> None:
 
 @task
 # USAGE; invoke rebuild development
-def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
+def rebuild(c: Any, flake_attr: str, yes: bool = False, boot: bool = False) -> None:
     """
     Build a host configuration and activate it on the machine.
     """
     host_attr_path = (
         f"{FLAKE}#nixosConfigurations.{flake_attr}.config.system.build.toplevel"
     )
+
+    if boot:
+        print("== WARNING ==")
+        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
 
     if not yes:
         print(f"== Checking if host {flake_attr} builds ==")
@@ -539,10 +543,14 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False) -> None:
             "--target-host",
             ssh_connection_string,
             *additional_switches,
-            "switch",
+            "boot" if boot else "switch",
         ],
         check=True,
     )
+
+    if boot:
+        print("== WARNING ==")
+        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
 
     print("== Pinning host closure as garbage root (nix gcroot) ==")
     # The machine builds and is deployed succesfully, pinning should succeed IF we have the closure downloaded locally
