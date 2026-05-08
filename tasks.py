@@ -402,14 +402,33 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
 
 @task
 # USAGE; invoke dev-rebuild
-def dev_rebuild(c: Any) -> None:
+def dev_rebuild(c: Any, boot: bool = False) -> None:
     """
     Rebuild the current machine with the host configuration for "development"
     """
     this_hostname = platform.node()
     if this_hostname != "development":
         raise RuntimeError(f"Hostname is '{this_hostname}', not 'development'. Refusing to clobber configuration")
-    c.run(f"sudo nixos-rebuild --flake {FLAKE}#development switch")
+    
+    if boot:
+        print("== WARNING ==")
+        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
+    
+    subprocess.run(
+        [
+            "sudo",
+            "nixos-rebuild",
+            "--flake",
+            f"{FLAKE}#development",
+            "boot" if boot else "switch",
+        ],
+        check=True,
+    )
+    
+    if boot:
+        print("== WARNING ==")
+        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
+    
     alert_finish()
 
 
