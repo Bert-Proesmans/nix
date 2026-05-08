@@ -19,7 +19,7 @@ index b10a5ded..07e1f3f7 100644
          .expect("Creating WebauthnBuilder failed")
          .rp_name(&domain)
 +        .allow_subdomains(CONFIG.webauthn_allow_subdomains())
-         .timeout(Duration::from_millis(60000));
+         .timeout(Duration::from_mins(1));
  
      webauthn.build().expect("Building Webauthn failed")
 diff --git a/src/config.rs b/src/config.rs
