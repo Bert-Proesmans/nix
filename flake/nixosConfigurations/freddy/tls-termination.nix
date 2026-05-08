@@ -49,6 +49,19 @@
           # DEBUG
           # log stdout format raw local0 notice
           
+          # generated 2026-05-08, Mozilla Guideline v6.0, HAProxy 3.3.8, OpenSSL 3.6.1, intermediate config, HSTS
+          # https://ssl-config.mozilla.org/#server=haproxy&version=3.3.8&config=intermediate&openssl=3.6.1&hsts&guideline=6.0
+          # intermediate configuration
+          ssl-default-bind-curves X25519MLKEM768:X25519:prime256v1:secp384r1
+          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305
+          ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-bind-options prefer-client-ciphers ssl-min-ver TLSv1.2 no-tls-tickets
+
+          ssl-default-server-curves X25519MLKEM768:X25519:prime256v1:secp384r1
+          ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305
+          ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+          ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
+          
         defaults
           timeout connect 5s
           timeout client 65s
@@ -118,7 +131,6 @@
     recommendedProxySettings = true;
     recommendedGzipSettings = true;
     recommendedBrotliSettings = true;
-    sslDhparam = true;
     appendHttpConfig = ''
       # Enable access logging for crowdsec
       access_log syslog:server=unix:/dev/log;
@@ -152,16 +164,6 @@
         # REF; https://bugzilla.mozilla.org/show_bug.cgi?id=1222136
         locations."/".return = "421 'Misdirected Request'";
       };
-    };
-  };
-
-  security.dhparams = {
-    enable = true;
-    # NOTE; Suggested by Mozilla TLS config generator
-    defaultBitSize = 2048;
-    params.nginx = {
-      # Defaults are used.
-      # Use 'params.nginx.path' to retrieve the parameters.
     };
   };
 

@@ -36,18 +36,20 @@
           log stdout format raw local0 info
           # DEBUG
           # log stdout format raw local0 notice
-          # generated 2025-08-15, Mozilla Guideline v5.7, HAProxy 3.2, OpenSSL 3.4.0, intermediate config
-          # https://ssl-config.mozilla.org/#server=haproxy&version=3.2&config=intermediate&openssl=3.4.0&guideline=5.7
-          #
-          ssl-default-bind-curves X25519:prime256v1:secp384r1
-          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
+          
+          # generated 2026-05-08, Mozilla Guideline v6.0, HAProxy 3.3.8, OpenSSL 3.6.1, intermediate config, HSTS
+          # https://ssl-config.mozilla.org/#server=haproxy&version=3.3.8&config=intermediate&openssl=3.6.1&hsts&guideline=6.0
+          # intermediate configuration
+          ssl-default-bind-curves X25519MLKEM768:X25519:prime256v1:secp384r1
+          ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305
           ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-bind-options prefer-client-ciphers ssl-min-ver TLSv1.2 no-tls-tickets
-          ssl-default-server-curves X25519:prime256v1:secp384r1
-          ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305
+
+          ssl-default-server-curves X25519MLKEM768:X25519:prime256v1:secp384r1
+          ssl-default-server-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305
           ssl-default-server-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
           ssl-default-server-options ssl-min-ver TLSv1.2 no-tls-tickets
-          ssl-dh-param-file '${config.security.dhparams.params.haproxy.path}'
+
           
         defaults
           timeout connect 5s
@@ -120,7 +122,6 @@
     recommendedProxySettings = true;
     recommendedGzipSettings = true;
     recommendedBrotliSettings = true;
-    sslDhparam = true;
     appendHttpConfig = ''
       # Enable access logging for crowdsec
       access_log syslog:server=unix:/dev/log;
@@ -145,18 +146,6 @@
         locations."/".return = "404";
       };
     };
-  };
-
-  security.dhparams = {
-    enable = true;
-    # NOTE; Suggested by Mozilla TLS config generator
-    defaultBitSize = 2048;
-    # Name of parameter set must match the systemd service name!
-    params.haproxy = {
-      # Defaults are used.
-      # Use 'params.haproxy.path' to retrieve the parameters.
-    };
-    params.nginx = { };
   };
 
   security.acme = {

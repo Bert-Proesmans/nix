@@ -71,12 +71,6 @@ let
     { ... }:
     {
       options = {
-        sslDhparam = lib.mkOption {
-          type = lib.types.nullOr lib.types.path;
-          default = null;
-          example = "/path/to/dhparams.pem";
-          description = "Path to DH parameters file.";
-        };
         extraConfig = lib.mkOption {
           type = lib.types.lines;
           default = "";
