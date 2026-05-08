@@ -16,7 +16,7 @@ in
 
   # WARN; This service is setup as replicated node!
   services.kanidm = {
-    package = pkgs.kanidm_1_9;
+    package = pkgs.kanidm_1_10;
 
     server.enable = true;
     server.settings = {
