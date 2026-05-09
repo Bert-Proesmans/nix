@@ -141,7 +141,7 @@ in
       # REF; https://github.com/dani-garcia/vaultwarden/wiki/Enabling-SSO-support-using-OpenId-Connect
       ## This allows for self-service signup without invite.
       ## This _does not_ prevent users from entering their master password, the master password is the encryption key of their vault data!
-      SSO_ENABLED = true;
+      SSO_ENABLED = false;
       SSO_ONLY = false;
       ## On SSO Signup if a user with a matching email already exists make the association
       SSO_SIGNUPS_MATCH_EMAIL = true;
