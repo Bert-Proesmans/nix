@@ -9,9 +9,9 @@
       # NOTE; In-memory cache (default)
       # HELP; Could tweak depending on observed memory pressure, ofcourse you want this
       # as high as possible but I haven't read about effects yet.
-      "-s default,100m"
-      # cache on disk, as preallocated file
-      "-s file,/var/cache/varnishd/cachefile.bin,10G"
+      "-s Transient=default,100m"
+      # cache on disk, not pre-allocated, madvise set to random (default)
+      "-s diskcache=file,/var/cache/varnishd/cachefile.bin,10G"
       # open port for admin interface (connect with varnishadm)
       # SEEALSO; systemd.services.varnish.serviceConfig.IPAddressAllow
       # "-T 127.0.0.1:42057" # Default
@@ -66,6 +66,7 @@
       sub vcl_recv {
         # Remove the proxy header (see https://httpoxy.org/#mitigate-varnish)
         unset req.http.proxy;
+		unset req.http.x-cache;
 
         if (req.http.X-Forwarded-Host ~ "^\s*$") {
           return (synth(404));
@@ -81,8 +82,8 @@
         }
 
         # --- Backend selection ---
-        if (req.http.X-Forwarded-Host == "pictures.proesmans.eu" || 
-            req.http.X-Forwarded-Host ~ "\.pictures\.proesmans\.eu$") {
+        if (req.http.X-Forwarded-Host == "pictures.proesmans.eu" ||
+          req.http.X-Forwarded-Host ~ "\.pictures\.proesmans\.eu$") {
           set req.http.X-Backend = "pictures";
           set req.backend_hint = pictures;
 
@@ -100,7 +101,7 @@
         if (req.method != "GET" && req.method != "HEAD") {
           return (pass);
         }
-        
+
         if(req.http.X-Backend == "pictures" && req.url ~ "^/api/server/ping") {
           return (pass);
         }
@@ -115,7 +116,7 @@
         # --- Some generic URL manipulation ---
         # Normalize the query arguments
         set req.url = std.querysort(req.url);
-        
+
         # Strip hash, improving cache hitrate
         if (req.url ~ "\#") {
           set req.url = regsub(req.url, "\#.*$", "");
@@ -144,6 +145,7 @@
             # WARN; Upstream requires following cookies; immich_access_token,immich_auth_type,immich_is_authenticated
             set req.http.X-Upstream-Cookies = req.http.cookie;
             unset req.http.cookie;
+            unset req.http.authorization;
           }
         }
 
@@ -159,7 +161,7 @@
         }
 
         # Set headers for request-response debugging
-        
+
         # No grace timer
         # SEEALSO sub vcl_deliver
         set req.http.grace = "none";
@@ -171,14 +173,16 @@
       }
 
       sub vcl_pipe {
+	  	set req.http.x-cache = "pipe uncacheable";
         # Do as builtin
       }
 
       sub vcl_pass {
+	  	set req.http.x-cache = "pass";
         # builtin.vcl does nothing..
       }
 
-      sub vcl_hash {        
+      sub vcl_hash {
         if (req.http.Cookie) {
           # hash cookies for requests that have them
           # NOTE; Prevents exfiltration of data without authentication
@@ -209,14 +213,11 @@
         # REF; https://vinyl-cache.org/docs/7.7/users-guide/vcl-grace.html
 
         # obj.ttl + obj.grace is _always_ > 0s here
-        
-        if (obj.ttl <= 0s) {
-          # Grace timer has started running down
-          set req.http.grace = "depleting";
-        } else {
-          # Grace timer still needs to start
-          set req.http.grace = "reset";  
-        }
+
+		set req.http.x-cache = "hit";
+		if (obj.ttl <= 0s && obj.grace > 0s) {
+			set req.http.x-cache = "hit graced";
+		}
 
         # builtin.vcl proceeds to deliver..
       }
@@ -224,20 +225,26 @@
       sub vcl_miss {
         # Called when
         # - hit-for-miss
-        # - grace period has run out (no background fetch running)
+        # - grace period has run out (no background-fetch pending)
+        # - keep period may or may-not have run out
         #
         # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
         # REF; https://vinyl-cache.org/docs/7.7/users-guide/vcl-grace.html
 
         if (!req.is_hitmiss) {
-          # Grace has run out
-          set req.http.grace = "depleted";
+          set req.http.x-cache = "miss";
+        }
+
+        if (req.is_hitmiss) {
+          # To prevent 304 client responses on hit-for-miss.
+          unset req.http.If-None-Match;
+          unset req.http.If-Modified-Since;
         }
 
         # builtin.vcl proceeds to fetch..
-      }
+        }
 
-      sub vcl_backend_fetch {
+        sub vcl_backend_fetch {
         # Reinsertion of fixed up headers should happen here logically (right before actual fetch)
         #
         # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
@@ -250,9 +257,9 @@
         }
 
         # builtin.vcl proceeds to fetch..
-      }
+        }
 
-      sub vcl_backend_response {
+        sub vcl_backend_response {
         # SEEALSO; sub vcl_recv
 
         if(beresp.status == 404) {
@@ -320,15 +327,16 @@
         }
 
         # These are specifically the media files!
-        if (bereq.http.X-Backend == "pictures" && 
-            (bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)" || bereq.url ~ "^/_app/")
+        if (bereq.http.X-Backend == "pictures" &&
+          (bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)" || bereq.url ~ "^/_app/")
         ) {
           # NOTE; The values below might seem backwards.
           # I want a low TTL for LRU cache eviction, while a high grace time keeps the assets available until the upstream server
           # comes back online.
           # There is no background refresh while TTL is still above 0!
-          # 
+          #
           set beresp.ttl = 3d; # serving from cache
+          # set beresp.ttl = 1m; # DEBUG DEBUG DEBUG
           set beresp.grace = 2w; # serving stale data from cache with background refresh at next client request
 
           # Force enable caching because immich returns HTTP "cache-control: private"
@@ -337,7 +345,7 @@
         }
 
         # builtin.vcl handles HTTP content-range normalization
-        # 
+        #
         # The next parts are about intelligent hit-for-miss.
         # REF; https://varnish-cache.org/docs/trunk/users-guide/increasing-your-hitrate.html#hit-for-miss
         # builtin.vcl handles HTTP cache control
@@ -352,19 +360,17 @@
       # validation response + restarting the original request..
       # It's some state-machine trickery because there is no sub-request system?
       sub vcl_deliver {
-        # Add client-side debugging values
-        set resp.http.X-Cache = "MISS";
-        set resp.http.X-Varnish-Grace = req.http.grace;
-
-        if (obj.hits > 0) {
-          # Returned object came from cache
-          set resp.http.X-Cache = "HIT";
-        }
+        if (obj.uncacheable) {
+			set resp.http.x-cache = req.http.x-cache + " uncacheable";
+		} else {
+			set resp.http.x-cache = req.http.x-cache + " cached";
+		}
 
         # builtin.vcl does nothing..
       }
 
       sub vcl_synth {
+	  	set resp.http.x-cache = "synth synth";
         # Up to Varnish current (v7.7) only action 'deliver' adds a http-header 'via'.
         # Since Varnish v7.2 there is a via header added/appended to the request before vcl_recv, so we can reuse that header value
         # copied to the response.
