@@ -204,7 +204,9 @@ def deploy(
     """
 
     if not encrypted_file.is_file():
-        raise FileNotFoundError(f"No decrypter keys file found. Create a decrypter key for host {hostname} first!")
+        raise FileNotFoundError(
+            f"No decrypter keys file found. Create a decrypter key for host {hostname} first!"
+        )
 
     host_attr_path = (
         f"{FLAKE}#nixosConfigurations.{hostname}.config.system.build.toplevel"
@@ -383,7 +385,9 @@ def filesystem_rebuild(c: Any, flake_attr: str) -> None:
     )
 
     if not ssh_connection_string:
-        raise LookupError(f"No ssh moniker found for host attribute. Set `proesmans.facts.hostName` in nixos config")
+        raise LookupError(
+            "No ssh moniker found for host attribute. Set `proesmans.facts.hostName` in nixos config"
+        )
 
     if not ask_user_input(
         f"Update filesystems for {flake_attr} on {ssh_connection_string}?"
@@ -408,12 +412,16 @@ def dev_rebuild(c: Any, boot: bool = False) -> None:
     """
     this_hostname = platform.node()
     if this_hostname != "development":
-        raise RuntimeError(f"Hostname is '{this_hostname}', not 'development'. Refusing to clobber configuration")
-    
+        raise RuntimeError(
+            f"Hostname is '{this_hostname}', not 'development'. Refusing to clobber configuration"
+        )
+
     if boot:
         print("== WARNING ==")
-        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
-    
+        print(
+            "Boot flag used. You must reboot the host manually after nixos-rebuild is done!"
+        )
+
     subprocess.run(
         [
             "sudo",
@@ -424,11 +432,13 @@ def dev_rebuild(c: Any, boot: bool = False) -> None:
         ],
         check=True,
     )
-    
+
     if boot:
         print("== WARNING ==")
-        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
-    
+        print(
+            "Boot flag used. You must reboot the host manually after nixos-rebuild is done!"
+        )
+
     alert_finish()
 
 
@@ -501,7 +511,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False, boot: bool = False) -> N
 
     if boot:
         print("== WARNING ==")
-        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
+        print(
+            "Boot flag used. You must reboot the host manually after nixos-rebuild is done!"
+        )
 
     if not yes:
         print(f"== Checking if host {flake_attr} builds ==")
@@ -538,7 +550,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False, boot: bool = False) -> N
     )
 
     if not ssh_connection_string:
-        raise LookupError(f"No ssh moniker found for hostname. Set `proesmans.facts.hostName` in nixos config")
+        raise LookupError(
+            "No ssh moniker found for hostname. Set `proesmans.facts.hostName` in nixos config"
+        )
 
     if not yes:
         ask = input(
@@ -569,7 +583,9 @@ def rebuild(c: Any, flake_attr: str, yes: bool = False, boot: bool = False) -> N
 
     if boot:
         print("== WARNING ==")
-        print("Boot flag used. You must reboot the host manually after nixos-rebuild is done!")
+        print(
+            "Boot flag used. You must reboot the host manually after nixos-rebuild is done!"
+        )
 
     print("== Pinning host closure as garbage root (nix gcroot) ==")
     # The machine builds and is deployed succesfully, pinning should succeed IF we have the closure downloaded locally
@@ -623,8 +639,13 @@ def secret_edit(
         Create a nixos configuration at path `{host_configuration_dir.as_posix()}` first!
     """
 
-    if not (encrypted_file.name.endswith("encrypted.yaml") or encrypted_file.name.endswith("encrypted.json")):
-        raise ValueError(f"Filename must end with *.encrypted.yaml or *.encrypted.json: {encrypted_file.name}")
+    if not (
+        encrypted_file.name.endswith("encrypted.yaml")
+        or encrypted_file.name.endswith("encrypted.json")
+    ):
+        raise ValueError(
+            f"Filename must end with *.encrypted.yaml or *.encrypted.json: {encrypted_file.name}"
+        )
 
     environment = os.environ.copy()
     environment.pop("SOPS_AGE_KEY_FILE", None)
@@ -670,7 +691,9 @@ def ssh_key_create(
     """
 
     if not encrypted_file.name.endswith("encrypted.yaml"):
-        raise ValueError(f"Filename must end with *.encrypted.yaml: {encrypted_file.name}")
+        raise ValueError(
+            f"Filename must end with *.encrypted.yaml: {encrypted_file.name}"
+        )
 
     if not key:
         raise ValueError("Secret key name cannot be empty")

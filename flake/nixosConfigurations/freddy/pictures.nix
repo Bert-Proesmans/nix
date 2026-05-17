@@ -1,6 +1,5 @@
 {
   lib,
-  utils,
   pkgs,
   config,
   ...
@@ -14,8 +13,6 @@ let
   immichVPSOnlineStoragePath = "/var/lib/freddy-immich"; # Local cache
   immichRclonePath = "/mnt/remote/buddy-sftp/chroot/pictures"; # Read-write network mounted data
   buddyImmichExternalPath = "/mnt/remote/buddy-sftp/chroot/pictures-external";
-
-  ip-freddy = config.proesmans.facts.freddy.host.tailscale.address;
   fqdn-freddy = "freddy.omega.proesmans.eu";
 in
 {

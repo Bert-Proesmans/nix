@@ -77,8 +77,8 @@
   ];
 
   nixpkgs.overlays = [
-    (final: previous: {
-      quarto = previous.quarto.overrideAttrs (old: rec {
+    (_final: previous: {
+      quarto = previous.quarto.overrideAttrs (_old: rec {
         # Last version with dependency pandoc v3.7.0.2 (currently on nixos-unstable), cannot go newer without pandoc upgrade!
         #
         # Pandoc is not yet staged for upgrade to v3.8.3.. Follow pandoc-cli jobs on haskell-updates project
