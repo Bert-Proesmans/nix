@@ -157,7 +157,9 @@
         if (std.healthy(req.backend_hint)) {
           // Prevent thundering herd on new/stale requests by allowing request coalescing
           // REF; https://varnish-cache.org/docs/trunk/users-guide/increasing-your-hitrate.html#cache-misses
-          set req.grace = 30s;
+
+		  // DEBUG - Under analysis
+		  // set req.grace = 30s;
         }
 
         # Set headers for request-response debugging
@@ -310,7 +312,7 @@
         }
 
         # NOTE; Step optimized regex! DO NOT "IMPROVE"
-        if (bereq.http.Content-type ~ "^(((image|video|font)/.+)|application/javascript|text/css).*$") {
+        if (beresp.http.Content-type ~ "^(((image|video|font)/.+)|application/javascript|text/css).*$") {
           # Force enable caching, do not follow server directives
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
@@ -336,7 +338,6 @@
           # There is no background refresh while TTL is still above 0!
           #
           set beresp.ttl = 3d; # serving from cache
-          # set beresp.ttl = 1m; # DEBUG DEBUG DEBUG
           set beresp.grace = 2w; # serving stale data from cache with background refresh at next client request
 
           # Force enable caching because immich returns HTTP "cache-control: private"
