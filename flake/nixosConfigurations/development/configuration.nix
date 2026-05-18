@@ -74,6 +74,7 @@
     pkgs.hydra-check
     pkgs.swaks # smtp client test-tool
     pkgs.quarto # Quarto pandoc wrapper
+    pkgs.nodejs # Required for python language server (vscode)
   ];
 
   nixpkgs.overlays = [
