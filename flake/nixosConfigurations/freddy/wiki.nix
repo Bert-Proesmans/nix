@@ -62,7 +62,7 @@ in
 
       APP_VIEWS_BOOKS = "list"; # Hide book images from public books overview
       ALLOW_UNTRUSTED_SERVER_FETCHING = false; # Disables wkhtmltopdf
-      REVISION_LIMIT = false; # Disable auto-removal of page revisions (100 by default)
+      REVISION_LIMIT = "false"; # Disable auto-removal of page revisions (100 by default)
       RECYCLE_BIN_LIFETIME = -1; # Disable auto-removal of recycle bin content
       APP_PROXIES = lib.concatStringsSep "," [
         "127.0.0.1"
