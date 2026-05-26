@@ -97,6 +97,7 @@
           matchConfig.MACAddress = managementMac;
           linkConfig.Alias = "Internet uplink";
           linkConfig.AlternativeName = "main";
+          linkConfig.WakeOnLan = "magic";
         };
       };
 
