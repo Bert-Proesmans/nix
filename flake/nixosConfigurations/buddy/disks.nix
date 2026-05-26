@@ -88,8 +88,6 @@
       # NOTE; SmartD only accepts short-form options, and these options _DO NOT_ map cleanly to smartctl!
       # smartctl is exec'ed by smartd but not through command-line options.
       #
-      # Enables SMART on device.
-      "-s on" # smartctl --smart=on
       # Enables SMART Automatic Offline Testing when smartd starts up and has no further effect.
       "-o on" # smartctl --offlineauto=on
       # Enables Attribute Autosave when smartd starts up and has no further effect
