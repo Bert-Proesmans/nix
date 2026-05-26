@@ -53,6 +53,16 @@
       "resilio-sync"
     ];
 
+  systemd.timers.auto-shutdown = {
+    description = "Automatically shutdown to save energy.";
+    timerConfig = {
+      # Every weekday at 6 in the morning
+      OnCalendar = "Mon..Fri 06:00:00";
+      Persistent = false;
+      Unit = "shutdown.target";
+    };
+  };
+
   # Ignore below
   # Consistent defaults accross all machine configurations.
   system.stateVersion = "24.05";
