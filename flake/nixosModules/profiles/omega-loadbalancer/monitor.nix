@@ -12,6 +12,7 @@ in
   services.gatus.settings.announcements = [
     {
       timestamp = "2026-05-18T00:00:00Z";
+      archived = true;
       type = "outage";
       message = ''
         Scheduled maintenance on Freddy from 00:00 to 02:00 UTC.
@@ -20,6 +21,7 @@ in
     }
     {
       timestamp = "2026-03-12T12:00:00Z";
+      archived = true;
       type = "operational";
       message = ''
         The [Pictures service](https://pictures.proesmans.eu) high-availability work has concluded.
@@ -27,7 +29,6 @@ in
 
         Uptime metrics are improving over time.
       '';
-      archived = true;
     }
   ];
 
