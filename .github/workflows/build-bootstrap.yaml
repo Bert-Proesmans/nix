@@ -17,13 +17,13 @@ jobs:
       contents: write # FUCKING GITHUB PERMISSIONS DOCUMENTATION IS UNCLEAR
       deployments: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check Nix flake inputs against policy
         uses: DeterminateSystems/flake-checker-action@v5
         with:
           flake-lock-path: ./flake/flake.lock
       - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v9
+        uses: DeterminateSystems/nix-installer-action@v21
       - name: Build default package
         run: |
           nix build --log-format raw ./flake
