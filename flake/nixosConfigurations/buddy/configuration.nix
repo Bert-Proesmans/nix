@@ -42,8 +42,9 @@
       "kvm" # Interact with forwarded VSOCK files
     ];
     openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDOs8kDMMm/QFeELt79EG9akdfX7dlfRuTezwVEqbPsM bert@B-PC"
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHQ6i6epTE7G73/fZT1V5iBIEwBS/mpMoOfv3OOo+cMr azuread\\bertproesmans@epower-518172"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
     ];
   };
 

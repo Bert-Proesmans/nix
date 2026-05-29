@@ -60,6 +60,7 @@ in
           #
           # NOTE; systemctl default == systemctl isolate default.target
           # NOTE; the unit systemd-ask-password-console.service is responsible for launching the password agent on tty's
+          "command=\"systemctl default\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDOs8kDMMm/QFeELt79EG9akdfX7dlfRuTezwVEqbPsM bert@B-PC"
           "command=\"systemctl default\" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILEeQ/KEIWbUKBc4bhZBUHsBB0yJVZmBuln8oSVrtcA5 bert@B-PC"
         ];
       };
