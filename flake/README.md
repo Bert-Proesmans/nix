@@ -2,15 +2,6 @@
 
 (from the ground up)
 
-## Bootstrap VM
-
-1. Download latest bootstrap image from Github releases: [https://github.com/Bert-Proesmans/nix/releases/tag/latest](https://github.com/Bert-Proesmans/nix/releases/tag/latest)
-2. Boot bare-metal or virtual machine from the ISO
-3. Git clone this repository: [https://github.com/Bert-Proesmans/nix](https://github.com/Bert-Proesmans/nix)
-4. Change directory into the cloned repository
-5. Open development environment: `nix develop`
-6. Install/deploy the development machine or any other: `invoke deploy development root@localhost` 
-
 ## Nix from scratch
 
 1. Download bootstrap image from official distribution: [https://nixos.org/download/#nixos-iso](https://nixos.org/download/#nixos-iso)
