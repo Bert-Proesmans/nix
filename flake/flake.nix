@@ -6,7 +6,7 @@
 
   inputs = {
     nixpkgs.follows = "nixpkgs-unstable";
-    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs-stable.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     # WARN; Seems like everybody is using flake-utils, but this dependency does not bring anything
