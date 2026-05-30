@@ -25,12 +25,6 @@
         ];
 
         config = {
-          _module.args.flake.outputs = {
-            # NOTE; Packages are not made available because they need to be re-evaluated within the package scope of the target host
-            # anyway. Their evaluation could change depending on introduced overlays!
-            inherit (flake.outputs) overlays homeModules;
-          };
-
           networking.hostName = lib.mkForce "installer";
           networking.domain = lib.mkForce "internal.proesmans.eu";
 
