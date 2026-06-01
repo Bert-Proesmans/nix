@@ -56,6 +56,7 @@
 
   systemd.timers.auto-shutdown = {
     description = "Automatically shutdown to save energy.";
+    wantedBy = [ "timers.target" ];
     timerConfig = {
       # Every weekday at 6 in the morning
       OnCalendar = "Mon..Fri 06:00:00";
