@@ -130,12 +130,15 @@ in
         cqMode = "auto"; # Attempt to "intelligently" apply constant quality mode factor
         targetAudioCodec = "aac"; # optimized for device compatibility
         targetResolution = "720"; # 720p, optimized for filesize
-        targetVideoCodec = "hevc"; # optimized for device compatibility and size
-        crf = 28; # Fidelity/Time factor, chosen for hevc, optimized for speed
-        maxBitrate = "2800"; # kb/s absolute maximum for 720p (range 2000-4000)
-        twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)
+        targetVideoCodec = "vp9"; # optimized for device compatibility and size
 
-        transcode = "optimal"; # Transcode if above target resolution or non-accepted codec/container
+        transcode = "bitrate"; # Transcode if above target bitrate or non-accepted codec/container
+        # NOTE; Heavily optimized against low-bandwith upload throughput from source server!
+        maxBitrate = "2000"; # kb/s absolute maximum for 720p (range 2000-4000)
+        crf = 31; # Fidelity/Time factor, chosen for VP9, optimized for speed
+        twoPass = true; # Transcode second pass optimized towards max bitrate (crf unused for hevc)
+        preset = "fast"; # fast to veryslow for VP9
+
         acceptedAudioCodecs = [
           "aac"
           "libopus"
@@ -143,27 +146,37 @@ in
         acceptedVideoCodecs = [
           "h264"
           "hevc"
-          #"vp9" # Too new, optimized for device support
-          #"av1" # Too new, optimized for device support
+          "vp9"
+          "av1"
         ];
         acceptedContainers = [
+          # NOTE; Standardise on mp4 with webm as future pick
           "mp4"
-          "mov"
+          #"mov"
           #"ogg" # Apple support too recent, optimized for device support
-          #"webm" # Too new (related to vp8/vp9/av1), optimized for device support
+          "webm" # Optimized for device support
         ];
       };
       image = {
         # Thumbnail/re-encoding settings
+        thumbnail.format = "webp"; # optimized for size
+        thumbnail.size = 250;
+        preview.format = "webp"; # optimized for size
         preview.size = 1080;
-        # NOTE; Progressive setting only works on JPEG types (preview images are JPEG by default)
+        # optimized version while zooming (non-web-friendly formats only, not sure which ones?)
+        fullsize.enabled = true;
+        fullsize.format = "webp"; # optimized for size
+
+        # NOTE; Progressive setting only works on JPEG types (kept in here for funsies)
         preview.progressive = true;
         thumbnail.progressive = true;
+        fullsize.progressive = true;
       };
       library.scan.cronExpression = "0 2 * * 1"; # Monday 02:00 (@configured timezone)
       library.scan.enabled = true;
       logging.enabled = true;
       logging.level = "log";
+      # logging.level = "debug";
       machineLearning.clip = {
         enabled = true;
         # Model optimized for good recall/time ratio in Dutch and English
