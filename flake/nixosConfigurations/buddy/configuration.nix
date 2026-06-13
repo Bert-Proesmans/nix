@@ -54,15 +54,14 @@
       "resilio-sync"
     ];
 
-  systemd.timers.auto-shutdown = {
+  systemd.services.auto-shutdown = {
     description = "Automatically shutdown to save energy.";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      # Every weekday at 6 in the morning
-      OnCalendar = "Mon..Fri 06:00:00";
-      Persistent = false;
-      Unit = "shutdown.target";
-    };
+    startAt = "Mon..Fri 06:00:00";
+    script = ''
+      # ERROR; Trying to be clever and manually calling the poweroff service/targets will not (always) cause the system to properly poweroff!
+      # REF; https://www.freedesktop.org/software/systemd/man/latest/systemd-halt.service.html
+      systemctl poweroff
+    '';
   };
 
   # Ignore below
