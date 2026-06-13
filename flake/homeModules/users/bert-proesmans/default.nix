@@ -222,7 +222,13 @@
       indent_size = 2;
     };
     "*.nix" = {
-      indent_size = 4;
+      # WARN; Nixfmt _does not_ incorporate editorconfig settings!
+      # REF; https://github.com/NixOS/nixfmt/blob/master/standard.md#editor-config
+      end_of_line = "lf";
+      insert_final_newline = true;
+      trim_trailing_whitespace = true;
+      charset = "utf-8";
+      indent_style = "space";
     };
   };
 
