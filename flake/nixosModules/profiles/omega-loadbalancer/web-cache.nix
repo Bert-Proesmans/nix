@@ -66,7 +66,7 @@
       sub vcl_recv {
         # Remove the proxy header (see https://httpoxy.org/#mitigate-varnish)
         unset req.http.proxy;
-		unset req.http.x-cache;
+        unset req.http.x-cache;
 
         if (req.http.X-Forwarded-Host ~ "^\s*$") {
           return (synth(404));
@@ -158,8 +158,8 @@
           // Prevent thundering herd on new/stale requests by allowing request coalescing
           // REF; https://varnish-cache.org/docs/trunk/users-guide/increasing-your-hitrate.html#cache-misses
 
-		  // DEBUG - Under analysis
-		  // set req.grace = 30s;
+          // DEBUG - Under analysis
+          // set req.grace = 30s;
         }
 
         # Set headers for request-response debugging
@@ -175,12 +175,12 @@
       }
 
       sub vcl_pipe {
-	  	set req.http.x-cache = "pipe uncacheable";
+        set req.http.x-cache = "pipe uncacheable";
         # Do as builtin
       }
 
       sub vcl_pass {
-	  	set req.http.x-cache = "pass";
+        set req.http.x-cache = "pass";
         # builtin.vcl does nothing..
       }
 
@@ -216,10 +216,10 @@
 
         # obj.ttl + obj.grace is _always_ > 0s here
 
-		set req.http.x-cache = "hit";
-		if (obj.ttl <= 0s && obj.grace > 0s) {
-			set req.http.x-cache = "hit graced";
-		}
+        set req.http.x-cache = "hit";
+        if (obj.ttl <= 0s && obj.grace > 0s) {
+          set req.http.x-cache = "hit graced";
+        }
 
         # builtin.vcl proceeds to deliver..
       }
@@ -244,9 +244,9 @@
         }
 
         # builtin.vcl proceeds to fetch..
-        }
+      }
 
-        sub vcl_backend_fetch {
+      sub vcl_backend_fetch {
         # Reinsertion of fixed up headers should happen here logically (right before actual fetch)
         #
         # REF; https://vinyl-cache.org/docs/7.7/reference/states.html
@@ -259,9 +259,9 @@
         }
 
         # builtin.vcl proceeds to fetch..
-        }
+      }
 
-        sub vcl_backend_response {
+      sub vcl_backend_response {
         # SEEALSO; sub vcl_recv
 
         if(beresp.status == 404) {
@@ -272,7 +272,7 @@
         }
 
         # NOTE; There are no defined status codes from 600 and beyond
-        if (beresp.status >= 500) {
+        if (beresp.status == 401 || beresp.status >= 500) {
           if (bereq.is_bgfetch) {
             # The client earlier received a cached object (grace), and that flow triggered this background update asynchronously.
             # If the response is 5xx we have to abandon, otherwise the previously cached object would be erased and
@@ -362,16 +362,16 @@
       # It's some state-machine trickery because there is no sub-request system?
       sub vcl_deliver {
         if (obj.uncacheable) {
-			set resp.http.x-cache = req.http.x-cache + " uncacheable";
-		} else {
-			set resp.http.x-cache = req.http.x-cache + " cached";
-		}
+          set resp.http.x-cache = req.http.x-cache + " uncacheable";
+        } else {
+          set resp.http.x-cache = req.http.x-cache + " cached";
+        }
 
         # builtin.vcl does nothing..
       }
 
       sub vcl_synth {
-	  	set resp.http.x-cache = "synth synth";
+        set resp.http.x-cache = "synth synth";
         # Up to Varnish current (v7.7) only action 'deliver' adds a http-header 'via'.
         # Since Varnish v7.2 there is a via header added/appended to the request before vcl_recv, so we can reuse that header value
         # copied to the response.
