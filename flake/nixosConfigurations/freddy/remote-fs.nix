@@ -84,6 +84,8 @@ in
         # Code must run _before_ anything is mounted
         mountpoint --quiet "$mountpoint" && exit 1
 
+        # ERROR; Inconsistent state (mount confusion) can lead to the following command to fail.
+        # TODO; Only set attribute once per target location (init pattern)
         location="/mnt/remote/buddy-sftp/chroot/pictures"
         setfattr -n user.mergerfs.branch_mounts_here "$location"
       '';
@@ -138,7 +140,7 @@ in
         "--vfs-cache-max-size=10G"
         # NOTE; Since most useful operations are handled by the database, the cache shouldn't be large.
         # HINT; Account for processing time, don't expire entries that are (long time) queued for immich processing!
-        "--vfs-cache-max-age=1h" # Default
+        "--vfs-cache-max-age=1d" # Big media files take a loooong time to upload!
         # Check for stale objects every hour (default is every minute)
         # This interval is changed to print less VFS cache cleanup log messages
         "--vfs-cache-poll-interval=1h"
