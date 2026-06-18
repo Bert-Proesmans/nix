@@ -5,19 +5,20 @@
   #   - "files" answers using data from the hosts file
   #   - "myhostname" answers using systemd (hostnamectl, but also /etc/hostname etc)
   #   - "dns" answers using queries over DNS. the /etc/resolv.conf file defines how DNS queries are created
-  system.nssDatabases.hosts = lib.mkForce [
-    "files"
-    "myhostname"
-    "dns"
-  ];
+  # system.nssDatabases.hosts = lib.mkForce [
+  #   "files"
+  #   "myhostname"
+  #   "dns"
+  # ];
 
   # Setup working local DNS resolve
-  networking.resolvconf.enable = true;
-  networking.resolvconf.extraConfig = ''
-    name_servers='127.0.0.53'
-  '';
+  # networking.resolvconf.enable = true;
+  # networking.resolvconf.extraConfig = ''
+  #   name_servers='127.0.0.53'
+  # '';
   # Disable resolved (systemd) to free up the DNS port(53) on loopback.
-  services.resolved.enable = false;
+  # services.resolved.enable = false;
+  services.resolved.enable = true; # DEBUG
 
   # Servicing structure
   # [INGRESS] -> Divert local or not -> ++local / **remote
@@ -29,7 +30,8 @@
     # WARN; The service will throw warnings about blocklists not being cached. These warnings will suspiciously look
     # like errors. It just means that routedns will download the requested files.
     # NOTE; The configuration is setup to fail the service if the blocklists cannot be downloaded!
-    enable = true;
+    # enable = true;
+    enable = false; # DEBUG
 
     # SOURCE; https://github.com/folbricht/routedns/blob/70bdfc29d9288eac1bf34d3b3b9ace37fcd1a393/cmd/routedns/example-config/use-case-6.toml
     # RouteDNS config with caching and multiple blocklists that are loaded and refreshed from remote
