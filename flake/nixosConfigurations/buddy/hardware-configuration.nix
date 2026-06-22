@@ -86,6 +86,9 @@
   ];
 
   networking = { inherit (config.proesmans.facts.self) hostId; };
+  networking.firewall.allowedUDPPorts = [
+    5353 # mDNS
+  ];
 
   systemd.network =
     let
@@ -95,9 +98,11 @@
       links = {
         "10-upstream" = {
           matchConfig.MACAddress = managementMac;
-          linkConfig.Alias = "Internet uplink";
-          linkConfig.AlternativeName = "main";
-          linkConfig.WakeOnLan = "magic";
+          linkConfig = {
+            Alias = "Internet uplink";
+            AlternativeName = "main";
+            WakeOnLan = "magic";
+          };
         };
       };
 
@@ -106,8 +111,9 @@
           matchConfig.MACAddress = managementMac;
           networkConfig = {
             DHCP = "ipv4";
-            IPv6AcceptRA = false;
-            LinkLocalAddressing = "no";
+            IPv6AcceptRA = true;
+            MulticastDNS = "yes";
+            LLMNR = "no";
           };
         };
       };
