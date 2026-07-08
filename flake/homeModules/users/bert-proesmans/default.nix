@@ -69,7 +69,7 @@
 
   programs.ssh.enable = true;
   programs.ssh.enableDefaultConfig = false;
-  programs.ssh.matchBlocks =
+  programs.ssh.settings =
     let
       inherit (nixosConfig.networking) hostName;
       other-facts = lib.filterAttrs (k: _v: k != "self" && k != hostName) nixosConfig.proesmans.facts;
