@@ -99,6 +99,7 @@
   programs.eza.enable = true;
   programs.eza.git = true;
   programs.fzf.enable = true;
+  programs.fzf.historyWidget.command = "";
   programs.fd.enable = true;
   programs.fd.ignores = [
     ".git/"
