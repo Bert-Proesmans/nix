@@ -248,6 +248,8 @@ in
     {
       description = "Immich external library";
       conflicts = [ "umount.target" ];
+      # Attempt restart after offlined
+      wantedBy = [ config.systemd.targets."buddy-online".name ];
       # TODO; Verify if dependency on rclone's unit is enough to properly handle online/offline switching, and not hang the system.
       requisite = [ config.systemd.services."rclone-ftp@buddy".name ];
       partOf = [ config.systemd.services."rclone-ftp@buddy".name ];
