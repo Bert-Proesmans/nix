@@ -1,186 +1,72 @@
-{
-  lib,
-  pkgs,
-  ...
-}:
-{
-  services.caddy = {
+{ ... }: {
+  services.displayManager.sddm = {
     enable = true;
-    enableReload = false;
-    # ERROR; Port is not automatically cast to string-type inside configuration.
-    # REF; https://github.com/NixOS/nixpkgs/pull/507283
-    # httpPort = 8080;
-    # httpsPort = 8443;
-    globalConfig = ''
-      # https://github.com/NixOS/nixpkgs/issues/389016
-      admin off
 
-      # REF; https://github.com/NixOS/nixpkgs/pull/507283
-      http_port 8080
-      # REF; https://github.com/NixOS/nixpkgs/pull/507283
-      https_port 8443
-    '';
-    logFormat = ''
-      level DEBUG
-    '';
-    virtualHosts."whoami" = {
-      hostName = "me.caddy.localhost";
-      extraConfig = ''
-        # ERROR; whoami binds to IPv4, no ipv6 binding
-        reverse_proxy 127.0.0.1:8008
+    wayland = {
+      enable = true;
 
-        forward_auth http://[::1]:4456 {
-          # NOTE; Caddy automatically sets the following headers on proxy;
-          #   - X-Forwarded-Method
-          #   - X-Forwarded-Proto
-          #   - X-Forwarded-Host
-          #   - X-Forwarded-Uri
-          #
-          # The headers above must be trusted by downstream services (eg Heimdall)!
-
-          # No communication through uri customization
-          # SEEALSO; automatically set headers, NOTE above
-          uri          /
-
-          # Pass header Authorization from Heimdall back to _the client_
-          # SEEALSO; Heimdall contextualizers and finalizers  
-          copy_headers Authorization 
-        }
-      '';
+      # default compositor is "weston", you can optionally change it to kwin
+      #compositor = "kwin";
     };
   };
 
-  services.whoami = {
+  programs.hyprland = {
     enable = true;
-    port = 8008;
+    withUWSM = true; # recommended for most users
+    xwayland.enable = true; # Xwayland can be disabled.
   };
 
-  systemd.services.heimdall-proxy =
-    let
-      serve-port = 4456;
-      management-port = 4457;
-      settingsFormat = pkgs.formats.json { };
-      config-file = settingsFormat.generate "heimdall.config.json" ({
-        log.level = "debug";
-        tracing.enabled = false;
-        metrics.enabled = false;
+  users.users.bert-proesmans.password = "testing123";
 
-        serve = {
-          host = "[::1]";
-          port = serve-port;
-          trusted_proxies = [ "::1" ];
-        };
-        management = {
-          host = "[::1]";
-          port = management-port;
-        };
+  home-manager.users.bert-proesmans = { config, ... }: {
+    programs.kitty.enable = true; # required for the default Hyprland config
+    wayland.windowManager.hyprland = {
+      enable = true; # enable Hyprland
+      systemd.enable = false;
+      # set the Hyprland and XDPH packages to null to use the ones from the NixOS module
+      package = null;
+      portalPackage = null;
 
-        mechanisms = {
-          authenticators = [
-            {
-              id = "deny_all";
-              type = "unauthorized";
-            }
-            {
-              id = "anon";
-              type = "anonymous";
-            }
-          ];
-          finalizers = [
-            {
-              id = "noop";
-              type = "noop";
-            }
-          ];
-        };
+      configType = "lua";
+      settings = {
+        mod._var = "SUPER";
 
-        default_rule = {
-          execute = [
-            { authenticator = "deny_all"; }
-          ];
-        };
+        # decoration = {
+        #   shadow_offset = "0 5";
+        #   "col.shadow" = "rgba(00000099)";
+        # };
 
-        providers = {
-          file_system = {
-            src = rules-file;
-            watch = false;
-          };
-        };
-      });
+        # "$mod" = "SUPER";
 
-      rules-file = settingsFormat.generate "heimdall.rules.json" ({
-        version = "1alpha4"; # ??
-        rules = [
-          {
-            id = "demo:public";
-            match.methods = [ "GET" ];
-            match.routes = [
-              { path = "/public"; }
-            ];
-            execute = [
-              { authenticator = "anon"; }
-              { finalizer = "noop"; }
-            ];
-          }
-        ];
-      });
-    in
-    {
-      wantedBy = [ "multi-user.target" ];
+        # bind = [
+        #   # Execute Rofi with only the SUPER key
+        #   # "$mod, Super_L, exec, pkill rofi || rofi -show drun"
 
-      wants = [ "network-online.target" ];
-      after = [ "network-online.target" ];
+        #   "$mod, F, exec, firefox"
 
-      serviceConfig = {
-        User = "heimdall";
-        Group = "heimdall";
-        DynamicUser = true;
-        ExecStart = lib.escapeShellArgs ([
-          (lib.getExe pkgs.heimdall-proxy)
-          "serve"
-          "decision"
-          "--config"
-          config-file
-          "--insecure"
-        ]);
+        #   # "CONTROL ALT, T, exec, wezterm"
+        # ];
 
-        # Hardening
-        AmbientCapabilities = "";
-        CapabilityBoundingSet = [ "" ];
-        DevicePolicy = "closed";
-        LockPersonality = true;
-        MemoryDenyWriteExecute = true;
-        NoNewPrivileges = true;
-        PrivateDevices = true;
-        PrivateTmp = true;
-        PrivateUsers = true;
-        ProcSubset = "pid";
-        ProtectClock = true;
-        ProtectControlGroups = true;
-        ProtectHome = true;
-        ProtectHostname = true;
-        ProtectKernelLogs = true;
-        ProtectKernelModules = true;
-        ProtectKernelTunables = true;
-        ProtectProc = "invisible";
-        ProtectSystem = "strict";
-        RemoveIPC = true;
-        RestrictAddressFamilies = [ "AF_INET AF_INET6" ];
-        RestrictNamespaces = true;
-        RestrictRealtime = true;
-        RestrictSUIDSGID = true;
-        SocketBindAllow = [
-          "tcp:${toString serve-port}"
-          "tcp:${toString management-port}"
-        ];
-        SocketBindDeny = "any";
-        SystemCallArchitectures = "native";
-        SystemCallFilter = [
-          "@system-service"
-          "~@privileged"
-          "~@resources"
-        ];
-        UMask = "0077";
+        # # Startup Apps
+        # exec-once = [
+        #   "hyprpanel"
+        # ];
+
+        # bindm = [
+        #   # mouse movements
+        #   "$mod, mouse:272, movewindow"
+        #   "$mod, mouse:273, resizewindow"
+        #   "$mod ALT, mouse:272, resizewindow"
+        # ];
       };
     };
+
+    # Optional, hint Electron apps to use Wayland:
+    # home.sessionVariables.NIXOS_OZONE_WL = "1";
+
+    programs.firefox = {
+      enable = true;
+      configPath = "${config.xdg.configHome}/mozilla/firefox";
+    };
+  };
 }
