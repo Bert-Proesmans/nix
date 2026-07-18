@@ -13,6 +13,8 @@
     # functional without footguns or anything we can't do ourselves.
     # It's imported to simplify/merge the input chain, but unused in this flake.
     flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    flake-parts.inputs.nixpkgs.follows = "nixpkgs";
 
     treefmt-nix.url = "github:numtide/treefmt-nix";
     treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
@@ -25,8 +27,7 @@
     # If nixpkgs happens to be stable by default, then also version the home-manager release!
     home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable"; # == "nixpkgs"
     vscode-server.url = "github:nix-community/nixos-vscode-server";
-    vscode-server.inputs.nixpkgs.follows = "nixpkgs";
-    vscode-server.inputs.flake-utils.follows = "flake-utils";
+    vscode-server.inputs.flake-parts.follows = "flake-parts";
     microvm.url = "github:astro/microvm.nix";
     microvm.inputs.nixpkgs.follows = "nixpkgs";
     dns.url = "github:nix-community/dns.nix";
