@@ -141,7 +141,7 @@ in
 
         acceptedAudioCodecs = [
           "aac"
-          "libopus"
+          "opus"
         ];
         acceptedVideoCodecs = [
           "h264"
