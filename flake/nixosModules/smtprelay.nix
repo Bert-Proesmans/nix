@@ -51,7 +51,7 @@ in
             description = ''
               Server certificate (chain) of the smtprelay listener for encrypted connections.
 
-              Use this option instead of `settings.local_cert` to prevent the mentioned file from 
+              Use this option instead of `settings.local_cert` to prevent the mentioned file from
               being copied into the world-readable nix-store!
             '';
           };
@@ -61,7 +61,7 @@ in
             description = ''
               Secret to encrypt connections on the listening side of smtprelay.
 
-              Use this option instead of `settings.local_key` to prevent the mentioned file from 
+              Use this option instead of `settings.local_key` to prevent the mentioned file from
               being copied into the world-readable nix-store!
             '';
           };
@@ -78,7 +78,7 @@ in
             description = ''
               Server certificate (chain) of the smtprelay listener for encrypted connections.
 
-              Use this option instead of `settings.remote_certificate` to prevent the mentioned file from 
+              Use this option instead of `settings.remote_certificate` to prevent the mentioned file from
               being copied into the world-readable nix-store!
             '';
           };
@@ -88,7 +88,7 @@ in
             description = ''
               Secret to encrypt connections on the listening side of smtprelay.
 
-              Use this option instead of `settings.remote_key` to prevent the mentioned file from 
+              Use this option instead of `settings.remote_key` to prevent the mentioned file from
               being copied into the world-readable nix-store!
             '';
           };
@@ -315,7 +315,7 @@ in
 
               Format:
                 protocol://[user[:password]@][netloc][:port][/remote_sender][?param1=value1&...]
-                
+
                 protocol: smtp (unencrypted), smtps (TLS), starttls (STARTTLS)
                 user: Username for authentication
                 password: Password for authentication
@@ -372,10 +372,10 @@ in
         '';
       in
       {
-      description = "SMTP relay/proxy server";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
-      wants = [ "network.target" ];
+        description = "SMTP relay/proxy server";
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+        wants = [ "network.target" ];
 
         # Create an augmented certificate bundle to allow server certificates rooted in Digicert G1 for TLS verification
         # This is a TEMPORARY workaround because Exchange Online is lagging with certificate chaining into the correct root!
@@ -390,80 +390,80 @@ in
           SSL_CERT_FILE = "/tmp/smtprelay-custom-bundle.crt";
         };
 
-      serviceConfig = {
-        Type = "simple";
-        ExecStart = [
-          (lib.concatStringsSep " " (
-            [
-              (lib.getExe cfg.package)
-              "-config ${smptprelay_ini}"
-            ]
-            ++ (lib.optionals (cfg.tls.listener != { }) [
-              "-local_cert ${cfg.tls.listener.certificate}"
-              "-local_key ${cfg.tls.listener.key}"
-            ])
-            ++ (lib.optionals (cfg.tls.relay != { }) [
-              "-remote_certificate ${cfg.tls.relay.certificate}"
-              "-remote_key ${cfg.tls.relay.key}"
-            ])
-            ++ (lib.optionals (cfg.allowed_users != { }) [ "-allowed_users ${allowed_users_conf}" ])
-            ++ (lib.optionals (cfg.aliases != { }) [ "-aliases_file ${alias_ini}" ])
-          ))
-        ];
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = [
+            (lib.concatStringsSep " " (
+              [
+                (lib.getExe cfg.package)
+                "-config ${smptprelay_ini}"
+              ]
+              ++ (lib.optionals (cfg.tls.listener != { }) [
+                "-local_cert ${cfg.tls.listener.certificate}"
+                "-local_key ${cfg.tls.listener.key}"
+              ])
+              ++ (lib.optionals (cfg.tls.relay != { }) [
+                "-remote_certificate ${cfg.tls.relay.certificate}"
+                "-remote_key ${cfg.tls.relay.key}"
+              ])
+              ++ (lib.optionals (cfg.allowed_users != { }) [ "-allowed_users ${allowed_users_conf}" ])
+              ++ (lib.optionals (cfg.aliases != { }) [ "-aliases_file ${alias_ini}" ])
+            ))
+          ];
 
-        User = cfg.user;
-        Group = cfg.group;
-        Restart = "always";
-        TimeoutSec = 30;
+          User = cfg.user;
+          Group = cfg.group;
+          Restart = "always";
+          TimeoutSec = 30;
 
-        # Bind standard privileged ports
-        AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-        CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
+          # Bind standard privileged ports
+          AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
+          CapabilityBoundingSet = [ "CAP_NET_BIND_SERVICE" ];
 
-        # Hardening
-        DeviceAllow = [ "" ];
-        LockPersonality = true;
-        MemoryDenyWriteExecute = true;
-        PrivateDevices = true;
-        PrivateUsers = false; # incompatible with CAP_NET_BIND_SERVICE
-        ProcSubset = "pid";
-        PrivateTmp = true;
-        ProtectClock = true;
-        ProtectControlGroups = true;
-        ProtectHome = true;
-        ProtectHostname = true;
-        ProtectKernelLogs = true;
-        ProtectKernelModules = true;
-        ProtectKernelTunables = true;
-        ProtectProc = "invisible";
-        ProtectSystem = "strict";
-        RestrictAddressFamilies = [
-          "AF_INET"
-          "AF_INET6"
-        ];
-        RestrictNamespaces = true;
-        RestrictRealtime = true;
-        RestrictSUIDSGID = true;
-        SystemCallArchitectures = "native";
-        SystemCallFilter = [
-          "@system-service"
-          "~@privileged"
-        ];
-        UMask = "0077";
-      };
-
-      unitConfig =
-        let
-          inherit (config.systemd.services.smtprelay.serviceConfig) TimeoutSec;
-          maxTries = 3;
-          bufferSec = 600; # 10mins
-        in
-        {
-          # The upper limit of required time to start(attempt) maxTries within the configured startup timeout.
-          # NOTE; Service retrycount resets after this amount of seconds.
-          StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
-          StartLimitBurst = maxTries;
+          # Hardening
+          DeviceAllow = [ "" ];
+          LockPersonality = true;
+          MemoryDenyWriteExecute = true;
+          PrivateDevices = true;
+          PrivateUsers = false; # incompatible with CAP_NET_BIND_SERVICE
+          ProcSubset = "pid";
+          PrivateTmp = true;
+          ProtectClock = true;
+          ProtectControlGroups = true;
+          ProtectHome = true;
+          ProtectHostname = true;
+          ProtectKernelLogs = true;
+          ProtectKernelModules = true;
+          ProtectKernelTunables = true;
+          ProtectProc = "invisible";
+          ProtectSystem = "strict";
+          RestrictAddressFamilies = [
+            "AF_INET"
+            "AF_INET6"
+          ];
+          RestrictNamespaces = true;
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          SystemCallArchitectures = "native";
+          SystemCallFilter = [
+            "@system-service"
+            "~@privileged"
+          ];
+          UMask = "0077";
         };
-    };
+
+        unitConfig =
+          let
+            inherit (config.systemd.services.smtprelay.serviceConfig) TimeoutSec;
+            maxTries = 3;
+            bufferSec = 600; # 10mins
+          in
+          {
+            # The upper limit of required time to start(attempt) maxTries within the configured startup timeout.
+            # NOTE; Service retrycount resets after this amount of seconds.
+            StartLimitIntervalSec = TimeoutSec * maxTries + bufferSec;
+            StartLimitBurst = maxTries;
+          };
+      };
   };
 }
