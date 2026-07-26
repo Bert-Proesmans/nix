@@ -74,6 +74,8 @@
     pkgs.hydra-check
     pkgs.swaks # smtp client test-tool
     pkgs.nodejs # Required for python language server (vscode)
+    pkgs.nushell
+    pkgs.bcc # execsnoop
   ];
 
   nixpkgs.config.allowUnfreePredicate =
