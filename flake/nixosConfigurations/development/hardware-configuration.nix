@@ -9,8 +9,9 @@
   # Enables (nested) virtualization through hardware acceleration.
   # There is no harm in having both modules loaded at the same time, also no real overhead.
   boot.kernelModules = [
-    "kvm-amd"
-    "kvm-intel"
+    # ERROR(2026-07-25); Nested virtualization broken due to kvm vs virtio issues. couldn't figure out why :/
+    # "kvm-amd"
+    # "kvm-intel"
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.editor = false;
