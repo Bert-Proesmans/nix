@@ -140,7 +140,7 @@ in
         "--vfs-cache-max-size=10G"
         # NOTE; Since most useful operations are handled by the database, the cache shouldn't be large.
         # HINT; Account for processing time, don't expire entries that are (long time) queued for immich processing!
-        "--vfs-cache-max-age=1d" # Big media files take a loooong time to upload!
+        "--vfs-cache-max-age=10d" # Big media files take a loooong time to upload!
         # Check for stale objects every hour (default is every minute)
         # This interval is changed to print less VFS cache cleanup log messages
         "--vfs-cache-poll-interval=1h"

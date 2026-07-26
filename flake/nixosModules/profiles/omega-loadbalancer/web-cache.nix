@@ -316,7 +316,7 @@
           # Force enable caching, do not follow server directives
           unset beresp.http.cache-control;
           unset beresp.http.Set-Cookie;
-          set beresp.ttl = 2d;
+          set beresp.ttl = 7d;
         }
 
         if (bereq.http.X-Backend == "pictures" && bereq.url ~ "^/api/assets/") {
@@ -332,13 +332,12 @@
         if (bereq.http.X-Backend == "pictures" &&
           (bereq.url ~ "^/api/assets/[^/]+/(thumbnail|original|video)" || bereq.url ~ "^/_app/")
         ) {
-          # NOTE; The values below might seem backwards.
-          # I want a low TTL for LRU cache eviction, while a high grace time keeps the assets available until the upstream server
-          # comes back online.
-          # There is no background refresh while TTL is still above 0!
+          # WARN; Low TTL and high grace is backwards. The varnish cache always polls the backend during grace!
+          # This doesn't effectively shed load from Immich, which tries to pull the asset again over sftp locking up kernel threads!
           #
-          set beresp.ttl = 3d; # serving from cache
-          set beresp.grace = 2w; # serving stale data from cache with background refresh at next client request
+          # Grace only works like TTL if the upstream is down. Immich is never down, the assets aren't always available.
+          set beresp.ttl = 4w; # serving from cache
+          set beresp.grace = 2w; # serving stale data from cache with inline/concurrent background refresh
 
           # Force enable caching because immich returns HTTP "cache-control: private"
           unset beresp.http.cache-control;
