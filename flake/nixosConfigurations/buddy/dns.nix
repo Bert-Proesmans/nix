@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ ... }:
 {
   # Resolve domain names using 1. hosts file, then 2. resolver (local routedns)
   # NOTE; These options all point to a pluggable Name Service Switch (NSS) compatible module.

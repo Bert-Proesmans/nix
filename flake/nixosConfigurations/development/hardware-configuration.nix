@@ -45,7 +45,7 @@
   # eth1 gets a stable link-local address for SSH, because Windows goes fucky wucky with
   # the host bridge network adapter and that's sad because IP's and routes won't stick
   # after a reboot.
-   systemd.network.networks = {
+  systemd.network.networks = {
     "eth0-management" = {
       matchConfig.Name = "eth0";
       DHCP = "yes";

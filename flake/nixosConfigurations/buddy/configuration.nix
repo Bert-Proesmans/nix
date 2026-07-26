@@ -72,7 +72,6 @@
           (
             {
               config,
-              pkgs,
               lib,
               modulesPath,
               ...
