@@ -22,6 +22,9 @@
     "192.168.88.11" = [ "buddy.internal.proesmans.eu" ];
   };
 
+  # REF; https://wiki.nixos.org/wiki/Signing_store_paths
+  nix.settings.secret-key-files = [ "/root/signing/nix-cache-priv-key" ];
+
   networking.domain = config.proesmans.facts.self.domainName;
   proesmans.filesystem.simple-disk.enable = false;
   proesmans.internationalisation.be-azerty.enable = true;
