@@ -11,9 +11,18 @@ in
 {
   services.gatus.settings.announcements = [
     {
+      timestamp = "2026-08-20T00:00:00Z";
+      archived = false;
+      type = "outage";
+      message = ''
+        Bitwarden client applications from version 2026.08.0 and newer currently fail to load the vault.
+        A server update will be rolled out during next week, in the meantime you can use [the webvault](https://passwords.proesmans.eu) to access your passwords.
+      '';
+    }
+    {
       timestamp = "2026-05-18T00:00:00Z";
       archived = true;
-      type = "outage";
+      type = "outage"; # outage, warning, information, operational, none
       message = ''
         Scheduled maintenance on Freddy from 00:00 to 02:00 UTC.
         This will have impact on the availability of most services!
