@@ -2,6 +2,7 @@
 {
   imports = [
     ./certificates.nix
+    ./journald.nix
     ./memory-handling.nix
     ./monitor.nix
     ./private-network.nix
