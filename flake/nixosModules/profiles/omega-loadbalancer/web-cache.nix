@@ -399,7 +399,7 @@
       #
       # NOTE; Limit is a bit higher than the default vsl space (80m) to allow for other memory segment types to be locked too.
       # REF; https://github.com/varnishcache/pkg-varnish-cache/blob/1f0d212dc45065f38bd80ac57fe22773a20a0595/systemd/varnish.service
-      LimitMEMLOCK = "100M";
+      LimitMEMLOCK = lib.mkForce "100M";
 
       # Restrict varnish from doing anything outside of muxing between unix sockets
       RestrictAddressFamilies = lib.mkForce [

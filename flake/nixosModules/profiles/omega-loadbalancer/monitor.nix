@@ -12,7 +12,7 @@ in
   services.gatus.settings.announcements = [
     {
       timestamp = "2026-08-20T00:00:00Z";
-      archived = false;
+      archived = true;
       type = "outage";
       message = ''
         Bitwarden client applications from version 2026.08.0 and newer currently fail to load the vault.
